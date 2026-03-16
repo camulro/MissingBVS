@@ -1,0 +1,26 @@
+Package: MissingBVS
+Type: Package
+Title: Variable Selection based on Bayes Factors with Missing Data
+Version: 0.1.0
+Authors@R: c(
+    person("Carolina", "Mulet", email = "carolina.mulet1@alu.uclm.es", role = c("aut", "cre")),
+    person("Gonzalo", "Garcia-Donato", email = "gonzalo.garciadonato@uclm.es", role = c("aut")),
+    person("María Eugenia", "Castellanos", email = "maria.castellanos@urjc.es", role = c("aut"))
+  )
+Description: Objective variable selection in the presence of missing data on 
+  the design matrix for linear and generalized linear models.
+Maintainer: Carolina Mulet <carolina.mulet1@alu.uclm.es>
+Author: Carolina Mulet [aut, cre],
+    Gonzalo Garcia-Donato [aut],
+    María Eugenia Castellanos [aut]
+Imports:
+  BayesVarSel,
+  BAS,
+  mice,
+  LaplacesDemon,
+  Matrix,
+  utils
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.3

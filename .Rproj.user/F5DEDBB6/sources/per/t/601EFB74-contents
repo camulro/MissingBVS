@@ -1,0 +1,34 @@
+#Código necesario para crear correctamente una librería en R
+setwd("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Package/MissingBVS")
+
+# install.packages(c("devtools", "usethis", "roxygen2"))
+install.packages(c("devtools", "roxygen2", "knitr"))
+#chekear que está Rtools instalado:
+library(devtools) #carga usethis
+has_devel() #Comprobar que Rtools está instalado, si no buscar en google, no es una libreria
+# Your system is ready to build packages! :D
+
+#una vez documentadas las funciones con el formato adecuado,
+#convertir esos xorygen comments creando un nuevo archivo.Rd:
+#No es necesario documentar todas las funciones, solo aquellas funciones que
+#queramos que estén disponibles y visibles para los usuarios
+devtools::document()
+
+devtools::load_all() # para cargar las funciones de la librería
+
+#para comprobar si el paquete contiene errores, es recomendable usar la función
+check()
+
+#crear soporte en C
+# usethis::use_rcpp()
+
+
+# para instalar mi librería desde local
+# install.packages("C:/Users/perezp/Desktop/a_GIT_2016/pkg4albacete", repos=NULL,type="source")
+# library(pkg4albacete)
+
+#comprobar si una función está registrada en un paquete:
+# getDLLRegisteredRoutines("BAS")
+
+build()
+

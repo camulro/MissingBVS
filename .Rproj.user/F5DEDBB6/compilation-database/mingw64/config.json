@@ -1,0 +1,20 @@
+{
+    "args": [
+        "-DEIGEN_DONT_VECTORIZE",
+        "-nostdinc",
+        "-Ic:/rbuild~1/4.4/x86_64~1.pos/bin/../lib/gcc/x86_64-w64-mingw32.static.posix/13.3.0/include/c++",
+        "-Ic:/rbuild~1/4.4/x86_64~1.pos/bin/../lib/gcc/x86_64-w64-mingw32.static.posix/13.3.0/include/c++/x86_64-w64-mingw32.static.posix",
+        "-Ic:/rbuild~1/4.4/x86_64~1.pos/bin/../lib/gcc/x86_64-w64-mingw32.static.posix/13.3.0/include/c++/backward",
+        "-Ic:/rbuild~1/4.4/x86_64~1.pos/bin/../lib/gcc/x86_64-w64-mingw32.static.posix/13.3.0/include",
+        "-Ic:/rbuild~1/4.4/x86_64~1.pos/bin/../lib/gcc/x86_64-w64-mingw32.static.posix/13.3.0/../../../../include",
+        "-Ic:/rbuild~1/4.4/x86_64~1.pos/bin/../lib/gcc/x86_64-w64-mingw32.static.posix/13.3.0/include-fixed",
+        "-include",
+        "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Package/MissingBVS/.Rproj.user/F5DEDBB6/compilation-database/mingw64/c-definitions.h"
+    ],
+    "pch": "",
+    "is_cpp": false,
+    "hash": "1770890315",
+    "compiler": "14560070257236426505",
+    "rversion": "4.4.0",
+    "dbversion": 4
+}

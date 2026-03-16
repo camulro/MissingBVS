@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<style>body{background-color:white;}</style>
+<link href="lib/htmltools-fill-0.5.8.1/fill.css" rel="stylesheet" />
+<script src="lib/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+<script src="lib/viz-1.8.2/viz.js"></script>
+<link href="lib/DiagrammeR-styles-0.2/styles.css" rel="stylesheet" />
+<script src="lib/grViz-binding-1.0.11/grViz.js"></script>
+
+</head>
+<body>
+<div id="htmlwidget_container">
+  <div class="grViz html-widget html-fill-item" id="htmlwidget-75bba9614f1f174bb4ce" style="width:960px;height:500px;"></div>
+</div>
+<script type="application/json" data-for="htmlwidget-75bba9614f1f174bb4ce">{"x":{"diagram":"\ndigraph model_space {\n\n  graph [layout = neato]\n\n  node [shape = circle, style = filled, fillcolor = \"#A6CEE3\"]\n\n  M0  [label=\"∅\"]\n  M1  [label=\"x1\"]\n  M2  [label=\"x2\"]\n  M3  [label=\"x3\"]\n  M12 [label=\"x1,x2\"]\n  M13 [label=\"x1,x3\"]\n  M23 [label=\"x2,x3\"]\n  M123[label=\"x1,x2,x3\"]\n\n  M0 -> M1\n  M0 -> M2\n  M0 -> M3\n\n  M1 -> M12\n  M1 -> M13\n\n  M2 -> M12\n  M2 -> M23\n\n  M3 -> M13\n  M3 -> M23\n\n  M12 -> M123\n  M13 -> M123\n  M23 -> M123\n}\n","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+<script type="application/htmlwidget-sizing" data-for="htmlwidget-75bba9614f1f174bb4ce">{"viewer":{"width":450,"height":350,"padding":15,"fill":true},"browser":{"width":960,"height":500,"padding":40,"fill":false}}</script>
+</body>
+</html>

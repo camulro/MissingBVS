@@ -1,0 +1,209 @@
+
+# Growth data with missings(Sala-i- data)
+
+install.packages("haven")
+library(haven)
+
+# setwd("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings")
+# data <- read_dta("Aplicación/Model_uncertainty_in_cross-country_growth_regressions_(replication_data)_resouces_1772648173.5351415/resources/millions.dta")
+#
+# # View(data)
+# # sum(is.na(data)) / prod(dim(data)) #prop of missings
+#
+# # gr56092 y x0 son exactamente la misma variable, la respuesta
+#
+# data <- data[,-63] #remove x0
+#
+# data$EcOrg <- factor(data$EcOrg)
+# data$SCOUT <- factor(data$SCOUT)
+# data$laam <- factor(data$laam)
+# data$safrica <- factor(data$safrica)
+# data$wardum <- factor(data$wardum)
+# data$BRIT <- factor(data$BRIT)
+# data$FRENCH <- factor(data$FRENCH)
+# data$SPAIN <- factor(data$SPAIN)
+# dataS97 <- data
+# save(dataS97, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/Sala-i-Martin97.Rdata")
+# str(data)
+# sum(is.na(data)) / prod(dim(data)) #prop of missings: 0.1560091
+
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/Sala-i-Martin97.Rdata")
+
+#changes in relationship due to data removal
+# boxplot(gr56092 ~ EcOrg, data)
+# boxplot(gr56092 ~ EcOrg, dataFLS)
+# boxplot(gr56092 ~ EcOrg, na.omit(data))
+
+#missingBVS
+setwd("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Package/MissingBVS")
+library(devtools)
+devtools::load_all()
+
+formula <- gr56092 ~ .
+null.model <- gr56092 ~ 1 + lifee060 + gdpsh60l
+
+#to study the imputation performed by mice
+imputation <- futuremice.imputation(data[,-56], formula, 50, 123)
+# plot(imputation)
+
+# Prueba con BayesVarSel:
+library(BayesVarSel)
+library(mice)
+imp <- mice(data, m=1, predictorMatrix = quickpred(data))
+data.imp <- complete(imp)
+# "Number of logged events: X". This means that during the imputation process,
+# certain variables or predictors were excluded or flagged due to issues such as
+# collinearity, constant values, or method-specific constraints.
+bvs <- GibbsBvs(gr56092 ~ ., data = data.imp, prior.betas = "FLS",
+                prior.models = "Constant", null.model = null.model, seed = 123)
+# save(bvs, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSBvs.Rdata")
+
+#prueba cogiendo menos variables
+mBvs <- missingBVS.lm(formula, null.model = gr56092 ~ 1, data = data[,c(1:9,56)], BF.approx.method = "gprior",
+                      prior.betas = "FLS", prior.models = "ScottBerger",
+                      imp.seed = 123)
+
+### with futuremice imputation:
+
+mBvs2 <- missingGibbsBVS.lm(formula, null.model, data, BF.approx.method = "gprior",
+                           prior.betas = "FLS", prior.models = "Constant",
+                           imp.seed = 123)
+# save(mBvs2, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSConst10000.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSConst10000.Rdata")
+
+#more iter
+mBvs3 <- missingGibbsBVS.lm(formula, null.model, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123, n.iter = 50000, n.burnin = 2500, n.thin = 1)
+# save(mBvs3, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSConst50000.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSConst50000.Rdata")
+
+mBvs4 <- missingGibbsBVS.lm(formula, null.model = gr56092 ~ 1, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123)
+# save(mBvs4, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons10000withoutfixed.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons10000withoutfixed.Rdata")
+
+mBvs5 <- missingGibbsBVS.lm(formula, null.model = gr56092 ~ 1, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123, n.iter = 50000, n.burnin = 2000, n.thin = 1)
+# save(mBvs5, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons50000withoutfixed.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons50000withoutfixed.Rdata")
+
+mBvs6 <- missingGibbsBVS.lm(formula, null.model = gr56092 ~ 1 + gdpsh60l, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123)
+# save(mBvs6, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons10000fixGDP.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons10000fixGDP.Rdata")
+
+mBvs7 <- missingGibbsBVS.lm(formula, null.model = gr56092 ~ 1 + gdpsh60l, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123, n.iter = 50000, n.burnin = 2000, n.thin = 1)
+# save(mBvs7, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons50000fixGDP.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons50000fixGDP.Rdata")
+
+# better version:
+mBvs8 <- missingGibbsBVS.lm(formula, null.model = gr56092 ~ 1, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123, n.iter = 100000, n.burnin = 5000, n.thin = 2)
+# save(mBvs8, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons100000withoutfixed.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons100000withoutfixed.Rdata")
+
+# EcOrg selected as numeric but imputed as factor:
+data$EcOrg <- as.integer(data$EcOrg)
+# imp <- mice.imputation(data[,-56], formula, 2, 123, imp.mice.method = "pmm")
+#mice imputa como integer
+mBvs9 <- missingGibbsBVS.lm(formula, null.model = gr56092 ~ 1, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123, n.iter = 100000, n.burnin = 5000, n.thin = 2)
+# save(mBvs9, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons100000withoutfixedEcOrgint.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons100000withoutfixedEcOrgint.Rdata")
+
+mBvs10 <- missingGibbsBVS.lm(formula, null.model = gr56092 ~ 1 + gdpsh60l, data, BF.approx.method = "gprior",
+                            prior.betas = "FLS", prior.models = "Constant",
+                            imp.seed = 123, n.iter = 100000, n.burnin = 5000, n.thin = 2)
+# save(mBvs10, file = "C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons100000fixgdpEcOrgint.Rdata")
+load("C:/Users/carol/OneDrive - Universidad de Castilla-La Mancha/Trabajo/Extra/Missings/Aplicación/FLSCons100000fixgdpEcOrgint.Rdata")
+
+
+
+
+
+BF.approx.method = "gprior"
+prior.betas ="gZellner"
+prior.models = "Constant"
+imp.mice.method = "pmm"
+n.imp = 1E3 #number of imputed data sets
+imp.seed = 123
+# null.model = y~1 + X3
+null.model = "M0"
+models <- list(M0 = gr56092 ~ 1, M1 = gr56092 ~ 1 +  gdpsh60l, M2 = gr56092 ~ 1 + lifee060 + gdpsh60l,
+               M3 = gr56092 ~ 1 + EcOrg, M4 = gr56092 ~ 1 +  gdpsh60l + EcOrg, M5 = gr56092 ~ 1 + lifee060 + gdpsh60l + EcOrg)
+pruebagprior <- missingBtest.lm(data, models, null.model, BF.approx.method = BF.approx.method,
+                                prior.betas = prior.betas, prior.models = prior.models,
+                                imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+
+
+#FLS data:
+# FLSnames <- c(
+#   "growth", "PrSc Enroll","LifeExp","GDPsh560",
+#   "Mining","EcOrg","YrsOpen",
+#   "EngFrac","OthFrac","RFEXDist","EquipInv","NEquipInv","stdBMP",
+#   "OutwarOr","BlMktPm","Area","LatAmerica","SubSahara","HighEnroll",
+#   "PublEdu","RevCoup","WarDummy","PolRights","CivlLib","AbsLat","Age",
+#   "BritCol","Buddha","Catholic","Confuncious","EthnoLFrac","FrenchCol",
+#   "Hindu","Jewish","Muslim","PrExports","Protestants","RuleLaw",
+#   "SpanishCol","Popg","WorkPop","LabForce"
+# )
+
+FLSnames <- c(
+  "gr56092", #response
+  "p60","lifee060","gdpsh60l", #fixed covariates
+  "Mining","EcOrg","YrsOpen","EngFrac","OthFrac","RERD","EQINV","NONEQINV",
+  "BMS6087","SCOUT","bmp1","area","laam","safrica","h60",
+  "geerec1","revcoup","wardum","prightsb","civlibb","ABSLATIT","AGE",
+  "BRIT","BUDDHA","CATH","CONFUC","FRAC","FRENCH",
+  "HINDU","JEW","MUSLIM","PRIEXP70","PROT","RULELAW",
+  "SPAIN","dpop6090","work60l","lforce60"
+)
+
+widths <- rep(14, 7)
+data_raw <- read.fwf("Aplicación/Model_uncertainty_in_cross-country_growth_regressions_(replication_data)_resouces_1772648173.5351415/resources/growth2.dat", widths = widths) # lee 7 columnas por línea
+
+mat <- as.matrix(data_raw)
+n <- nrow(mat)/6
+dataFLS <- matrix(NA, nrow = n, ncol = 42)
+for(i in 1:n){
+  block <- mat[((i-1)*6 + 1):(i*6), ]
+  dataFLS[i, ] <- as.vector(t(block))
+}
+dataFLS <- as.data.frame(dataFLS)
+
+# View(dataFLS)
+colnames(dataFLS) <- FLSnames
+
+# # get dataFLS from the original dataset
+# table1vars <- c(
+#   "gr56092", #response
+#   "gdpsh60l", "lifee060", "p60", # always included
+#   "EQINV", "YrsOpen", "CONFUC", "RULELAW", "MUSLIM", "prightsb", "laam",
+#   "safrica", "civlibb", "revcoup", "Mining", "bmp1",
+#   "PRIEXP70", "EcOrg", #gvxdxe52?
+#   "wardum", "NONEQINV", "ABSLATIT", "RERD", "PROT", "BUDDHA", "CATH", "SPAIN"
+# )
+#
+# dataprueba <- data[,table1vars]
+# dataprueba <- model.frame(dataprueba)
+# notNAObs <- rownames(dataprueba)
+#
+# aux <- data[notNAObs,]
+# O <- 1*(!is.na(aux))
+# #zeros where missing observations on the data without missings on the response
+# notNAvars <- names(which(colSums(O) == dim(aux)[1])) #columns with missings
+# # notNAvars
+# finaldata <- data.frame(aux[,notNAvars])
+
+
+
+

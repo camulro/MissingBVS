@@ -1,0 +1,728 @@
+library(devtools)
+devtools::load_all()
+
+#Linear regression
+
+#Bvs
+# simulated data
+library(mvtnorm)
+set.seed(123)
+p <- 10 # numer of predictors
+n <- 50 # number of observations
+q <- 4 # number of true covariates (q<p)
+
+rho <- 0.5 # correlation between predictors
+sigma.rho <- matrix(rho, nr = p, nc = p) # cov matrix to generate data
+diag(sigma.rho) <- 1
+
+X <- rmvnorm(n, mean = rep(0, p), sigma = sigma.rho)
+colnames(X) <- paste0("X", 1:p)
+
+# response
+beta <- c(rep(1,q), rep(0,p-q)) # true betas
+y <- X %*% beta + rnorm(n) # linear regression
+data.full <- data.frame(y = y, X) #without missings
+
+formula <- y ~ .
+null.model <- y ~ 1
+
+# missings with ampute function from mice package
+X.miss <- mice::ampute(X, prop = 0.2, # proportion of missingness
+                       mech = "MAR" # missingness mechanism
+                      )$amp
+data <- data.frame(y = y, X.miss)
+
+##Garcia-Donato's 2025 method:
+# BFapprox = FALSE
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+n.keep = 2^p
+imp.seed = 123
+n.imp = 1E3
+
+prueba <- missingGD25(formula, data, prior.models = prior.models, n.keep = n.keep,
+                      imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+prueba$time # Time difference of 1.318097 mins
+
+##mice and BIC method:
+BF.approx.method = "BIC"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+n.keep = 2^p
+imp.seed = 123
+n.imp = 1E3
+# null.model <- y ~ X1 + X4 #fijar variables
+
+pruebabic <- missingBVS.lm(formula, null.model, data, BF.approx.method = BF.approx.method, prior.models = prior.models, n.keep = n.keep,
+                        imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+pruebabic$time # Time difference of 1.271269 mins
+
+##mice and BayesVarSel method:
+BF.approx.method = "gprior"
+# prior.betas = "gZellner"
+prior.betas = "FLS"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+n.keep = 2^p
+imp.seed = 123
+n.imp = 1E3
+
+pruebagprior <- missingBVS.lm(formula, null.model, data, BF.approx.method = BF.approx.method, prior.betas = prior.betas,
+                              prior.models = prior.models, n.keep = n.keep,
+                              imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+pruebagprior$time # Time difference of 1.323282 mins
+
+##mice and TBF method:
+BF.approx.method = "TBF"
+prior.betas = "gZellner" #only g = n right now
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+n.keep = 2^p
+imp.seed = 123
+n.imp = 1E3
+
+pruebaTBF <- missingBVS.lm(formula, null.model, data, BF.approx.method = BF.approx.method, prior.betas = prior.betas,
+                              prior.models = prior.models, n.keep = n.keep,
+                              imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+pruebaTBF$time # Time difference of 1.32618 mins
+
+library(BayesVarSel)
+vs.all <- Bvs(formula = formula, data = data.full, prior.betas = "gZellner", n.keep = 2^p)
+# vs.all$inclprob # oracle probs
+vs.rem <- Bvs(formula = formula, data = na.omit(data), prior.betas = "gZellner", n.keep = 2^p)
+# vs.rem$inclprob # probs removing missings
+
+resumen <- cbind(prueba$inclprob, #paper
+                 pruebabic$inclprob, #approx BIC
+                 pruebagprior$inclprob, # approx BayesVarSel
+                 pruebaTBF$inclprob, # approx TBF
+                 vs.rem$inclprob,
+                 vs.all$inclprob)
+colnames(resumen)<- c("Imput paper", "Imput BIC", "Imput gprior", "Imput TBF", "removing", "Oracle")
+round(resumen, 2)
+
+# comparar con OLD (código ME)
+source("./demo/gBFmissing-functions-2.R")
+
+#to compare, this does not add the intercept to the imputed datasets, to use in Btest
+mice.imputation2 <- function(X, nMC = 1E4, seed, imp.mice.method = "pmm") {
+  #X is nxp with missing values coded as NA
+  #nMC is the number of samples
+
+  imput <- mice::mice(X,
+                      meth = imp.mice.method,
+                      m = nMC,
+                      printFlag = FALSE,
+                      seed = seed)
+
+  imps <- mice::complete(imput, action = "all") #extracts all at once
+
+  n <- nrow(X)
+  p <- ncol(X)
+
+  imputation.list <- list()
+  for (s in seq_len(nMC)) {
+    Xs <- as.matrix(imps[[s]])
+    mu <- colMeans(Xs)
+    imputation.list[[s]] <- Xs - matrix(mu, n, p, byrow = TRUE) # to center
+  }
+
+  return(imputation.list) #a list with the matrices centered imputed
+}
+
+time <- Sys.time()
+simul <- mice.imputation2(X=X.miss, nMC=n.imp, seed = imp.seed, imp.mice.method = imp.mice.method)
+modelsprob <- Bvs.missing.BayesVar.mice(Y=y, X=X.miss, imputation.list=simul, prior.betas = "gZellner")
+colSums(modelsprob[,1:p]*modelsprob[,p+1]) # post incl prob
+time <- Sys.time() - time
+time #Time difference of 27.03318 mins
+
+
+library(devtools)
+devtools::load_all()
+
+#Gibbs version
+# simulated data
+library(mvtnorm)
+set.seed(123)
+p <- 10 # numer of predictors
+n <- 50 # number of observations
+q <- 4 # number of true covariates (q<p)
+
+rho <- 0.5 # correlation between predictors
+sigma.rho <- matrix(rho, nr = p, nc = p) # cov matrix to generate data
+diag(sigma.rho) <- 1
+
+X <- rmvnorm(n, mean = rep(0, p), sigma = sigma.rho)
+colnames(X) <- paste0("X", 1:p)
+
+# response
+beta <- c(rep(1,q), rep(0,p-q)) # true betas
+y <- X %*% beta + rnorm(n) # linear regression
+data.full <- data.frame(y = y, X) #without missings
+
+formula <- y ~ .
+null.model <- y ~ 1
+
+# missings with ampute function from mice package
+X.miss <- mice::ampute(X, prop = 0.2, # proportion of missingness
+                       mech = "MAR" # missingness mechanism
+)$amp
+data <- data.frame(y = y, X.miss)
+
+##Garcia-Donato's 2025 method:
+# BFapprox = FALSE
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+init.model = "Full"
+n.iter = 10000 #number of iterations for Gibbs Sampling algorithm
+n.imp = 1E3 #number of imputed data sets
+n.burnin = 500
+n.thin = 1
+imp.seed = 123
+Gibbs.seed = imp.seed
+
+prueba <- missingGibbsGD25(formula, data, prior.models = prior.models,
+                        imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed,
+                        init.model = init.model, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin, Gibbs.seed = Gibbs.seed)
+
+prueba$time # Time difference of 38.6176 secs
+
+##mice and BIC method:
+
+BF.approx.method = "BIC"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+init.model = "Full"
+n.iter = 10000 #number of iterations for Gibbs Sampling algorithm
+n.imp = 1E3 #number of imputed data sets
+n.burnin = 500
+n.thin = 1
+imp.seed = 123
+Gibbs.seed = imp.seed
+
+# null.model <- y ~X1 + X4
+pruebabic <- missingGibbsBVS.lm(formula, null.model, data, BF.approx.method = BF.approx.method, prior.models = prior.models,
+                             imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed,
+                             init.model = init.model, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin, Gibbs.seed = Gibbs.seed)
+
+pruebabic$time # Time difference of 1.190929 mins
+
+##mice and BayesVarSel method:
+
+BF.approx.method = "gprior"
+prior.betas = "gZellner"
+prior.models = "ScottBerger" #function to use
+imp.mice.method = "pmm"
+init.model = "Full"
+n.iter = 10000 #number of iterations for Gibbs Sampling algorithm
+n.imp = 1E3 #number of imputed data sets
+n.burnin = 500
+n.thin = 1
+imp.seed = 123
+Gibbs.seed = imp.seed
+
+pruebagprior <- missingGibbsBVS.lm(formula, null.model, data, BF.approx.method = BF.approx.method, prior.betas = prior.betas, prior.models = prior.models,
+                                imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed,
+                                init.model = init.model, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin, Gibbs.seed = Gibbs.seed)
+
+pruebagprior$time # Time difference of 1.16874 mins
+
+##mice and TBF method:
+
+BF.approx.method = "TBF"
+prior.betas = "gZellner"
+prior.models = "ScottBerger" #function to use
+imp.mice.method = "pmm"
+init.model = "Full"
+n.iter = 10000 #number of iterations for Gibbs Sampling algorithm
+n.imp = 1E3 #number of imputed data sets
+n.burnin = 500
+n.thin = 1
+imp.seed = 123
+Gibbs.seed = imp.seed
+
+pruebaTBF <- missingGibbsBVS.lm(formula, null.model, data, BF.approx.method = BF.approx.method, prior.betas = prior.betas, prior.models = prior.models,
+                                   imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed,
+                                   init.model = init.model, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin, Gibbs.seed = Gibbs.seed)
+
+pruebaTBF$time # Time difference of 1.498981 mins
+
+library(BayesVarSel)
+vs.all <- GibbsBvs(formula = formula, data = data.full, prior.betas = "gZellner", init.model = init.model,
+                   n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin, seed = Gibbs.seed)
+# vs.all$inclprob # oracle probs
+vs.rem <- GibbsBvs(formula = formula, data = na.omit(data.full), prior.betas = "gZellner", init.model = init.model,
+                   n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin, seed = Gibbs.seed)
+# vs.rem$inclprob # probs removing missings
+
+resumen <- cbind(prueba$inclprob, #paper
+                 pruebabic$inclprob, #approx BIC
+                 pruebagprior$inclprob, # approx BayesVarSel
+                 pruebaTBF$inclprob, # approx TBF
+                 vs.rem$inclprob,
+                 vs.all$inclprob)
+colnames(resumen)<- c("Imput paper", "Imput BIC", "Imput gprior", "Imput TBF", "removing", "Oracle")
+round(resumen, 2)
+
+library(devtools)
+devtools::load_all()
+
+#Btest version
+# simulated data
+library(mvtnorm)
+set.seed(123)
+p <- 10 # numer of predictors
+n <- 50 # number of observations
+q <- 4 # number of true covariates (q<p)
+
+rho <- 0.5 # correlation between predictors
+sigma.rho <- matrix(rho, nr = p, nc = p) # cov matrix to generate data
+diag(sigma.rho) <- 1
+
+X <- rmvnorm(n, mean = rep(0, p), sigma = sigma.rho)
+colnames(X) <- paste0("X", 1:p)
+
+# response
+beta <- c(rep(1,q), rep(0,p-q)) # true betas
+y <- X %*% beta + rnorm(n) # linear regression
+data.full <- data.frame(y = y, X) #without missings
+
+formula <- y ~ .
+null.model <- y ~ 1
+
+# missings with ampute function from mice package
+X.miss <- mice::ampute(X, prop = 0.2, # proportion of missingness
+                       mech = "MAR" # missingness mechanism
+)$amp
+data <- data.frame(y = y, X.miss)
+
+##Garcia-Donato's 2025 method:
+# BFapprox = FALSE
+# models <- list(M0 = y~1, M1 = y~1 + X1, M2 = y~1 + X2, M3 = y~1 + X1 + X2)
+models <- list(M1 = y~1 + X1, M2 = y~1 + X2, M3 = y~1 + X1 + X2)
+prior.models = "Constant"
+imp.mice.method = "pmm"
+n.imp = 1E3 #number of imputed data sets
+imp.seed = 123
+
+prueba <- missingBtestGD25(data, models, prior.models = prior.models,
+                          imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+##mice and BayesVarSel method:
+
+BF.approx.method = "gprior"
+prior.betas ="gZellner"
+models <- list(M1 = y~1 + X1 + X3, M2 = y~1 + X2 + X3, M3 = y~1 + X1 + X2 + X3, M0 =y~1 + X3)
+# models <- list(M1 = y~1 + X1, M2 = y~1 + X2, M3 = y~1 + X1 + X2)
+prior.models = "Constant"
+imp.mice.method = "pmm"
+n.imp = 1E3 #number of imputed data sets
+imp.seed = 123
+# null.model = y~1 + X3
+null.model = "M0"
+
+pruebagprior <- missingBtest.lm(data, models, null.model, BF.approx.method = BF.approx.method,
+                                prior.betas = prior.betas, prior.models = prior.models,
+                                imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+
+library(devtools)
+devtools::load_all()
+
+#Logistic regression
+
+#Bvs
+# simulated data
+library(mvtnorm)
+set.seed(123)
+p <- 10 # number of predictors
+n <- 100 # number of observations
+q <- 4 # number of true covariates (q<p)
+
+rho <- 0.5 # correlation between predictors
+sigma.rho <- matrix(rho, nr = p, nc = p) # cov matrix to make corr approx rho
+diag(sigma.rho) <- 1
+
+X <- rmvnorm(n, mean = rep(0, p), sigma = sigma.rho)
+colnames(X) <- paste0("X", 1:p)
+
+# response
+intercept <- 1
+beta <- c(rep(2,q), rep(0,p-q)) # true betas
+theta <- intercept + X %*% beta # lineal predictor
+prob <- 1 / (1 + exp(-theta))
+y <- rbinom(n = n, size = 1, prob = prob) # Bernuilli with pi = prob, logistic regression
+data.full <- data.frame(y = y, X)
+
+formula <- y ~ .
+null.model <- y ~ 1
+
+# missings with ampute function from mice package
+X.miss <- mice::ampute(X, prop = 0.2, # proportion of missingness
+                       # patterns = NULL, # 0 indicates that a variable should have missings and 1, should remain complete
+                       # freq = NULL, # relative frequency with which the patterns should occur
+                       mech = "MAR" # missingness mechanism
+)$amp
+data <- data.frame(y = y, X.miss)
+
+
+##mice and BIC method:
+BF.approx.method = "BIC"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+n.keep = 2^p
+imp.seed = 123
+n.imp = 4E2
+family = binomial(link = "probit")
+
+#with BAS (faster)
+pruebabic <- missingBVS.glm(formula, null.model, data, family = family, BF.approx.method = BF.approx.method,
+                            prior.models = prior.models, n.keep = n.keep,
+                            imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+pruebabic$time # Time difference of 2.30176 mins
+pruebabic$modelsprob[1:10,]
+round(pruebabic$inclprob,3)
+
+#with glm.fit (OLD)
+# pruebabic2 <- missingBVS.glm(formula, data, family = family, BF.approx.method = BF.approx.method,
+#                             prior.models = prior.models, n.keep = n.keep,
+#                             imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+#
+# pruebabic2$time # Time difference of 8.182962 mins
+# pruebabic2$modelsprob[1:10,] # the same as before
+# round(pruebabic2$inclprob,3) # the same as before
+
+##mice and gprior method:
+BF.approx.method = "gprior"
+prior.betas = "gZellner"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+n.keep = 2^p
+imp.seed = 123
+n.imp = 4E2
+family = binomial()
+
+#bas.glm() version (OLD)
+# pruebagprior <- missingBVS.glm(formula, data, family = family, BF.approx.method = BF.approx.method,
+#                             prior.betas = prior.betas, prior.models = prior.models, n.keep = n.keep,
+#                             imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+# pruebagprior$time # Time difference of 29.47097 mins
+# pruebagprior$modelsprob[1:10,]
+# round(pruebagprior$inclprob,3)
+
+#to call directly marginal glm lihelihood with C code:
+prior.betas <- BAS::robust(n = n)
+family <- binomial(link = "logit")
+margfull <- BF.approx.gprior.glm(k = p,
+                                 y = as.numeric(y), X = X,
+                                 family = family,
+                                 prior.betas = prior.betas,
+                                 logmargnull = 0)
+margfull
+
+#faster version in C
+null.model <- y ~ X1 + X4 #fijar variables
+pruebagprior <- missingBVS.glm(formula, null.model, data, family = family, BF.approx.method = BF.approx.method,
+                               prior.betas = prior.betas, prior.models = prior.models, n.keep = n.keep,
+                               imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+pruebagprior$time # Time difference of 2.434604 mins :)
+pruebagprior$modelsprob[1:10,] #the same as before
+round(pruebagprior$inclprob,3) #the same as before
+
+##mice and TBF method:
+BF.approx.method = "TBF"
+prior.betas = "gZellner"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+n.keep = 2^p
+imp.seed = 123
+n.imp = 4E2
+family = binomial()
+
+pruebaTBF <- missingBVS.glm(formula, null.model, data, family = family, BF.approx.method = BF.approx.method,
+                               prior.betas = prior.betas, prior.models = prior.models, n.keep = n.keep,
+                               imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+pruebaTBF$time # Time difference of 4.697325 mins
+pruebaTBF$modelsprob[1:10,]
+round(pruebaTBF$inclprob,3)
+
+library(BAS)
+vs.all <- bas.glm(formula = formula, family = family, data = data.full, betaprior = g.prior(n), n.models= 2^p) #modelprior = beta.binomial(1, 1) by default
+# vs.all$probne0[-1] # oracle probs
+vs.rem <- bas.glm(formula = formula, family = family, data = na.omit(data), betaprior = g.prior(n), n.models = 2^p)
+# vs.rem$probne0[-1]  # probs removing missings
+
+resumen <- cbind(pruebabic$inclprob, #approx BIC
+                 pruebagprior$inclprob, # approx BayesVarSel
+                 pruebaTBF$inclprob, # approx TBF
+                 vs.rem$probne0[-1],
+                 vs.all$probne0[-1])
+colnames(resumen)<- c("Imput BIC", "Imput gprior", "Imput TBF","removing", "Oracle")
+round(resumen, 2)
+
+library(devtools)
+devtools::load_all()
+
+#Gibbs version
+
+# simulated data
+library(mvtnorm)
+set.seed(123)
+p <- 10 # number of predictors
+n <- 100 # number of observations
+q <- 4 # number of true covariates (q<p)
+
+rho <- 0.5 # correlation between predictors
+sigma.rho <- matrix(rho, nr = p, nc = p) # cov matrix to make corr approx rho
+diag(sigma.rho) <- 1
+
+X <- rmvnorm(n, mean = rep(0, p), sigma = sigma.rho)
+colnames(X) <- paste0("X", 1:p)
+
+# response
+intercept <- 1
+beta <- c(rep(2,q), rep(0,p-q)) # true betas
+theta <- intercept + X %*% beta # lineal predictor
+prob <- 1 / (1 + exp(-theta))
+y <- rbinom(n = n, size = 1, prob = prob) # Bernuilli with pi = prob, logistic regression
+data.full <- data.frame(y = y, X)
+
+formula <- y ~ .
+null.model <- y ~ 1
+
+# missings with ampute function from mice package
+X.miss <- mice::ampute(X, prop = 0.2, # proportion of missingness
+                       # patterns = NULL, # 0 indicates that a variable should have missings and 1, should remain complete
+                       # freq = NULL, # relative frequency with which the patterns should occur
+                       mech = "MAR" # missingness mechanism
+)$amp
+data <- data.frame(y = y, X.miss)
+
+##mice and BIC method:
+BF.approx.method = "BIC"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+init.model = "Full"
+n.iter = 1000 #number of iterations for Gibbs Sampling algorithm
+n.burnin = 100
+n.thin = 1
+imp.seed = 123
+n.imp = 4E2
+family = binomial()
+
+pruebabic <- missingGibbsBVS.glm(formula, null.model, data, family = family, BF.approx.method = BF.approx.method,
+                                prior.models = prior.models, init.model = init.model, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin,
+                                imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+pruebabic$time # Time difference of 2.46727 mins
+pruebabic$modelsprob[1:10,]
+round(pruebabic$inclprob,3)
+
+##mice and gprior method:
+BF.approx.method = "gprior"
+prior.betas = "gZellner"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+init.model = "Full"
+n.iter = 1000 #number of iterations for Gibbs Sampling algorithm
+n.burnin = 100
+n.thin = 1
+imp.seed = 123
+n.imp = 4E2
+family = binomial()
+null.model <- y ~ X1 + X4
+
+pruebagprior <- missingGibbsBVS.glm(formula, null.model, data, family = family, BF.approx.method = BF.approx.method, prior.betas = prior.betas,
+                                    prior.models = prior.models, init.model = init.model, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin,
+                                    imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+pruebagprior$time # Time difference of 1.223785 mins
+pruebagprior$modelsprob[1:10,]
+round(pruebagprior$inclprob,3)
+
+##mice and TBF method:
+BF.approx.method = "TBF"
+prior.betas = "gZellner"
+prior.models = "ScottBerger"
+imp.mice.method = "pmm"
+init.model = "Full"
+n.iter = 1000 #number of iterations for Gibbs Sampling algorithm
+n.burnin = 100
+n.thin = 1
+imp.seed = 123
+n.imp = 4E2
+family = binomial()
+
+pruebaTBF <- missingGibbsBVS.glm(formula, null.model, data, family = family, BF.approx.method = BF.approx.method, prior.betas = prior.betas,
+                                    prior.models = prior.models, init.model = init.model, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin,
+                                    imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+pruebaTBF$time # Time difference of 1.288736 mins
+pruebaTBF$modelsprob[1:10,]
+round(pruebaTBF$inclprob,3)
+
+library(devtools)
+devtools::load_all()
+
+#Btest.glm
+# simulated data
+library(mvtnorm)
+set.seed(123)
+p <- 10 # number of predictors
+n <- 100 # number of observations
+q <- 4 # number of true covariates (q<p)
+
+rho <- 0.5 # correlation between predictors
+sigma.rho <- matrix(rho, nr = p, nc = p) # cov matrix to make corr approx rho
+diag(sigma.rho) <- 1
+
+X <- rmvnorm(n, mean = rep(0, p), sigma = sigma.rho)
+colnames(X) <- paste0("X", 1:p)
+
+# response
+intercept <- 1
+beta <- c(rep(2,q), rep(0,p-q)) # true betas
+theta <- intercept + X %*% beta # lineal predictor
+prob <- 1 / (1 + exp(-theta))
+y <- rbinom(n = n, size = 1, prob = prob) # Bernuilli with pi = prob, logistic regression
+data.full <- data.frame(y = y, X)
+
+formula <- y ~ .
+# null.model <- y ~ 1
+
+# missings with ampute function from mice package
+X.miss <- mice::ampute(X, prop = 0.2, # proportion of missingness
+                       # patterns = NULL, # 0 indicates that a variable should have missings and 1, should remain complete
+                       # freq = NULL, # relative frequency with which the patterns should occur
+                       mech = "MAR" # missingness mechanism
+)$amp
+data <- data.frame(y = y, X.miss)
+
+##mice and gprior method:
+models <- list(M0 = y~1, M1 = y~1 + X1+ X3, M2 = y~1 + X2+ X3, M3 = y~1 + X1 + X2+ X3)
+# models <- list(M1 = y~1 + X1, M2 = y~1 + X2, M3 = y~1 + X1 + X2)
+BF.approx.method = "gprior"
+prior.betas = "gZellner"
+prior.models = "Constant"
+imp.mice.method = "pmm"
+n.imp = 1E3 #number of imputed data sets
+imp.seed = 123
+family = binomial()
+null.model = "M0"
+
+pruebagprior <- missingBtest.glm(data, models, null.model, family = family, BF.approx.method = BF.approx.method,
+                                 prior.betas = prior.betas, prior.models = prior.models,
+                                 imp.mice.method = imp.mice.method, n.imp = n.imp, imp.seed = imp.seed)
+
+
+#############################################################################################
+
+# Mostrar resultados
+
+###########
+#con BayesVarSel en Gibbs: Da error. Solución:
+x <- vs.all
+p <- x$p
+n.iter <- dim(x$modelslogBF)[1]
+dimmodels<- rowSums(x$modelslogBF[,1:p])+1
+
+#falta:
+if (!is.character(x$priorprobs)) lpriorprobs <- log(x$priorprobs)
+if (x$priorprobs=="ScottBerger") lpriorprobs <- rep(-log(p+1),p+1)
+if (x$priorprobs=="Constant") lpriorprobs <- -p*log(2) + lchoose(p, 0:p)
+
+#cambio priorprobs:
+logpostprob <- x$modelslogBF[, (p+1)] + lpriorprobs[dimmodels]-log(x$C)-#log(sum(priorprobs*choose(p,0:p)))
+  log(sum(exp(lpriorprobs + lchoose(p,0:p))))
+
+#MAL:
+# ordenado <- x$modelslogBF[order(logpostprob,decreasing = T),]
+ordenado <- cbind(x$modelslogBF, logpostprob)
+ordenado <- ordenado[order(logpostprob,decreasing = T),]
+models <- ordenado[!duplicated(ordenado),]
+
+ten<- min(10, dim(models)[1])
+#mod.mat <- as.data.frame(models[1:ten,1:p])
+mod.mat <- as.data.frame(models[1:ten,])
+
+for (i in 1:ten) {
+  varnames.aux <- rep("", p)
+  varnames.aux[models[i,1:p] == 1] <- "*"
+  mod.mat[i,1:p] <- varnames.aux
+}
+##########
+
+# print.MissingBvs <- function(bvs.object){
+#   cat("\nCall:\n")
+#   print(bvs.object$call)
+#
+#   if(class(bvs.object) == "MissingGibbsBvs"){
+#     p <- bvs.object$p
+#     postprob <- bvs.object$postprobs
+#
+#     ord <- order(postprob, decreasing = T)
+#     modelspostprob <- cbind(bvs.object$modelsprob[ord,], postprob[ord])
+#     modelspostprob <- modelspostprob[!duplicated(modelspostprob),]
+#
+#     n.keep <- min(dim(modelspostprob)[1], 10)
+#     mod.mat <- as.data.frame(modelspostprob[1:n.keep,])
+#
+#     # for (i in 1:n.keep) {
+#     #   varnames.aux <- rep("", p)
+#     #   varnames.aux[models[i,1:p] == 1] <- "*"
+#     #   mod.mat[i,1:p] <- varnames.aux
+#     # }
+#     cat("\nThe ", n.keep, " most probable models among the visited ones are:\n")
+#     print(mod.mat)
+#     cat("---\n")
+#     cat("Code: Column BF.PM is the Bayes factor multiplied by model prior \n")
+#     cat("and column postprob is an estimation of posterior probabilities \n")
+#     cat("based on the normalizing constant.")
+#
+#   } else if(class(bvs.object) == "MissingBvs"){
+#     n.keep <- min(dim(bvs.object$modelsprob)[1], 10)
+#
+#     cat(paste("\nThe", n.keep, "most probable models and their probabilities are:\n", sep=" "))
+#     print(bvs.object$modelsprob[1:n.keep, ])
+#   } else stop("Object of class 'MissingBvs' or 'MissingGibbsBvs' needed.\n")
+#   cat("\n\n")
+# }
+
+# summary.MissingBvs <- function(mbvs.object){
+#     #we use object because it is requiered by S3 methods #???????
+#     # z <- object
+#     p <- mbvs.object$p
+#     if (!inherits(mbvs.object, "MissingBvs") | !inherits(mbvs.object, "MissingGibbsBvs"))
+#       warning("calling summary.MissingBvs(<fake-MissingBvs-x>) . . . ") #??????????
+#
+#     inclprob <- mbvs.object$inclprob
+#     HPM <- as.integer(mbvs.object$HPMbin[1:p])
+#     MPM <- as.integer(inclprob >= 0.5)
+#     summ.missingBvs <- as.data.frame(cbind(round(inclprob, digits = 4), HPM, MPM))
+#     dimnames(summ.missingBvs)[1] <- mbvs.object$variables
+#     dimnames(summ.missingBvs)[2] <- c("Incl.prob.", "HPM", "MPM")
+#
+#     ans <- list()
+#     ans$summary <- summ.missingBvs
+#     # ans$method <- mbvs.object$method
+#     ans$call <- mbvs.object$call
+#
+#     cat("\nPosterior Inclusion Probabilities:\n")
+#     print(ans$summary)
+#     cat("---\n")
+#     cat("Code: HPM stands for Highest posterior Probability Model and
+#         MPM for Median Probability Model.\n ")
+#     if (inherits(mbvs.object, "MissingGibbsBvs")) {
+#       cat("Results are estimates based on the visited models.\n")
+#     }
+#     class(ans) <- "summary.MissingBvs"
+#     return(invisible(ans)) #??
+#   }
+
+
