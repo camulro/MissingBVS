@@ -15,7 +15,8 @@ missingBVS.glm(
   prior.models = "ScottBerger",
   priorprobs = NULL,
   n.keep = 10,
-  parallelmice = FALSE,
+  parallelmice = NULL,
+  n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
   n.imp = 300,
@@ -62,6 +63,13 @@ dimensional vector defining the prior model probabilities (used for chosen
 \item{n.keep}{Number of the most probable models kept. By default it is set to
 10 and automatically adjusted if 10 is greater than the total number of models.}
 
+\item{parallelmice}{Logital to indicate whether or not to use parallel
+\code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
+the parallel mice imputation if the number of imputations or the dataset are
+big enough.}
+
+\item{n.core}{See \code{\link[mice]{futuremice}} for details.}
+
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 10} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
@@ -106,7 +114,9 @@ explanatory variables.}
 \item{postprobdim}{Posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
-\item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
+\item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
+model space)}
+\item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}

@@ -7,9 +7,11 @@
 mice.imputation(
   X,
   formula,
-  n.imp = 10000,
-  seed = runif(1, 0, 9011975),
+  n.imp = 1000,
   imp.mice.method = "pmm",
+  seed = runif(1, 0, 9011975),
+  parallel = n.imp > 120,
+  n.core = NULL,
   time.test = FALSE
 )
 }
@@ -20,13 +22,19 @@ mice.imputation(
 
 \item{n.imp}{Number of imputed datasets to compute the average Bayes factor.}
 
-\item{seed}{Seed chosen for the \pkg{mice}'s imputation.}
-
 \item{imp.mice.method}{Method used by \code{\link[mice]{mice}} to impute the
 values. See \code{\link[mice]{mice}} for possible choices.}
 
+\item{seed}{Seed chosen for the imputations.}
+
+\item{n.core}{See \code{\link[mice]{futuremice}} for details.}
+
 \item{time.test}{Logical to indicate whether to check time of performance with
 \code{n.imp = 10} or not.}
+
+\item{parallelmice}{Logical to indicate whether or not to use parallel
+\code{\link[mice]{mice}} imputation. By default performs parallel mice
+imputation if the number of imputations is big enough (\code{n.imp > 120}).}
 }
 \value{
 An object of class \code{MissingBVS.imputation}, an array of dimension
@@ -39,6 +47,11 @@ an array with the proper form to compute Bayesian Variable Selection in the
 presence of missing data. It can be applied to any kind of data with the correct
 imputation method.
 }
+\details{
+A parallel version of \pkg{mice} can be performed through the \code{parallelmice}
+argument, which makes the imputation a lot faster for a big number of imputations
+or huge datasets.
+}
 \examples{
 #To be completed
 
@@ -47,6 +60,9 @@ imputation method.
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice:
 Multivariate Imputation by Chained Equations in R. Journal of Statistical
 Software. 45: 1–67.
+
+Volker, T.B. and Vink, G. (2022). futuremice: The future starts today.
+\link{https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html}
 }
 \seealso{
 Use \code{\link[MissingBVS]{lBF.approx}} for computing the logarithm

@@ -11,7 +11,7 @@ missingGD25(
   priorprobs = NULL,
   n.keep = 10,
   imp.time.test = TRUE,
-  imp.mice.method = "pmm",
+  initialimp.mice.method = "pmm",
   n.imp = 300,
   imp.seed = runif(1, 0, 9011975)
 )
@@ -36,7 +36,7 @@ dimensional vector defining the prior model probabilities (used for chosen
 of the imputation process with \code{n.imp = 10} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
 
-\item{imp.mice.method}{Method for mice's imputation.}
+\item{initialimp.mice.method}{Method for mice's imputation.}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 
@@ -63,7 +63,9 @@ explanatory variables.}
 \item{postprobdim}{Posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
-\item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
+\item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
+model space)}
+\item{imp.args}{List of arguments used for the imputation step}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
 \item{method}{\code{Full}}
 }

@@ -8,7 +8,7 @@ MC.imputation(
   X,
   nMC = 10000,
   seed = runif(1, 0, 9011975),
-  imp.mice.method = "pmm",
+  initialimp.mice.method = "pmm",
   time.test = FALSE
 )
 }
@@ -20,7 +20,7 @@ defining the Bayes factor.}
 
 \item{seed}{Seed chosen for the gibbs sampler on the imputation step.}
 
-\item{imp.mice.method}{Method used by \code{\link[mice]{mice}} to impute the
+\item{initialimp.mice.method}{Method used by \code{\link[mice]{mice}} to impute the
 initial values. See \code{\link[mice]{mice}} for possible choices.}
 
 \item{time.test}{Logical to indicate whether to check time of performance with

@@ -9,7 +9,7 @@ missingGibbsBVS.lm(
   formula,
   null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   data,
-  BF.approx.method = "BIC",
+  BF.approx.method = "gprior",
   prior.betas = "Robust",
   prior.models = "ScottBerger",
   priorprobs = NULL,
@@ -17,7 +17,8 @@ missingGibbsBVS.lm(
   n.iter = 10000,
   n.burnin = 500,
   n.thin = 1,
-  parallelmice = FALSE,
+  parallelmice = NULL,
+  n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
   n.imp = 300,
@@ -68,6 +69,13 @@ Set 'n.thin' > 1 to save memory and computation time if 'n.iter' is large.
 A large \code{n.thin} can reduce the accuracy because it, along with \code{n.iter},
 sets the number of simulations used to construct the estimates.}
 
+\item{parallelmice}{Logital to indicate whether or not to use parallel
+\code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
+the parallel mice imputation if the number of imputations or the dataset are
+big enough.}
+
+\item{n.core}{See \code{\link[mice]{futuremice}} for details.}
+
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 10} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
@@ -105,6 +113,7 @@ explanatory variables}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
+\item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}

@@ -13,7 +13,8 @@ missingBtest.lm(
   prior.betas = "Robust",
   prior.models = "Constant",
   priorprobs = NULL,
-  parallelmice = FALSE,
+  parallelmice = NULL,
+  n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
   n.imp = 300,
@@ -48,6 +49,13 @@ Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
+\item{parallelmice}{Logital to indicate whether or not to use parallel
+\code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
+the parallel mice imputation if the number of imputations or the dataset are
+big enough.}
+
+\item{n.core}{See \code{\link[mice]{futuremice}} for details.}
+
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 10} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
@@ -65,6 +73,7 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
 \item{models}{List with the entertained models.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{prior.models}{Function used to compute the prior over the model space}

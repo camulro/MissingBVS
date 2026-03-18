@@ -10,12 +10,13 @@ missingBtest.glm(
   models,
   null.model = NULL,
   family = binomial(link = "logit"),
-  BF.approx.method = "gprior",
+  BF.approx.method = "BIC",
   prior.betas = "Robust",
   prior.models = "Constant",
   priorprobs = NULL,
   imp.mice.method = "pmm",
-  parallelmice = FALSE,
+  parallelmice = NULL,
+  n.core = NULL,
   imp.time.test = TRUE,
   n.imp = 300,
   imp.seed = runif(1, 0, 9011975),
@@ -62,6 +63,13 @@ dimensional vector defining the prior model probabilities (used for chosen
 
 \item{imp.mice.method}{Method for mice's imputation.}
 
+\item{parallelmice}{Logital to indicate whether or not to use parallel
+\code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
+the parallel mice imputation if the number of imputations or the dataset are
+big enough.}
+
+\item{n.core}{See \code{\link[mice]{futuremice}} for details.}
+
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 10} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
@@ -90,6 +98,7 @@ for more details.}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
 \item{models}{List with the entertained models.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{prior.models}{Function used to compute the prior over the model space}

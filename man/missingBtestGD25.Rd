@@ -10,7 +10,7 @@ missingBtestGD25(
   models,
   prior.models = "Constant",
   priorprobs = NULL,
-  imp.mice.method = "pmm",
+  initialimp.mice.method = "pmm",
   n.imp = 300,
   imp.seed = runif(1, 0, 9011975)
 )
@@ -29,7 +29,7 @@ Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
-\item{imp.mice.method}{Method for mice's imputation.}
+\item{initialimp.mice.method}{Method for mice's imputation.}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 
@@ -46,6 +46,7 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
 \item{models}{List with the entertained models.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{imp.args}{List of arguments used for the imputation step}
 \item{prior.models}{Function used to compute the prior over the model space}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 }
