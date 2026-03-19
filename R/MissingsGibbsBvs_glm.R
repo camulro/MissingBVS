@@ -122,22 +122,22 @@
 #' selection. Statistica Sinica, 7, 339:372.
 #'
 #' Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
-#' Statistics. 6: 461–464.
+#' Statistics. 6(2): 461–464.
 #'
-#' Held, L., Gravestock, I. and Sabanés Bové, D.
-#' (2015)<DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection
-#' for generalized linear models using test-based Bayes factors. Journal of the
-#' American Statistical Association, 110, 1157–1168.
+#' Held, L., Sabanés Bové, D. and Gravestock, I.
+#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
+#' Deviance Statistic. Statistical Science, 30(2): 242–257.
 #'
 #' Li, Y. and Clyde, M. (2018)<DOI:10.1080/01621459.2018.1469992> Mixtures
 #' of g-Priors in Generalized Linear Models. Journal of the American
 #' Statistical Association. 113: 1275–1287.
 #'
-#' Clyde, M (2025)<DOI:10.32614/CRAN.package.BAS> BAS: Bayesian Variable Selection
-#' and Model Averaging using Bayesian Adaptive Sampling. R package (CRAN).
+#' Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+#' Bayesian Adaptive Sampling. R package version 2.0.2
+#' <https://CRAN.R-project.org/package=BAS>.
 #'
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-#' by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
+#' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 #'
 #' @keywords package
 #'
@@ -339,8 +339,8 @@ missingGibbsBVS.glm <- function (formula,
   cat("Of these,", n.iter + n.burnin, "are sampled with replacement.\n")
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
-  #García-Donato and Martínez-Beneito's Gibbs exploration
-  gibbs.list <- GDMB.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
+  #George and McCulloch's Gibbs exploration
+  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
                            lprior.models, lBF.method,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
 

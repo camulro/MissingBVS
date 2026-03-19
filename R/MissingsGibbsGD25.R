@@ -256,7 +256,7 @@ missingGibbsGD25 <- function (formula,
                        width = 50,
                        char = "=")
 
-  #García-Donato and Martínez-Beneito's Gibbs exploration
+  #George and McCulloch's Gibbs exploration
   set.seed(Gibbs.seed)
   all.models.lPM <- matrix(0, nr = n.iter + n.burnin, nc = p+1) #last column contains log(BF_a0*Pr(M))
   #Rao-Blackwellized inclusion probabilities:

@@ -142,7 +142,7 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 #' Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 #'
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-#' by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
+#' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 #'
 lBF.approx <- function(model, imputation.array, BF.approx.method,
                        p0 = 1, n.imp = dim(imputation.array)[3]) {
@@ -189,7 +189,7 @@ lBF.approx <- function(model, imputation.array, BF.approx.method,
 #' @examples #To be completed
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
-#' Annals of Statistics. 6: 461–464.
+#' Annals of Statistics. 6(2): 461–464.
 #'
 BF.approx.BIC.lm <- function(y, X, SS0,
                              n = length(y), k = ncol(X)-p0, p0 = 1L) {
@@ -232,10 +232,9 @@ BF.approx.BIC.lm <- function(y, X, SS0,
 #'
 #' @examples #To be completed
 #'
-#' @references Held, L., Gravestock, I. and Sabanés Bové, D.
-#' (2015) <DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection
-#' for generalized linear models using test-based Bayes factors. Journal of the
-#' American Statistical Association, 110, 1157–1168.
+#' @references Held, L., Sabanés Bové, D. and Gravestock, I.
+#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
+#' Deviance Statistic. Statistical Science, 30(2): 242–257.
 #'
 #'
 BF.approx.TBF.lm <- function(y, X, SS0, prior.betas = "gBF",
@@ -413,8 +412,9 @@ c_glm.fit <- utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute l
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
 #' Annals of Statistics. 6: 461–464.
 #'
-#' Clyde, M (2025)<DOI:10.32614/CRAN.package.BAS> BAS: Bayesian Variable Selection
-#' and Model Averaging using Bayesian Adaptive Sampling. R package (CRAN).
+#' Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+#' Bayesian Adaptive Sampling. R package version 2.0.2
+#' <https://CRAN.R-project.org/package=BAS>.
 #'
 BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
                               logmargnull,
@@ -471,7 +471,7 @@ BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
 #' @examples #To be completed
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
-#' Annals of Statistics. 6: 461–464.
+#' Annals of Statistics. 6(2): 461–464.
 #'
 BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
                                     devnull,
@@ -531,13 +531,13 @@ BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
 #'
 #' @examples #To be completed
 #'
-#' @references Held, L., Gravestock, I. and Sabanés Bové, D.
-#' (2015)<DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection
-#' for generalized linear models using test-based Bayes factors. Journal of the
-#' American Statistical Association, 110, 1157–1168.
+#' @references Held, L., Sabanés Bové, D. and Gravestock, I.
+#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
+#' Deviance Statistic. Statistical Science, 30(2): 242–257.
 #'
-#' Clyde, M (2025)<DOI:10.32614/CRAN.package.BAS> BAS: Bayesian Variable Selection
-#' and Model Averaging using Bayesian Adaptive Sampling. R package (CRAN).
+#' Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+#' Bayesian Adaptive Sampling. R package version 2.0.2
+#' <https://CRAN.R-project.org/package=BAS>.
 #'
 BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
                               devnull, prior.betas = BAS::g.prior(g = length(y)),
@@ -593,10 +593,9 @@ BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
 #'
 #' @examples #To be completed
 #'
-#' @references Held, L., Gravestock, I. and Sabanés Bové, D. (2015)
-#' <DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection for
-#' generalized linear models using test-based Bayes factors. Journal of the
-#' American Statistical Association, 110, 1157–1168.
+#' @references Held, L., Sabanés Bové, D. and Gravestock, I.
+#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
+#' Deviance Statistic. Statistical Science, 30(2): 242–257.
 #'
 BF.approx.TBF.glm.stats <- function(y, X,
                                     family = binomial(link = "logit"),
@@ -660,13 +659,14 @@ BF.approx.TBF.glm.stats <- function(y, X,
 #'
 #' @examples #To be completed
 #'
-#' @references Clyde, M (2025)<DOI:10.32614/CRAN.package.BAS> BAS: Bayesian
-#' Variable Selection and Model Averaging using Bayesian Adaptive Sampling.
-#' R package (CRAN).
+#' @references Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+#' Bayesian Adaptive Sampling. R package version 2.0.2
+#' <https://CRAN.R-project.org/package=BAS>.
 #'
 #' Li, Y. and Clyde, M. (2018)<DOI:10.1080/01621459.2018.1469992> Mixtures of
 #' g-priors in Generalized Linear Models. Journal of the American Statistical
-#' Association. 113:1828-1845
+#' Association. 113: 1828-1845
+#'
 #'
 BF.approx.gprior.glm <- function(y, X, family = binomial(link = "logit"),
                                  logmargnull, prior.betas = BAS::robust(n = length(y)),
