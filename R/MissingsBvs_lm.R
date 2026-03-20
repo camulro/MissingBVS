@@ -77,7 +77,7 @@
 #' @param n.core See \code{\link[mice]{futuremice}} for details.
 #' @param imp.time.test Logical to indicate whether to check or not time of performance
 #' of the imputation process with \code{n.imp = 10} if the number of variables or
-#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).
+#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
 #' @param imp.seed Seed for imputation.
@@ -167,7 +167,7 @@ missingBVS.lm <- function (formula,
                            n.core = NULL,
                            imp.time.test = TRUE,
                            imp.mice.method = "pmm", #mice's default
-                           n.imp = 3E2, #number of imputed datasets for BF
+                           n.imp = 039E1, #number of imputed datasets for BF
                            imp.seed = runif(1,0,09011975)) { #seed for the imputation
 
   time <- Sys.time()
@@ -250,7 +250,7 @@ missingBVS.lm <- function (formula,
     } else parallelmice <- FALSE
   }
 
-  if (imp.time.test & (n*p > 10000 | n.imp > 3E2)) {
+  if (imp.time.test & (n*p > 10000 | n.imp > 039E1)) {
     #test imputation time
     cat("Time test . . . \n")
     time.test <- mice.imputation(X = X.toimp,

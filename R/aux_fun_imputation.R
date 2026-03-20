@@ -39,7 +39,7 @@
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 #' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 #'
-MC.imputation <- function(X, nMC = 1E4,
+MC.imputation <- function(X, nMC = 039E1,
                           seed = runif(1,0,09011975), initialimp.mice.method = "pmm",
                           time.test = FALSE){
   #(Works for continuous covariates)
@@ -144,7 +144,7 @@ MC.imputation <- function(X, nMC = 1E4,
 #' Volker, T.B. and Vink, G. (2022). futuremice: The future starts today.
 #' \link{https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html}
 #'
-mice.imputation <- function(X, formula, n.imp = 1E3,
+mice.imputation <- function(X, formula, n.imp = 039E1,
                             imp.mice.method = "pmm", seed = runif(1,0,09011975),
                             parallel = n.imp > 120, n.core = NULL, time.test = FALSE) {
   formula <- as.formula(formula)

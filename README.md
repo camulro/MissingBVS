@@ -22,6 +22,10 @@ install_github('camulro/MissingBVS', dependencies = TRUE)
 ```
 ## References
 
+-   Barbieri, M and Berger, J. (2004).  Optimal Predictive Model Selection. 
+    *The Annals of Statistics, 32*: 870-897. DOI:
+    [10.1214/009053604000000238](https://doi.org/10.1214/009053604000000238)
+
 -   Bayarri, M.J., Berger, J.O., Forte, A. and Garcia-Donato, G. (2012).
     Criteria for Bayesian Model choice with Application to Variable
     Selection. *Annals of Statistics, 40*: 1550-1577. DOI:
@@ -75,6 +79,11 @@ install_github('camulro/MissingBVS', dependencies = TRUE)
 -   Schwarz, G. (1978). Estimating the dimension of a model. 
     *The Annals of Statistics, 6*(2): 461–464. DOI:
     [10.1214/aos/1176344136](https://doi.org/10.1214/aos/1176344136)
+    
+-   Scott, J.G. and Berger, J.O. (2010). Bayes and empirical-Bayes multiplicity
+    adjustment in the variable-selection problem. 
+    *The Annals of Statistics, 38*: 2587–2619. DOI:
+    [10.1214/10-AOS792](https://doi.org/10.1214/10-AOS792)
     
 -   Zellner, A. and Siow, A. (1980). Posterior Odds Ratio for Selected
     Regression Hypotheses. 

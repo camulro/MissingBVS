@@ -32,10 +32,9 @@
 #' @param priorprobs A p+1 (being p the number of non-fixed covariates)
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details).
-
 #' @param imp.time.test Logical to indicate whether to check or not time of performance
 #' of the imputation process with \code{n.imp = 10} if the number of variables or
-#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).
+#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param initialimp.mice.method Method for mice's imputation.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
 #' @param imp.seed Seed for imputation.
@@ -71,8 +70,9 @@ missingBtestGD25 <- function (data,
                               models,
                               prior.models = "Constant",
                               priorprobs = NULL, #needed if prior.models = "User"
+                              imp.time.test = TRUE,
                               initialimp.mice.method = "pmm", #mice's default
-                              n.imp = 3E2,
+                              n.imp = 039E1,
                               imp.seed = runif(1,0,09011975)) { #seed for the imputation
 
   #N is the number of models:
@@ -178,6 +178,19 @@ missingBtestGD25 <- function (data,
                                                            n = n, k)
 
   #Imputation of missing data
+  if (imp.time.test & (p > 20 | n.imp > 039E1)) {
+    #test imputation time
+    cat("Time test . . . \n")
+    time.test <- MC.imputation(X = X.full,
+                               time.test = TRUE)
+
+    estim.time <- time.test * n.imp / (60 * 10) #10 imputed datasets used to test
+    cat("The whole imputation would take ", estim.time,
+        "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
+    if (tolower(readline()) != "y") {
+      stop("Reduce the number of imputed datasets.\n")
+    }
+  }
   cat("Performing imputation of missing data with Garcia-Donato's 2025 method.\n",
       "Please wait . . . \n")
   imputation.list <- MC.imputation(X = X.full,
