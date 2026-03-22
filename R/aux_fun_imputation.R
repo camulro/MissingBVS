@@ -147,7 +147,7 @@ MC.imputation <- function(X, nMC = 039E1,
 mice.imputation <- function(X, formula, n.imp = 039E1,
                             imp.mice.method = "pmm", seed = runif(1,0,09011975),
                             parallel = n.imp > 120, n.core = NULL, time.test = FALSE) {
-  formula <- as.formula(formula)
+  formula <- paste(formula)
 
   if (time.test) {time <- Sys.time(); n.imp <- 30} # to estimate imputation time
   if (!parallel) {
@@ -168,7 +168,7 @@ mice.imputation <- function(X, formula, n.imp = 039E1,
 
   #Get final dim of full imputed datasets
   n <- nrow(X)
-  X.formula <- as.formula(paste(formula[[1]], formula[[3]]))
+  X.formula <- as.formula(paste(formula[1], formula[3]))
   aux <- model.matrix(X.formula, model.frame(X.formula, X, na.action = NULL))
   q <- ncol(aux)
 

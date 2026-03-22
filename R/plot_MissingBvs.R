@@ -1,11 +1,11 @@
 #' Summary plot of an object of class \code{MissingBvs}
 #'
 #' Plots to summarize graphically the results in an object of class
-#' \code{MissingBvs}, including prior and posterior probabilities obtained. 
-#' Two summaries are available: the model size probability if \code{plotdim}=TRUE 
-#' and the inclusion probabilities if  \code{plotpip}=TRUE. By default, 
-#' both plots are shown. 
-#' 
+#' \code{MissingBvs}, including prior and posterior probabilities obtained.
+#' Two summaries are available: the model size probability if \code{plotdim}=TRUE
+#' and the inclusion probabilities if  \code{plotpip}=TRUE. By default,
+#' both plots are shown.
+#'
 #' @export
 #' @param mbvs.object Object of class \code{MissingBvs}.
 #' @param plotdim Logical indicating whether or not to plot model dimension
@@ -13,37 +13,37 @@
 #' @param plotpip Logical indicating whether or not to plot posterior inclusion
 #' probabilities.
 #' @param ... Additional graphical parameters.
-#' 
+#'
 #' @author Carolina Mulet
 #' Maintainer: <carolina.mulet1@@alu.uclm.es>
-#' 
-#' @seealso See \code{\link[MissingBVS]{MissingBvs.lm}}, 
-#' \code{\link[MissingBVS]{MissingBvs.glm}}, 
+#'
+#' @seealso See \code{\link[MissingBVS]{MissingBvs.lm}},
+#' \code{\link[MissingBVS]{MissingBvs.glm}},
 #' \code{\link[MissingBVS]{MissingGibbsBvs.lm}} and
 #' \code{\link[MissingBVS]{MissingGibbsBvs.glm}} for creating objects of class
 #' \code{MissingBvs}.
-#' 
+#'
 #' @examples
 #' # To be completed
 
 plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
-    
+
   if (!inherits(mbvs.object, "MissingBvs")){
     warning("An object of class MissingBvs is needed.\n")
   }
-  
+
   p <- mbvs.object$p #number of covariates
   k <- mbvs.object$k #number of fixed vars
   vars <- mbvs.object$variables
-  
-  par(mar = c(5, 4, 4, 2) + 0.1, mfrow = c(sum(plot), 1))
-  if (plot[1]) {
-    
+
+  par(mar = c(5, 4, 4, 2) + 0.1, mfrow = c(plotdim + plotpip, 1))
+  if (plotdim) {
+
     #dimension probabilities
     if (mbvs.object$method == "gibbs") {
       main.1 <- "Estimated Model Size Probabilities"
     } else main.1 <- "Model Size Probabilities"
-    
+
     barplot(
       mbvs.object$priorprobs,
       main = main.1, names.arg = (0:p) + k,
@@ -58,12 +58,12 @@ plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
       mbvs.object$postprobdim,
       col = rgb(0.3,0.3,0.3,0.8),
       border = NA,
-      ylim = c(0, 1),        
+      ylim = c(0, 1),
       cex.names = 0.8,
       axes = FALSE
     )
     abline(h = seq(0,1,0.2), col = "gray90", lty = "dotted")
-    
+
     legend(
       "topright",
       legend = c("Posterior", "Prior"),
@@ -73,13 +73,13 @@ plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
     )
   }
 
-  if (plot[2]) {
-    
+  if (plotpip) {
+
     #posterior inclusion probabilities
     if (mbvs.object$method == "gibbs") {
       main.2 <- "Estimated Posterior Inclusion Probabilities"
     } else main.2 <- "Posterior Inclusion Probabilities"
-    
+
     barplot(
       mbvs.object$inclprob,
       main = main.2, names.arg = vars,
