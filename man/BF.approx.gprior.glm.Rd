@@ -69,13 +69,13 @@ for complete data in generalized linear models.
 
 }
 \references{
-Clyde, M (2025)<DOI:10.32614/CRAN.package.BAS> BAS: Bayesian
-Variable Selection and Model Averaging using Bayesian Adaptive Sampling.
-R package (CRAN).
+Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+Bayesian Adaptive Sampling. R package version 2.0.2
+<https://CRAN.R-project.org/package=BAS>.
 
 Li, Y. and Clyde, M. (2018)<DOI:10.1080/01621459.2018.1469992> Mixtures of
 g-priors in Generalized Linear Models. Journal of the American Statistical
-Association. 113:1828-1845
+Association. 113: 1828-1845
 }
 \seealso{
 Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes

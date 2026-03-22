@@ -47,7 +47,7 @@ and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
 Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
+by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 }
 \seealso{
 Use \code{\link[MissingBVS]{mice.imputation}} or

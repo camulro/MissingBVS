@@ -15,7 +15,7 @@ missingGibbsGD25(
   n.thin = 1,
   imp.time.test = TRUE,
   initialimp.mice.method = "pmm",
-  n.imp = 300,
+  n.imp = 390,
   Gibbs.seed = runif(1, 0, 26061970),
   imp.seed = runif(1, 0, 9011975)
 )
@@ -52,7 +52,7 @@ sets the number of simulations used to construct the estimates.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 10} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
+the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{initialimp.mice.method}{Method for mice's imputation.}
 

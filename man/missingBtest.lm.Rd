@@ -17,7 +17,7 @@ missingBtest.lm(
   n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
-  n.imp = 300,
+  n.imp = 390,
   imp.seed = runif(1, 0, 9011975)
 )
 }
@@ -58,7 +58,7 @@ big enough.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 10} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
+the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
 

@@ -59,7 +59,7 @@ complete data in generalized linear models.
 }
 \references{
 Schwarz, G. (1978) Estimating the dimension of a model. The
-Annals of Statistics. 6: 461–464.
+Annals of Statistics. 6(2): 461–464.
 }
 \seealso{
 Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes

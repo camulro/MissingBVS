@@ -47,10 +47,9 @@ complete data in linear models.
 
 }
 \references{
-Held, L., Gravestock, I. and Sabanés Bové, D.
-(2015) <DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection
-for generalized linear models using test-based Bayes factors. Journal of the
-American Statistical Association, 110, 1157–1168.
+Held, L., Sabanés Bové, D. and Gravestock, I.
+(2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
+Deviance Statistic. Statistical Science, 30(2): 242–257.
 }
 \seealso{
 Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes

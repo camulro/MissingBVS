@@ -10,8 +10,9 @@ missingBtestGD25(
   models,
   prior.models = "Constant",
   priorprobs = NULL,
+  imp.time.test = TRUE,
   initialimp.mice.method = "pmm",
-  n.imp = 300,
+  n.imp = 390,
   imp.seed = runif(1, 0, 9011975)
 )
 }
@@ -29,15 +30,15 @@ Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
+\item{imp.time.test}{Logical to indicate whether to check or not time of performance
+of the imputation process with \code{n.imp = 10} if the number of variables or
+the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
+
 \item{initialimp.mice.method}{Method for mice's imputation.}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 
 \item{imp.seed}{Seed for imputation.}
-
-\item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
 }
 \value{
 \code{\link[MissingBVS]{MissingGD25Btest}} returns an object of type

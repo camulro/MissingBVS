@@ -65,8 +65,9 @@ complete data in generalized linear models.
 Schwarz, G. (1978) Estimating the dimension of a model. The
 Annals of Statistics. 6: 461–464.
 
-Clyde, M (2025)<DOI:10.32614/CRAN.package.BAS> BAS: Bayesian Variable Selection
-and Model Averaging using Bayesian Adaptive Sampling. R package (CRAN).
+Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+Bayesian Adaptive Sampling. R package version 2.0.2
+<https://CRAN.R-project.org/package=BAS>.
 }
 \seealso{
 Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes

@@ -21,7 +21,7 @@ missingGibbsBVS.lm(
   n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
-  n.imp = 300,
+  n.imp = 390,
   Gibbs.seed = runif(1, 0, 26061970),
   imp.seed = runif(1, 0, 9011975)
 )
@@ -78,7 +78,7 @@ big enough.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 10} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>300}).}
+the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
 
@@ -170,15 +170,14 @@ Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
 Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
 
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
-Statistics. 6: 461–464.
+Statistics. 6(2): 461–464.
 
-Held, L., Gravestock, I. and Sabanés Bové, D.
-(2015)<DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection
-for generalized linear models using test-based Bayes factors. Journal of the
-American Statistical Association, 110, 1157–1168.
+Held, L., Sabanés Bové, D. and Gravestock, I.
+(2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
+Deviance Statistic. Statistical Science, 30(2): 242–257.
 
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
+by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 }
 \seealso{
 Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation

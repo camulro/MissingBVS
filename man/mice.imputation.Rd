@@ -7,7 +7,7 @@
 mice.imputation(
   X,
   formula,
-  n.imp = 1000,
+  n.imp = 390,
   imp.mice.method = "pmm",
   seed = runif(1, 0, 9011975),
   parallel = n.imp > 120,
@@ -59,7 +59,7 @@ or huge datasets.
 \references{
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice:
 Multivariate Imputation by Chained Equations in R. Journal of Statistical
-Software. 45: 1–67.
+Software. 45(3): 1–67.
 
 Volker, T.B. and Vink, G. (2022). futuremice: The future starts today.
 \link{https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html}
