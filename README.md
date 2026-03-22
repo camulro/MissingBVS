@@ -6,10 +6,23 @@ different disciplines. The package provides several functions to deal with the d
 model uncertainty and the presence of missing data by the proper Bayes factor and posterior 
 distribution computation.
 
-The process can be done through exact algorithms to perform fast computations in problems of 
-small to moderate size and heuristic sampling methods to solve large problems.
+
+## Methodology
 
 ![https://github.com/camulro/MissingBVS](./README_fig.png)
+
+`MissingBVS` deals with the Bayesian Variable Selection problem in the presence of 
+missing data by performing a multiple imputation proccess and computing the Bayes
+factor for each model as an average of the diferent Bayes factores over the bunch of 
+imputed datasets. It can be applied to both linear and generalized linear models,
+in order to cover a broad range of real problems.
+
+The advanced user has the possibility of using several popular priors from the 
+well-stablished literature and approximations of the Bayes factor as well. The 
+process can be done through exact algorithms to perform fast computations in
+problems of small to moderate size and heuristic sampling methods to solve the 
+larger ones.
+
 
 ## Installing steps
 
