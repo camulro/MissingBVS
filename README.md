@@ -9,6 +9,8 @@ distribution computation.
 The process can be done through exact algorithms to perform fast computations in problems of 
 small to moderate size and heuristic sampling methods to solve large problems.
 
+![https://github.com/camulro/MissingBVS](./README_fig.png)
+
 ## Installing steps
 
 To install the latest development version, you can use `install_github` from the `devtools` package:
