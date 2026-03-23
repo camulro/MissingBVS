@@ -234,6 +234,13 @@ missingBVS.glm <- function (formula,
   X.full <- X.full[, namesxnotnull]
   p <- dim(X.full)[2] #Number of covariates to select from
 
+  #check if null model is contained in the full one:
+  for (i in 1:p0){
+    if (namesnull[i] %notin% namesx) {
+      stop(paste0("Error in var: ", namesnull[i],"; null model not nested in full model.\n"))
+    }
+  }
+
   #Is there any variable to select from?
   if (p == p0) {
     stop(paste0("The number of fixed covariates is equal to the number of\n",
@@ -385,8 +392,8 @@ missingBVS.glm <- function (formula,
   for (i in seq_len(2^p)) {
     inclprob[which(all.models.PM[i, seq_len(p)] == 1)] <-
       inclprob[which(all.models.PM[i, seq_len(p)] == 1)] + all.models.PM[i, p + 1]
-    probdim[sum(all.models.PM[i, seq_len(p)])] <-
-      probdim[sum(all.models.PM[i, seq_len(p)])] + all.models.PM[i, p + 1]
+    probdim[sum(all.models.PM[i, seq_len(p)]) + 1] <-
+      probdim[sum(all.models.PM[i, seq_len(p)]) + 1] + all.models.PM[i, p + 1]
   }
 
   #HPM
@@ -440,6 +447,10 @@ missingBVS.glm <- function (formula,
   result$imp.args <- list(parallelmice = parallelmice,
                           imp.mice.method = imp.mice.method,
                           n.imp = n.imp, imp.seed = imp.seed)
+
+  #save the imputed datasets for sensitivity analysis
+  # raw.imp.array <- serialize(imputation.array, NULL)
+  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas

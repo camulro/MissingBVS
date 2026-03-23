@@ -242,6 +242,10 @@ missingBtestGD25 <- function (data,
   result$imp.args <- list(initialimp.mice.method = initialimp.mice.method,
                           n.imp = n.imp, imp.seed = imp.seed)
 
+  #save the imputed datasets for sensitivity analysis
+  # raw.imp.array <- serialize(imputation.array, NULL)
+  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+
   result$prior.models <- prior.models #function used for model prior
   result$priorprobs <- exp(lPriorModels)
 

@@ -256,8 +256,8 @@ missingGD25 <- function (formula,
   for (i in seq_len(2^p)) {
     inclprob[which(all.models.PM[i, seq_len(p)] == 1)] <-
       inclprob[which(all.models.PM[i, seq_len(p)] == 1)] + all.models.PM[i, p + 1]
-    probdim[sum(all.models.PM[i, seq_len(p)])] <-
-      probdim[sum(all.models.PM[i, seq_len(p)])] + all.models.PM[i, p + 1]
+    probdim[sum(all.models.PM[i, seq_len(p)]) + 1] <-
+      probdim[sum(all.models.PM[i, seq_len(p)]) + 1] + all.models.PM[i, p + 1]
   }
 
   #HPM
@@ -310,6 +310,10 @@ missingGD25 <- function (formula,
   #arguments used for imputation
   result$imp.args <- list(initialimp.mice.method = initialimp.mice.method,
                           n.imp = n.imp, imp.seed = imp.seed)
+
+  #save the imputed datasets for sensitivity analysis
+  # raw.imp.array <- serialize(imputation.array, NULL)
+  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
 
   result$logprior.models <- lprior.models #function used for model prior
 

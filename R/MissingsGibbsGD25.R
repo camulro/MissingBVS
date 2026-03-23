@@ -339,8 +339,8 @@ missingGibbsGD25 <- function (formula,
   #compute posterior probability of the dimension of the true model and
   #save logBF for each model
   for (i in seq_len(floor(n.iter / n.thin))) {
-    probdim[sum(all.models.PM[i, seq_len(p)])] <-
-      probdim[sum(all.models.PM[i, seq_len(p)])] + all.models.PM[i, p + 1]
+    probdim[sum(all.models.PM[i, seq_len(p)]) + 1] <-
+      probdim[sum(all.models.PM[i, seq_len(p)]) + 1] + all.models.PM[i, p + 1]
 
     all.models.lBF[i, p + 1] <- all.models.lPM[i, p + 1] -
       lprior.models(all.models.lPM[i, seq_len(p)]) # lBF
@@ -401,6 +401,10 @@ missingGibbsGD25 <- function (formula,
   #arguments used for imputation
   result$imp.args <- list(initialimp.mice.method = initialimp.mice.method,
                           n.imp = n.imp, imp.seed = imp.seed)
+
+  #save the imputed datasets for sensitivity analysis
+  # raw.imp.array <- serialize(imputation.array, NULL)
+  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
 
   result$logprior.models <- lprior.models #function used for model prior
 
