@@ -13,6 +13,7 @@ missingGibbsBVS.glm(
   BF.approx.method = "BIC",
   prior.betas = "Robust",
   prior.models = "ScottBerger",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   init.model = "Full",
   n.iter = 5000,
@@ -60,15 +61,19 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (to be literally specified). Possible
 choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details.)}
 
 \item{init.model}{The model at which the simulation process starts. Options
-include "Null" (the model only with the covariates specified in
+include "Null" (the model only with the variables specified in
 \code{null.model}), "Full" (the model defined by \code{formula}), "Random" (a
-randomly selected model) and a vector with p (the number of covariates to
-select from) zeros and ones defining a model.}
+randomly selected model) and a vector with p (the number of factors and/or
+covariates to select from) zeros and ones defining a model.}
 
 \item{n.iter}{The total number of iterations performed after the burn in
 process.}
@@ -89,7 +94,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
@@ -128,6 +133,11 @@ the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model using
 \code{inclprobRB}}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Vector of length p with 1 if the variable is a numerical
+covariate and 0 otherwise}
 \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
 most probable a posteriori models and their associated Bayes factor in
 logaritmic scale}
@@ -143,6 +153,8 @@ model space)}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{method}{\code{Gibbs}}
 }
 \description{

@@ -68,7 +68,7 @@
 #' @param prior.models.dummies Prior distribution over the model space of the
 #' factor levels (to be literally specified). Possible choices are "Constant" and
 #' "ScottBerger" (see details).
-#' @param priorprobs A p+1 (being p the number of non-fixed covariates)
+#' @param priorprobs A p+1 (being p the number of non-fixed variables)
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details).
 #' @param n.keep Number of the most probable models kept. By default it is set to
@@ -79,7 +79,7 @@
 #' big enough.
 #' @param n.core See \code{\link[mice]{futuremice}} for details.
 #' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 10} if the number of variables or
+#' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
@@ -98,9 +98,9 @@
 #' \item{k}{Number of fixed variables}
 #' \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 #' \item{MPMbin}{Binary expression of the Median Probability model}
-#' \item{positions}{\code{matrix} with p rows and p plus the number of dummies
-#' resulting from factors columns with 1 if the column dummy corresponds to
-#' the row factor and 0 otherwise}
+#' \item{positions}{\code{matrix} with L rows and p plus the number of dummies
+#' resulting from factors columns - L, where L is the number of factors, with 1
+#' if the column dummy corresponds to the row factor and 0 otherwise}
 #' \item{positionsx}{Vector of length p with 1 if the variable is a numerical
 #' covariate and 0 otherwise}
 #' \item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
@@ -203,7 +203,7 @@ missingBVS.lm <- function (formula,
   namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
 
   #Missing model matrix of fixed vars
-  X0 <- model.matrix(null.model, auxnull)
+  X0 <- model.matrix.rankdef(auxnull)
   namesnull <- dimnames(X0)[[2]]
   p0 <- dim(X0)[2] #Number of fixed vars
 
@@ -217,35 +217,36 @@ missingBVS.lm <- function (formula,
   X.toimp <- data[,c(namesnull.toimp, namesxnotnull.toimp)] #design matrix with missing data with fixed vars
 
   #Model matrix data with missings
-  X.full <- model.matrix(formula, auxfull)
+  X.full <- model.matrix.rankdef(auxfull)
   namesx <- dimnames(X.full)[[2]]
   namesxnotnull <- namesx[namesx %notin% namesnull]
   X.full <- X.full[, namesxnotnull]
   p <- length(namesxnotnull) #Number of covariates and levels of factors to select from
 
   #Factors: positions has number of rows equal to the number of regressors
-  #(either factor or numeric) and p columns
-  #Each row describes the position (0-1) in X of a regressor (several positions in case
-  #this regressor is a factor)
-  depvars <- namesxnotnull.toimp
-  positions <- matrix(0, ncol = p, nrow = length(depvars))
+  #(factors or numeric covariates) and p columns.
+  #A 1 in a row denotes the position in X of a regressor (several positions for
+  #the dummies of a factor).
+  depvars <- setdiff(attr(terms(auxfull), "term.labels"),
+                     attr(terms(auxnull), "term.labels"))
+
+  positions <- t(sapply(depvars, function(var) {
+    if(is.factor(data[[var]])) {
+      levs <- levels(data[[var]])
+      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 in the namelevel matches
+    } else ind <- which(namesxnotnull == var) #1 in the name matches
+
+    posi <- rep(0,p); posi[ind] <- 1
+    posi
+  }))
   colnames(positions) <- namesxnotnull
-  rownames(positions) <- namesxnotnull.toimp
-  for (i in 1:length(depvars)) {
-    ind <- which(startsWith(namesxnotnull, depvars[i]))
-    #check if selected vars are dummies of the same factor
-    if (length(ind) > 1) {
-      ind <- ind[which(levels(data[,depvars[i]])[-1] %in%
-                       gsub(depvars[i], "", namesxnotnull[ind]))]
-    }
-    positions[i,ind] <- 1
-  }
+
   #vector of length p with 1 if numeric variable
   positionsx <- as.numeric(colSums(positions %*% t(positions)) == 1)
 
   L <- sum(!positionsx) #Number of factors to select from
   temp <- rowSums(positions %*% t(positions))
-  l <- temp[temp > 1] #Number of levels - 1 for each factor
+  l <- temp[temp > 1] #Number of levels for each factor
 
   q <- p - sum(l) + L #Number of factors and covariates to select from
   #q = p if there are no factors
@@ -357,11 +358,10 @@ missingBVS.lm <- function (formula,
   cat("Most complex model has a total of", q + p0, "covariates and/or factors.\n")
   if (p0 == 1) {
     cat(paste0("From those 1 is fixed (the intercept) and we should select from the remaining ",
-               q, ":\n"))
+               q, ".\n"))
   } else cat(paste0("From those ", p0, " are fixed and we should select from the remaining ",
                q, ".\n"))
 
-  # cat(paste(paste(namesxnotnull, collapse = ", ", sep = ""), "\n", sep = ""))
   cat("  Numerical covariates:", depvars[positionsx == 1], "\n")
   if (L > 0) cat(" Factors:", depvars[positionsx == 0], "\n")
 
@@ -454,13 +454,13 @@ missingBVS.lm <- function (formula,
 
   if (L > 0) {
     #matrix for the factors index
-    result$positions <- positions
+    result$positions <- positionsfac
     result$positionsx <- positionsx
   }
 
   result$modelsprob <- cf.models.PM[order(cf.models.PM[,q+1],
                                           decreasing = TRUE)[seq_len(n.keep)],]
-  #The binary code for the n.keep best models (after n.thin is applied) and the correspondent post
+  #The binary code for the n.keep best models and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
   names(result$inclprob) <- depvars
 
@@ -612,6 +612,24 @@ checkforprior.betas.lm <- function (BF.approx.method, prior.betas, n, p, p0, y, 
   } else {
     stop("Only approximations 'BIC', 'TBF' and 'gprior' supported.")
   }
+}
+
+model.matrix.rankdef <- function (model.frame.aux) {
+  #internal function to create rank defficient matrices from a given dataframe
+  #created from a model.frame call
+  if (ncol(model.frame.aux) == 1) { #just the response
+    Xnull.def <- cbind(`(Intercept)` = rep(1, nrow(model.frame.aux)))
+    return(Xnull.def)
+  }
+
+  terms <- attr(terms(model.frame.aux), "term.labels")
+
+  Xi.rdef <- sapply(terms, function(var) {
+             f <- as.formula(paste0("~ 0 + ", var))
+             model.matrix(f, data = model.frame.aux)}, simplify = FALSE)
+  Xfull.def <- do.call(cbind, Xi.rdef)
+  Xfull.def <- cbind(`(Intercept)` = rep(1, nrow(Xfull.def)), Xfull.def)
+  return(Xfull.def)
 }
 
 #' Print an object of class \code{MissingBvs}

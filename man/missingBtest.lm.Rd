@@ -28,7 +28,7 @@ missingBtest.lm(
 with one nested in all the others. If the list is unnamed, default names are
 given.}
 
-\item{null.model}{Name of the null model. If \code{NULL}, the names of covariates
+\item{null.model}{Name of the null model. If \code{NULL}, the names of variables
 in \code{models} are used to identify the null. If provided, \code{null.model}
 must coincide with the one with the largest sum of squared errors and should
 be the one with the smallest dimension.}
@@ -45,7 +45,7 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (literally specified).
 Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
@@ -57,7 +57,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
@@ -96,7 +96,7 @@ If \code{prior.models}="User" is chosen, user has to provide a q+1 dimensional
 parameter vector, where q is the number of diferent sizes among \code{models},
 with the model dimension prior probabilities through \code{priorprobs}.
 The first component of \code{priorprobs} must contain the probability of the
-model with fixed covariates; next q components correspond to the q prior probabilities
+model with fixed variables; next q components correspond to the q prior probabilities
 of the possible model dimensions.
 }
 \examples{

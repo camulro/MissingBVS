@@ -11,6 +11,7 @@ missingBVS.lm(
   BF.approx.method = "gprior",
   prior.betas = "Robust",
   prior.models = "ScottBerger",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   n.keep = 10,
   parallelmice = NULL,
@@ -43,7 +44,11 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (to be literally specified).
 Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
@@ -58,7 +63,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
@@ -81,6 +86,11 @@ the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{k}{Number of fixed variables}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Vector of length p with 1 if the variable is a numerical
+covariate and 0 otherwise}
 \item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
 most probable a posteriori models and their associated probability}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
@@ -94,6 +104,8 @@ the model space)}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{method}{\code{Full}}
 }
 \description{
@@ -103,7 +115,7 @@ in problems of small to moderate size when missingness occurs in linear models.
 \details{
 The set of competing models is made up by all the possible subsets of
 regressors specified by \code{formula}: Mi for i in 1,...,2^p, being p the number
-of potential (non-fixed) covariates in the variable selection problem. The simplest,
+of potential (non-fixed) regressors in the variable selection problem. The simplest,
 nested in all of them, contains only the intercept. \code{MissingBvs} performs
 \code{n.imp} imputations given by \code{imp.mice.method} with the mice package and
 computes the posterior distribution over this model space through Bayes' theorem:
@@ -143,7 +155,7 @@ every possible model dimension and, therefore, accounts for multiplicity issues
 If \code{prior.models}="User" is chosen, user has to provide a p+1 dimensional
 parameter vector with the model dimension prior probabilities through \code{priorprobs}.
 The first component of \code{priorprobs} must contain the probability of the
-model with fixed covariates; next p components correspond to the p prior probabilities
+model with fixed variables; next p components correspond to the p prior probabilities
 of the possible model dimensions.
 }
 \examples{
@@ -158,6 +170,10 @@ Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 García-Donato, G. and Forte, A. (2018) Bayesian Testing,
 Variable Selection and Model Averaging in Linear Models using R with
 BayesVarSel. The R Journal. 10: 329.
+
+Garcia-Donato, G. and Paulo, R. (2021)<DOI:10.1080/01621459.2021.1889565>
+Variable Selection in the Presence of Factors: A Model Selection Perspective.
+Journal of the American Statistical Association. 117. 1-27.
 
 Bayarri, M.J., Berger, J.O., Forte, A. and Garcia-Donato, G.
 (2012)<DOI:10.1214/12-aos1013> Criteria for Bayesian Model choice with

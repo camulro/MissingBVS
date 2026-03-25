@@ -169,16 +169,13 @@ mice.imputation <- function(X, formula, n.imp = 039E1,
   #Get final dim of full imputed datasets
   n <- nrow(X)
   X.formula <- as.formula(paste(formula[1], formula[3]))
-  aux <- model.matrix(X.formula, model.frame(X.formula, X, na.action = NULL))
+  aux <- model.matrix.rankdef(model.frame(X.formula, X, na.action = NULL))
   q <- ncol(aux)
 
   imputation.array <- array(0, dim = c(n, q, n.imp)) #an array with the matrices imputed
   for (s in seq_len(n.imp)) {
-    # Xs <- as.matrix(imps[[s]])
-    # mu <- colMeans(Xs)
-    # imputation.array[, , s] <- cbind(1, Xs - matrix(mu, n, p, byrow = TRUE)) #for numerical cov
-
-    imputation.array[, , s] <- model.matrix(X.formula, imps[[s]],) #build the model matrix
+    aux.imps <- model.frame(X.formula, imps[[s]])
+    imputation.array[, , s] <- model.matrix.rankdef(aux.imps) #build the model matrix
   }
   if (time.test) return(time <- Sys.time() - time)
 

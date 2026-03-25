@@ -28,14 +28,17 @@
 #' "FLS", "intrinsic.MGC" and "IHG" (see details).
 #' @param prior.models Prior distribution over the model space (to be literally specified). Possible
 #' choices are "Constant", "ScottBerger" and "User" (see details).
-#' @param priorprobs A p+1 (being p the number of non-fixed covariates)
+#' @param prior.models.dummies Prior distribution over the model space of the
+#' factor levels (to be literally specified). Possible choices are "Constant" and
+#' "ScottBerger" (see details).
+#' @param priorprobs A p+1 (being p the number of non-fixed variables)
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details.)
 #' @param init.model The model at which the simulation process starts. Options
-#' include "Null" (the model only with the covariates specified in
+#' include "Null" (the model only with the variables specified in
 #' \code{null.model}), "Full" (the model defined by \code{formula}), "Random" (a
-#' randomly selected model) and a vector with p (the number of covariates to
-#' select from) zeros and ones defining a model.
+#' randomly selected model) and a vector with p (the number of factors and/or
+#' covariates to select from) zeros and ones defining a model.
 #' @param n.iter The total number of iterations performed after the burn in
 #' process.
 #' @param n.burnin Length of burn in, i.e. number of iterations to discard at
@@ -50,7 +53,7 @@
 #' big enough.
 #' @param n.core See \code{\link[mice]{futuremice}} for details.
 #' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 10} if the number of variables or
+#' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
@@ -71,6 +74,11 @@
 #' \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 #' \item{MPMbin}{Binary expression of the Median Probability model using
 #' \code{inclprobRB}}
+#' \item{positions}{\code{matrix} with L rows and p plus the number of dummies
+#' resulting from factors columns - L, where L is the number of factors, with 1
+#' if the column dummy corresponds to the row factor and 0 otherwise}
+#' \item{positionsx}{Vector of length p with 1 if the variable is a numerical
+#' covariate and 0 otherwise}
 #' \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
 #' most probable a posteriori models and their associated Bayes factor in
 #' logaritmic scale}
@@ -85,6 +93,8 @@
 #' \item{BF.approx.method}{Function used to compute Bayes factors}
 #' \item{prior.betas}{\code{prior.betas}}
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
+#' \item{logprior.models.dumm}{Function used to compute the log-prior over the
+#' model space of the factor levels}
 #' \item{method}{\code{Gibbs}}
 #'
 #' @author Carolina Mulet and Gonzalo Garcia-Donato
@@ -145,6 +155,7 @@ missingGibbsBVS.lm <- function (formula,
                                 BF.approx.method = "gprior",
                                 prior.betas = "Robust", #if BF.approx.method = "gprior"
                                 prior.models = "ScottBerger",
+                                prior.models.dummies = "ScottBerger",
                                 priorprobs = NULL, #needed if prior.models = User
                                 init.model = "Full",
                                 n.iter = 10000, #number of iterations for Gibbs Sampling algorithm
@@ -163,7 +174,7 @@ missingGibbsBVS.lm <- function (formula,
   formula <- as.formula(formula)
   null.model <- as.formula(null.model)
 
-  #The response in the null model and in the full model must coincide
+  #Response in the null model and full model must coincide
   if (formula[[2]] != null.model[[2]]){
     stop("The response in the full and null model does not coincide.\n")
   }
@@ -175,10 +186,10 @@ missingGibbsBVS.lm <- function (formula,
   auxnull <- model.frame(null.model, data, na.action = NULL)
   namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
 
-  #Missing model matrix of fixed covariates
-  X0 <- model.matrix(null.model, auxnull)
+  #Missing model matrix of fixed vars
+  X0 <- model.matrix.rankdef(auxnull)
   namesnull <- dimnames(X0)[[2]]
-  p0 <- dim(X0)[2] #Number of covariates to select from
+  p0 <- dim(X0)[2] #Number of fixed vars
 
   #Eval the full model
   lmfull <- lm(formula, data = data, y = TRUE, x = TRUE) #omits NA observations
@@ -187,14 +198,45 @@ missingGibbsBVS.lm <- function (formula,
   auxfull <- model.frame(formula, data, na.action = NULL)
   namesx.toimp <- dimnames(auxfull)[[2]][-1] #name of variables to imputation
   namesxnotnull.toimp <- namesx.toimp[namesx.toimp %notin% namesnull.toimp]
-  X.toimp <- data[,c(namesnull.toimp, namesxnotnull.toimp)] #design matrix with missing data with fixed cov
+  X.toimp <- data[,c(namesnull.toimp, namesxnotnull.toimp)] #design matrix with missing data with fixed vars
 
   #Model matrix data with missings
-  X.full <- model.matrix(formula, auxfull)
+  X.full <- model.matrix.rankdef(auxfull)
   namesx <- dimnames(X.full)[[2]]
   namesxnotnull <- namesx[namesx %notin% namesnull]
   X.full <- X.full[, namesxnotnull]
-  p <- dim(X.full)[2] #Number of covariates to select from
+  p <- length(namesxnotnull) #Number of covariates and levels of factors to select from
+
+  #Factors: positions has number of rows equal to the number of regressors
+  #(factors or numeric covariates) and p columns.
+  #A 1 in a row denotes the position in X of a regressor (several positions for
+  #the dummies of a factor).
+  depvars <- setdiff(attr(terms(auxfull), "term.labels"),
+                     attr(terms(auxnull), "term.labels"))
+
+  positions <- t(sapply(depvars, function(var) {
+    if(is.factor(data[[var]])) {
+      levs <- levels(data[[var]])
+      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 in the namelevel matches
+    } else ind <- which(namesxnotnull == var) #1 in the name matches
+
+    posi <- rep(0,p); posi[ind] <- 1
+    posi
+  }))
+  colnames(positions) <- namesxnotnull
+
+  #vector of length p with 1 if numeric variable
+  positionsx <- as.numeric(colSums(positions %*% t(positions)) == 1)
+
+  L <- sum(!positionsx) #Number of factors to select from
+  temp <- rowSums(positions %*% t(positions))
+  l <- temp[temp > 1] #Number of levels for each factor
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
+
+  #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+  positionsfac <- positions[!positionsx*1:q,]
 
   #check if null model is contained in the full one:
   for (i in 1:p0){
@@ -205,8 +247,8 @@ missingGibbsBVS.lm <- function (formula,
 
   #Is there any variable to select from?
   if (p == p0) {
-    stop(paste0("The number of fixed covariates is equal to the number of\n",
-                "covariates in the full model. No model selection can be done.\n"))
+    stop(paste0("The number of fixed variables is equal to the number of\n",
+                "regressors in the full model. No model selection can be done.\n"))
   }
 
   #The response variable
@@ -214,7 +256,7 @@ missingGibbsBVS.lm <- function (formula,
   n <- length(y)
   SS0 <- crossprod(lmnull$residuals) #SSE of the null model
 
-  #check for missings and define covariates with NAs
+  #check for missings and define competing variables with NAs
   NAvars <- checkformissings.lm(y = auxnull[,1], X0, X.full, obsnotNA)
 
   if (p <= 20) {
@@ -223,7 +265,11 @@ missingGibbsBVS.lm <- function (formula,
   }
 
   #Check model priors chosen and define the function to be used
-  lprior.models <- checkforprior.models(prior.models, priorprobs, p)
+  lprior.models <- checkforprior.models(prior.models, priorprobs, q)
+
+  if (L > 0) {
+    lprior.models.dummies <- checkforprior.models.dummies(prior.models.dummies, l)
+  } else lprior.models.dummies <- function(delta, tau) 0
 
   #Check the initial model:
   if (is.character(init.model) == TRUE) {
@@ -246,12 +292,12 @@ missingGibbsBVS.lm <- function (formula,
 
   #Imputation of missing data
   if (is.null(parallelmice)) {
-    if (n.imp > 120 | n*p > 50000) {
+    if (n.imp > 120 | n*q > 50000) {
       parallelmice <- TRUE #faster
     } else parallelmice <- FALSE
   }
 
-  if (imp.time.test & (n*p > 10000 | n.imp > 039E1)) {
+  if (imp.time.test & (n*q > 10000 | n.imp > 039E1)) {
     #test imputation time
     cat("Time test . . . \n")
     time.test <- mice.imputation(X = X.toimp,
@@ -286,7 +332,7 @@ missingGibbsBVS.lm <- function (formula,
                                        parallel = parallelmice,
                                        n.core = n.core)
 
-  #remove observations with missings on the response
+  #remove observations with missings on the response or fixed vars
   imputation.array <- imputation.array[obsnotNA,,]
   #function to compute log(BFa0) for a given model as an average of BF computed
   #by BF.approx.method over the imputed datasets
@@ -297,15 +343,15 @@ missingGibbsBVS.lm <- function (formula,
 
   #Info:
   cat("Info. . .\n")
-  cat("Most complex model has a total of", p + p0, "single covariates.\n")
+  cat("Most complex model has a total of", q + p0, "covariates and/or factors.\n")
   if (p0 == 1) {
     cat(paste0("From those 1 is fixed (the intercept) and we should select from the remaining ",
-               p, ":\n"))
-  } else {
-    cat(paste0("From those ", p0, " are fixed and we should select from the remaining ",
-               p, ":\n"))
-  }
-  cat(paste(paste(namesxnotnull, collapse = ", ", sep = ""), "\n", sep = ""))
+               q, ".\n"))
+  } else  cat(paste0("From those ", p0, " are fixed and we should select from the remaining ",
+               q, ".\n"))
+
+  cat("  Numerical covariates:", depvars[positionsx == 1], "\n")
+  if (L > 0) cat(" Factors:", depvars[positionsx == 0], "\n")
 
   cat("The problem has a total of", 2^p, "competing models.\n")
   cat("Of these,", n.iter + n.burnin, "are sampled with replacement.\n")
@@ -313,54 +359,64 @@ missingGibbsBVS.lm <- function (formula,
 
   #George and McCulloch's Gibbs exploration
   gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
-                           lprior.models, lBF.method,
+                           lprior.models, lprior.models.dummies, lBF.method,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
 
   all.models.lPM <- gibbs.list$all.models.lPM
 
-  inclprob <- colMeans(all.models.lPM[,-(p+1)]) #inclusion probabilities except for fixed variables
+  #models matrix at the covariate-factor level
+  cf.models.lPM <- all.models.lPM[,seq_len(p)] %*% t(positions)
+  cf.models.lPM <- cbind(cf.models.lPM, all.models.lPM[,p+1])
+  colnames(cf.models.lPM)[q+1] <- "logBF.PM"
+  #cf.models.PM is exactly all.models.lPM if there are no factors
 
-  all.models.PM <- all.models.lPM[,seq_len(p)]
-  all.models.PM <- cbind(all.models.PM, exp(all.models.lPM[, p + 1]))
-  colnames(all.models.PM) <- c(namesxnotnull, "BF.PM")
+  inclprob <- colMeans(cf.models.lPM[,-(q+1)]) #inclusion probabilities except for fixed variables
+
+  cf.models.PM <- cf.models.lPM[,seq_len(q)]
+  cf.models.PM <- cbind(cf.models.PM, exp(cf.models.lPM[, q + 1]))
+  colnames(cf.models.PM) <- c(depvars, "BF.PM")
 
   #Estimation of the normalizing constant:
-  K <- round(dim(all.models.PM)[1]/2)
-  Aset <- sample(x = 1:dim(all.models.PM)[1], size = K, replace = F)
-  Bset <- (1:dim(all.models.PM)[1])[-Aset]
+  K <- round(dim(cf.models.PM)[1]/2)
+  Aset <- sample(x = 1:dim(cf.models.PM)[1], size = K, replace = F)
+  Bset <- (1:dim(cf.models.PM)[1])[-Aset]
   #Bayes factors multiplied by prior probs of the models in A
-  BF.PMAset <- all.models.PM[Aset, "BF.PM"]
+  BF.PMAset <- cf.models.PM[Aset, "BF.PM"]
   #Remove duplicates
   BF.PMAset <- unique(BF.PMAset)
   gAset <- sum(BF.PMAset)
   #How many of the models in Bset are in A?
-  sumIA <- sum(all.models.PM[Bset,"BF.PM"] %in% all.models.PM[Aset,"BF.PM"])
+  sumIA <- sum(cf.models.PM[Bset,"BF.PM"] %in% cf.models.PM[Aset,"BF.PM"])
   #Normalizing constant estimation
   C <- gAset*K / sumIA
 
   #compute estimated posterior probabilities
-  all.models.PM[, p + 1] <- exp(all.models.lPM[, p + 1] - log(C))
-  colnames(all.models.PM) <- c(namesxnotnull, "Post")
+  cf.models.PM[, q + 1] <- exp(cf.models.lPM[, q + 1] - log(C))
+  colnames(cf.models.PM) <- c(depvars, "Post")
 
-  probdim <- rep(0, p + 1)
-  all.models.lBF <- all.models.lPM
+  probdim <- rep(0, q + 1)
+  cf.models.lBF <- cf.models.lPM
   #compute posterior probability of the dimension of the true model and
   #save logBF for each model
   for (i in seq_len(floor(n.iter / n.thin))) {
-    probdim[sum(all.models.PM[i, seq_len(p)]) + 1] <-
-      probdim[sum(all.models.PM[i, seq_len(p)]) + 1] + all.models.PM[i, p + 1]
+    probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
+      probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
 
-    all.models.lBF[i, p + 1] <- all.models.lPM[i, p + 1] -
-      lprior.models(all.models.lPM[i, seq_len(p)]) # lBF
+    gamma.tau <- cf.models.lPM[i, seq_len(q)] > 0
+    deltasum <- cf.models.lPM[i, !positionsx]
+    tau <- deltasum > 0
+    cf.models.lBF[i, q + 1] <- cf.models.lPM[i, q + 1] -
+      lprior.models(gamma.tau) -
+      lprior.models.dummies(deltasum, tau) # lBF
   }
-  colnames(all.models.lBF) <- c(namesxnotnull, "logBF")
+  colnames(cf.models.lBF) <- c(depvars, "logBF")
 
   #HPM
-  nPmax <- which.max(all.models.lBF[, p+1])
-  hpm <- all.models.lBF[nPmax, ]
+  nPmax <- which.max(cf.models.lBF[, q+1])
+  hpm <- cf.models.lBF[nPmax, ]
 
   #MPM
-  mpm <- rep(0,p)
+  mpm <- rep(0,q)
   mpm[which(gibbs.list$inclprobRB[n.iter, ] >= 0.5)] <- 1
 
   #result
@@ -369,42 +425,48 @@ missingGibbsBVS.lm <- function (formula,
   result$lmfull <- lmfull #The lm object for the full model (without NAs)
   result$lmnull <- lmnull #The lm object for the null model
 
-  result$variables <- namesxnotnull #The name of the competing variables
+  result$variables <- depvars #The name of the competing variables
   result$n <- n #number of observations
-  result$p <- p #number of competing variables
-  result$k <- p0 #number of fixed covariates
-  result$HPMbin <- hpm #The binary code for the HPM model and its BF.PM
-  names(result$HPMbin) <- c(namesxnotnull, "logBF")
+  result$p <- q #number of competing vars
+  result$k <- p0 #number of fixed vars
+  result$HPMbin <- hpm #The binary code for the HPM model
+  names(result$HPMbin) <- c(depvars, "logBF")
   result$MPMbin <- mpm #The binary code for the MPM model
-  names(result$MPMbin) <- namesxnotnull
+  names(result$MPMbin) <- depvars
 
-  result$modelsprob <- all.models.lBF
+  if (L > 0) {
+    #matrix for the factors index
+    result$positions <- positionsfac
+    result$positionsx <- positionsx
+  }
+
+  result$modelsprob <- cf.models.lBF
 
   #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
-  names(result$inclprob) <- namesxnotnull
+  names(result$inclprob) <- depvars
 
   result$inclprobRB <- gibbs.list$inclprobRB #Rao-Blackwellized inclusion probability
 
   result$postprobdim <- probdim #vector with the dimension probabilities.
-  names(result$postprobdim) <- 0:p + p0 #dimension of the true model
+  names(result$postprobdim) <- 0:q + p0 #dimension of the true model
 
   result$call <- match.call()
   result$C <- C #estimated normilizing constant
 
   if(!identical(lprior.models, logUser)){
-    priorprobs <- rep(0, p + 1)
-    priorprobs[1] <- exp(lprior.models(rep(0, p))) #prior inclusion probability for dimension 0
-    for (i in seq_len(p)) {
-      priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, p - i))) + lchoose(p, i))
+    priorprobs <- rep(0, q + 1)
+    priorprobs[1] <- exp(lprior.models(rep(0, q))) #prior inclusion prob for dimension 0
+    for (i in seq_len(q)) {
+      priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, q - i))) + lchoose(q, i))
       #prior inclusion probability for each dimension
     }
   }
   result$priorprobs <- priorprobs
-  names(result$priorprobs) <- 0:p + p0 #dimension prior probability
+  names(result$priorprobs) <- 0:q + p0 #dimension prior probability
 
   #Estimation of posterior probabilities based on C
-  result$postprobs <- all.models.PM[,"Post"]
+  result$postprobs <- cf.models.PM[,"Post"]
 
   #arguments used for imputation
   result$imp.args <- list(parallelmice = parallelmice,
@@ -418,6 +480,7 @@ missingGibbsBVS.lm <- function (formula,
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas
   result$logprior.models <- lprior.models #function used for model prior
+  if (L > 0) result$logprior.models.dumm <- lprior.models.dummies
 
   result$method <- "Gibbs"
   class(result) <- "MissingBvs"
@@ -426,7 +489,7 @@ missingGibbsBVS.lm <- function (formula,
 }
 
 GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
-                        lprior.models, lBF.method,
+                        lprior.models, lprior.models.dummies, lBF.method,
                         init.model, n.iter, n.burnin, n.thin, Gibbs.seed) {
   #Gibbs sampling algorithm, originally proposed by George and McCulloch (1997)
   #and further studied by Garcia-Donato and Martinez-Beneito (2013), to explore
@@ -444,11 +507,15 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
   inclprobRB <- matrix(0, nr = n.iter + n.burnin, nc = p)
 
   current.model <- init.model
+  gamma.tau <- positions %*% current.model > 0 #covariates and/or factors active
+  deltasum <- positionsfac %*% current.model #levels of factors
+  tau <- deltasum > 0 #factors
+
   if (sum(current.model) == 0) { #null
-    lBF.PMcurrent <- lprior.models(current.model)
+    lBF.PMcurrent <- lprior.models(gamma.tau)
   } else {
     lBF.PMcurrent <- lBF.method(model = which(current.model == 1)) +
-                     lprior.models(current.model) #log(BF_a0*Pr(M))
+                     lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
   }
   #visited models in decimal notation and the corresponding log(BF_a0*Pr(M))
   visited.models.lBF.PM <- matrix(c(sum(current.model * 2^(0:(p-1))),
@@ -457,6 +524,10 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
     setTxtProgressBar(pb, i)
     for (j in seq_len(p)){
       proposal.model <- current.model; proposal.model[j] <- 1 - current.model[j]
+
+      gamma.tau <- positions %*% proposal.model > 0 #covariates and/or factors active
+      deltasum <- positionsfac %*% proposal.model #levels of factors
+      tau <- deltasum > 0 #factors
 
       #avoiding recomputing the BF for models already visited
       already.visited <- which(visited.models.lBF.PM[,1] ==
@@ -469,14 +540,15 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
           #check if there are NAs in the model considered to save computation time
           if (any(namesxnotnull[which(proposal.model == 1)] %in% NAvars)) {
             lBF.PMproposal <- lBF.method(model = which(proposal.model == 1)) +
-                              lprior.models(proposal.model) #log(BF_a0*Pr(M))
+              lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
           } else { #if there are no missings, compute the BF by the method selected
             X.i <- cbind(X0[names(y),], X.full[names(y), which(proposal.model == 1)])
             lBF.PMproposal <- BF.approx.method(k = sum(proposal.model),
-                                               X = as.matrix(X.i)) + lprior.models(proposal.model)
+                                               X = as.matrix(X.i)) +
+              lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau)
           }
         } else {
-          lBF.PMproposal <- lprior.models(proposal.model) #BF_a0 = 1
+          lBF.PMproposal <- lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #BF_a0 = 1
         }
         visited.models.lBF.PM <- rbind(visited.models.lBF.PM,
                                        c(sum(proposal.model * 2^(0:(p-1))), lBF.PMproposal))

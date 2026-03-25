@@ -19,17 +19,17 @@ probabilities.}
 }
 \description{
 Plots to summarize graphically the results in an object of class
-\code{MissingBvs}, including prior and posterior probabilities obtained. 
-Two summaries are available: the model size probability if \code{plotdim}=TRUE 
-and the inclusion probabilities if  \code{plotpip}=TRUE. By default, 
+\code{MissingBvs}, including prior and posterior probabilities obtained.
+Two summaries are available: the model size probability if \code{plotdim}=TRUE
+and the inclusion probabilities if  \code{plotpip}=TRUE. By default,
 both plots are shown.
 }
 \examples{
 # To be completed
 }
 \seealso{
-See \code{\link[MissingBVS]{MissingBvs.lm}}, 
-\code{\link[MissingBVS]{MissingBvs.glm}}, 
+See \code{\link[MissingBVS]{MissingBvs.lm}},
+\code{\link[MissingBVS]{MissingBvs.glm}},
 \code{\link[MissingBVS]{MissingGibbsBvs.lm}} and
 \code{\link[MissingBVS]{MissingGibbsBvs.glm}} for creating objects of class
 \code{MissingBvs}.
