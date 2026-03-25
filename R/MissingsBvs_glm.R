@@ -217,6 +217,7 @@ missingBVS.glm <- function (formula,
   #Response and fixed vars for imputation
   auxnull <- model.frame(null.model, data, na.action = NULL)
   namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
+  q0 <- length(namesnull.toimp) + 1 # the intercept
 
   #Missing model matrix of fixed vars
   X0 <- model.matrix.rankdef(auxnull)
@@ -379,11 +380,11 @@ missingBVS.glm <- function (formula,
 
   #Info:
   cat("Info. . .\n")
-  cat("Most complex model has a total of", q + p0, "covariates and/or factors.\n")
-  if (p0 == 1) {
+  cat("Most complex model has a total of", q + q0, "covariates and/or factors.\n")
+  if (q0 == 1) {
     cat(paste0("From those 1 is fixed (the intercept) and we should select from the remaining ",
                q, ".\n"))
-  } else cat(paste0("From those ", p0, " are fixed and we should select from the remaining ",
+  } else cat(paste0("From those ", q0, " are fixed and we should select from the remaining ",
                     q, ".\n"))
 
   cat("  Numerical covariates:", depvars[positionsx == 1], "\n")
@@ -470,7 +471,7 @@ missingBVS.glm <- function (formula,
   result$variables <- depvars #The name of the competing variables
   result$n <- n #number of observations
   result$p <- q #number of competing vars
-  result$k <- p0 #number of fixed vars
+  result$k <- q0 #number of fixed vars
   result$HPMbin <- hpm #The binary code for the HPM model
   names(result$HPMbin) <- C(depvars, "Post")
   result$MPMbin <- mpm #The binary code for the MPM model
@@ -489,7 +490,7 @@ missingBVS.glm <- function (formula,
   names(result$inclprob) <- depvars
 
   result$postprobdim <- probdim #vector with the dimension probabilities.
-  names(result$postprobdim) <- 0:q + p0 #dimension of the true model
+  names(result$postprobdim) <- 0:q + q0 #dimension of the true model
 
   result$call <- match.call()
 
@@ -502,7 +503,7 @@ missingBVS.glm <- function (formula,
     }
   }
   result$priorprobs <- priorprobs
-  names(result$priorprobs) <- 0:q + p0 #prior dimension probability
+  names(result$priorprobs) <- 0:q + q0 #prior dimension probability
 
   result$C <- C #normalizing constant
 
