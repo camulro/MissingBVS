@@ -615,6 +615,7 @@ checkforprior.betas.lm <- function (BF.approx.method, prior.betas, n, p, p0, y, 
   }
 }
 
+#' @keywords internal
 model.matrix.rankdef <- function (model.frame.aux) {
   #internal function to create rank defficient matrices from a given dataframe
   #created from a model.frame call
