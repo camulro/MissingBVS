@@ -102,7 +102,7 @@ logUser <- function(p, model, priorprobs) {
 #auxiliar function for lprior.model.dummies computation
 #returns lchoose(n, k) if k < n -1 and 1 otherwise (k <= n)
 mylchoose <- function(n, k) {
-  ifelse(k < (n - 1), lchoose(n, k), 1)
+  ifelse(k < (n - 1), lchoose(n, k), 0)
 }
 
 ## assuming independence between factors:
@@ -115,7 +115,7 @@ logScottBerger.d <- function(delta, tau, l) {
     return(0)
   } else {
     ltau <- l[tau] #levels of active factors
-    -sum(mylchoose(n = ltau, k = delta[tau])) - sum(log(ltau)) #logarithmic scale
+    -sum(mylchoose(n = ltau, k = delta[tau])) - sum(log(ltau - 1)) #logarithmic scale
   }
 }
 
@@ -124,7 +124,7 @@ logConstant.d <- function(tau, l) {
     return(0)
   } else {
     ltau <- l[tau] #levels of active factors
-    -log(2) * sum(ltau) #logarithmic scale
+    -log(2^ltau - 1 - ltau) #logarithmic scale
   }
 }
 

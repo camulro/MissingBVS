@@ -43,6 +43,9 @@
 #' "FLS", "intrinsic.MGC" and "IHG" (see details).
 #' @param prior.models Prior distribution over the model space (to be literally specified).
 #' Possible choices are "Constant", "ScottBerger" and "User" (see details).
+#' @param prior.models.dummies Prior distribution over the model space of the
+#' factor levels (to be literally specified). Possible choices are "Constant" and
+#' "ScottBerger" (see details).
 #' @param priorprobs A p+1 (being p the number of non-fixed variables)
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details).
@@ -69,14 +72,21 @@
 
 #' @return \code{\link[MissingBVS]{MissingBtest.glm}} returns an object of type
 #' \code{MissingBtest} with the following elements:
-#' \item{lBFi0}{Bayes factor in logaritmic scale of each model to the null.}
-#' \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
+#' \item{lBFi0}{Bayes factor in logaritmic scale of each model to the null}
+#' \item{PostProbi}{Posterior probabilities for each model in \code{models}}
 #' \item{models}{List with the entertained models.}
-#' \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+#' \item{nullmodel}{Name in \code{models} of the null (simplest) model}
+#' \item{positions}{\code{matrix} with L rows and p plus the number of dummies
+#' resulting from factors columns - L, where L is the number of factors, with 1
+#' if the column dummy corresponds to the row factor and 0 otherwise}
+#' \item{positionsx}{Vector of length p with 1 if the variable is a numerical
+#' covariate and 0 otherwise}
 #' \item{imp.args}{List of arguments used for the imputation step}
 #' \item{BF.approx.method}{Function used to compute Bayes factors}
 #' \item{prior.betas}{\code{prior.betas}}
 #' \item{prior.models}{Function used to compute the prior over the model space}
+#' \item{logprior.models.dumm}{Function used to compute the log-prior over the
+#' model space of the factor levels}
 #' \item{priorprobs}{Prior probabilities over the true model dimension}
 #'
 #' @author Carolina Mulet and Gonzalo García-Donato
@@ -118,6 +128,7 @@ missingBtest.glm <- function (data,
                               BF.approx.method = "BIC",
                               prior.betas = "Robust", #if BF.approx.method = "gprior"
                               prior.models = "Constant",
+                              prior.models.dummies = "ScottBerger",
                               priorprobs = NULL, #needed if prior.models = "User"
                               imp.mice.method = "pmm", #mice's default
                               parallelmice = NULL,
@@ -206,7 +217,7 @@ missingBtest.glm <- function (data,
   auxnull <- model.frame(null.model, data, na.action = NULL)
   namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
 
-  #Missing model matrix of fixed variables
+  #Missing model matrix of fixed vars
   X0 <- model.matrix.rankdef(auxnull)
   namesnull <- dimnames(X0)[[2]]
   p0 <- dim(X0)[2] #Number of fixed vars
@@ -224,7 +235,7 @@ missingBtest.glm <- function (data,
   namesx <- dimnames(X.full)[[2]]
   namesxnotnull <- namesx[namesx %notin% namesnull]
   X.full <- X.full[, namesxnotnull]
-  p <- dim(X.full)[2] #Number of variables
+  p <- length(namesxnotnull) #Number of covariates and levels of factors
 
   #Factors: positions has number of rows equal to the number of regressors
   #(factors or numeric covariates) and p columns.
@@ -255,7 +266,7 @@ missingBtest.glm <- function (data,
   #q = p if there are no factors
 
   #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-  # positionsfac <- positions[!positionsx*1:q,]
+  positionsfac <- positions[!positionsx*1:q,]
 
   #The response variable
   obsnotNA <- rownames(na.omit(auxnull)) #response variable without missings
@@ -285,6 +296,17 @@ missingBtest.glm <- function (data,
               stop("Prior probabilities must be positive.\n")
             }
             prior.models <- function(modeli) priorprobs[modeli]}
+  )
+
+  #Check model priors for dummies chosen and define the function to be used
+  if (prior.models.dummies %notin% c("ScottBerger", "Constant")) {
+    stop("Only priors 'ScottBerger' and 'Constant' supported.\n")
+  }
+  switch (prior.models.dummies, #change the string for the corresponding function
+          Constant = {lprior.models.dummies <-
+            function (deltai, ltau) {-sum(log(2^(ltau) - 1 - ltau))}},
+          ScottBerger = {lprior.models.dummies <-
+            function (deltai, ltau) {-sum(mylchoose(ltau, deltai)) - sum(log(ltau - 1))}}
   )
 
   #Check approx method and priors chosen and define the function to be used
@@ -347,25 +369,66 @@ missingBtest.glm <- function (data,
   for (i in competing.models){
     modeli <- namesxnotnull %in% covar.list[[i]]
 
-    gamma.tau <- positions %*% modeli > 0 #covariates and/or factors active
-    # deltasum <- positionsfac %*% modeli #levels of factors
-
     #check whether the null is nested in the other ones
     if (!relax.nest & any(namesnull %notin% covar.list[[i]])) {
       stop(paste0("The simplest (null) model may not be nested in all the others.\n",
                   "Please define explicitly the null model if it is the case.\n"))
     }
 
-    #check if there are NAs in the model considered to save computation time
-    if (any(covar.list[[i]] %in% NAvars)) {
-      lBFi0[i] <- lBF.method(model = which(modeli))
-    } else { #if there are no missings, compute the BF by the method selected
-      X.i <- cbind(X0[obsnotNA,], X.full[obsnotNA, which(modeli)])
-      lBFi0[i] <- BF.approx.method(k = Dim[i], X = as.matrix(X.i))
-    }
-    lPriorModels[i] <- log(prior.models(gamma.tau))
-  }
+    deltasum <- positionsfac %*% modeli #levels of factors
+    tau <- deltasum > 0; ltau <- deltasum[tau]
+    m2 <- sum(tau) #number of factors active
+    positionsfaci <- matrix(positionsfac[which(tau),] == 1, nrow = m2)
+    if (m2 > 0) {
+      ind <- t(sapply(2:(2^ltau[1])-1, FUN =
+                        function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[1])))
+      half <- ceiling(nrow(ind)/2)
+      rep <- which(rowSums(ind[half:nrow(ind),])  >= (ltau[1] - 1)) + half - 1
+      mat.ind <- matrix(ind[-rep,], ncol = ltau[1])
+      if (m2 > 1) {
+        for(j in 2:m2){
+          ind <- t(sapply(2:(2^ltau[j])-1, FUN =
+                            function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[j])))
+          half <- ceiling(nrow(ind)/2)
+          rep <- which(rowSums(ind[half:nrow(ind),])  >= (ltau[j] - 1)) + half - 1
+          ind <- matrix(ind[-rep,], ncol = ltau[j])
+          mat.ind <- merge(mat.ind, ind, by = NULL)
+        }
+      }
+      colnames(mat.ind) <- namesxnotnull[apply(positionsfaci, MARGIN = 2, FUN = any)]
 
+      lBF <- lpriorM <- numeric(nrow(mat.ind))
+      for (j in 1:nrow(mat.ind)) {
+        deltaj <- mat.ind[j,]
+        deltasumj <- positionsfac[which(tau),colnames(mat.ind)] %*% as.numeric(deltaj)
+
+        current.model <- as.integer(modeli)
+        current.model[which(apply(positionsfaci,
+                                  MARGIN = 2, FUN = any))] <- as.numeric(deltaj)
+
+        #check if there are NAs in the model considered to save computation time
+        if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
+          lBF[j] <- lBF.method(model = which(current.model == 1)) #log(BF_a0)
+          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M))
+        } else { #if there are no missings, compute the BF by the method selected
+          X.i <- cbind(X0[obsnotNA,], X.full[obsnotNA, which(current.model == 1)])
+          lBF[j] <- BF.approx.method(k = sum(current.model), X = as.matrix(X.i)) #log(BF_a0)
+          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M))
+        }
+      }
+      lBFi0[i] <- log(sum(exp(lBF + lpriorM)))
+      lPriorModels[i] <- log(prior.models(i))
+    } else {
+      #check if there are NAs in the model considered to save computation time
+      if (any(covar.list[[i]] %in% NAvars)) {
+        lBFi0[i] <- lBF.method(model = which(modeli))
+      } else { #if there are no missings, compute the BF by the method selected
+        X.i <- cbind(X0[obsnotNA,], X.full[obsnotNA, which(modeli)])
+        lBFi0[i] <- BF.approx.method(k = Dim[i], X = as.matrix(X.i))
+      }
+      lPriorModels[i] <- log(prior.models(i))
+    }
+  }
   cat("\n")
   lPriorModels[nullmodel.pos] <- log(prior.models(nullmodel.pos))
   lBFi0[nullmodel.pos] <- 0
@@ -383,6 +446,12 @@ missingBtest.glm <- function (data,
   result$models <- models
   result$nullmodel <- names(models)[pos.user.null.model]
 
+  if (L > 0) {
+    #matrix for the factors index
+    result$positions <- positionsfac
+    result$positionsx <- positionsx
+  }
+
   #arguments used for imputation
   result$imp.args <- list(parallelmice = parallelmice,
                           imp.mice.method = imp.mice.method,
@@ -395,6 +464,7 @@ missingBtest.glm <- function (data,
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas
   result$prior.models <- prior.models #function used for model prior
+  result$logprior.models.dumm <- lprior.models.dummies
   result$priorprobs <- exp(lPriorModels)
 
   class(result) <- "MissingBtest"
