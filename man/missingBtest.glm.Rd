@@ -13,6 +13,7 @@ missingBtest.glm(
   BF.approx.method = "BIC",
   prior.betas = "Robust",
   prior.models = "Constant",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   imp.mice.method = "pmm",
   parallelmice = NULL,
@@ -57,6 +58,10 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (to be literally specified).
 Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
 \item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
@@ -94,14 +99,21 @@ for more details.}
 \value{
 \code{\link[MissingBVS]{MissingBtest.glm}} returns an object of type
 \code{MissingBtest} with the following elements:
-\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null.}
-\item{PostProbi}{Posterior probabilities for each model in \code{models}.}
+\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null}
+\item{PostProbi}{Posterior probabilities for each model in \code{models}}
 \item{models}{List with the entertained models.}
-\item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{nullmodel}{Name in \code{models} of the null (simplest) model}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Vector of length p with 1 if the variable is a numerical
+covariate and 0 otherwise}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{prior.models}{Function used to compute the prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 }
 \description{

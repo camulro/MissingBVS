@@ -210,7 +210,7 @@ Use \code{\link[MissingBVS]{MissingBvs.glm}} for an exact computation
 of the model posterior distribution (recommended when p<20).
 }
 \author{
-Carolina Mulet and Gonzalo Garcia-Donato
+Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
 \keyword{package}

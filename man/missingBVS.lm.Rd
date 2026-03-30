@@ -171,7 +171,7 @@ García-Donato, G. and Forte, A. (2018) Bayesian Testing,
 Variable Selection and Model Averaging in Linear Models using R with
 BayesVarSel. The R Journal. 10: 329.
 
-Garcia-Donato, G. and Paulo, R. (2021)<DOI:10.1080/01621459.2021.1889565>
+Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
 Variable Selection in the Presence of Factors: A Model Selection Perspective.
 Journal of the American Statistical Association. 117. 1-27.
 

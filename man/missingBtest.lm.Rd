@@ -12,6 +12,7 @@ missingBtest.lm(
   BF.approx.method = "gprior",
   prior.betas = "Robust",
   prior.models = "Constant",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   parallelmice = NULL,
   n.core = NULL,
@@ -45,6 +46,10 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (literally specified).
 Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
 \item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
@@ -69,14 +74,21 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \value{
 \code{\link[MissingBVS]{MissingBtest.lm}} returns an object of type
 \code{MissingBtest} with the following elements:
-\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null.}
-\item{PostProbi}{Posterior probabilities for each model in \code{models}.}
+\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null}
+\item{PostProbi}{Posterior probabilities for each model in \code{models}}
 \item{models}{List with the entertained models.}
-\item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{nullmodel}{Name in \code{models} of the null (simplest) model}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Vector of length p with 1 if the variable is a numerical
+covariate and 0 otherwise}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{prior.models}{Function used to compute the prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 }
 \description{
@@ -111,6 +123,10 @@ Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 García-Donato, G. and Forte, A. (2018) Bayesian Testing,
 Variable Selection and Model Averaging in Linear Models using R with
 BayesVarSel. The R Journal. 10: 329.
+
+Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
+Variable Selection in the Presence of Factors: A Model Selection Perspective.
+Journal of the American Statistical Association. 117. 1-27.
 
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 Statistics. 6: 461–464.
