@@ -230,8 +230,12 @@ missingBtest.lm <- function (data,
   q <- p - sum(l) + L #Number of factors and covariates
   #q = p if there are no factors
 
-  #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-  positionsfac <- positions[!positionsx*1:q,]
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
+    rownames(positionsfac) <- rownames(positions)[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+  } else positionsfac <- 0
 
   #The response variable
   obsnotNA <- rownames(na.omit(auxnull)) #response variable without missings
@@ -338,43 +342,41 @@ missingBtest.lm <- function (data,
                   "Please define explicitly the null model if it is the case.\n"))
     }
 
-    deltasum <- positionsfac %*% modeli #levels of factors
-    tau <- deltasum > 0; ltau <- deltasum[tau]
+    tau <- (positionsfac %*% modeli) > 0; ltau <- (positionsfac %*% modeli)[tau]
     m2 <- sum(tau) #number of factors active
-    positionsfaci <- matrix(positionsfac[which(tau),] == 1, nrow = m2)
     if (m2 > 0) {
+      colsi <- which(colSums(matrix(positionsfac[which(tau),], nrow = m2)) > 0)
       ind <- t(sapply(2:(2^ltau[1])-1, FUN =
                         function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[1])))
-      half <- ceiling(nrow(ind)/2)
-      rep <- which(rowSums(ind[half:nrow(ind),])  >= (ltau[1] - 1)) + half - 1
+      rep <- which((rowSums(ind) == ltau[1]) |
+                     ((rowSums(ind) == (ltau[1] - 1)) &  ind[,ltau[1]]))
       mat.ind <- matrix(ind[-rep,], ncol = ltau[1])
       if (m2 > 1) {
         for(j in 2:m2){
           ind <- t(sapply(2:(2^ltau[j])-1, FUN =
                             function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[j])))
-          half <- ceiling(nrow(ind)/2)
-          rep <- which(rowSums(ind[half:nrow(ind),])  >= (ltau[j] - 1)) + half - 1
+          rep <- which((rowSums(ind) == ltau[j]) |
+                         ((rowSums(ind) == (ltau[j] - 1)) &  ind[,ltau[j]]))
           ind <- matrix(ind[-rep,], ncol = ltau[j])
           mat.ind <- merge(mat.ind, ind, by = NULL)
         }
       }
-      colnames(mat.ind) <- namesxnotnull[apply(positionsfaci, MARGIN = 2, FUN = any)]
+      colnames(mat.ind) <- colsi
 
       lBF <- lpriorM <- numeric(nrow(mat.ind))
       for (j in 1:nrow(mat.ind)) {
         deltaj <- mat.ind[j,]
-        deltasumj <- positionsfac[which(tau),colnames(mat.ind)] %*% as.numeric(deltaj)
+        deltasumj <- positionsfac[which(tau), colsi] %*% as.integer(deltaj)
 
         current.model <- as.integer(modeli)
-        current.model[which(apply(positionsfaci,
-                            MARGIN = 2, FUN = any))] <- as.numeric(deltaj)
+        current.model[colsi] <- as.integer(deltaj)
 
         #check if there are NAs in the model considered to save computation time
         if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
           lBF[j] <- lBF.method(model = which(current.model == 1)) #log(BF_a0)
           lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M))
         } else { #if there are no missings, compute the BF by the method selected
-          X.i <- cbind(X0[obsnotNA,], X.full[obsnotNA, which(current.model == 1)])
+          X.i <- cbind(X0, X.full[,which(current.model == 1)])[obsnotNA,]
           lBF[j] <- BF.approx.method(k = sum(current.model), X = as.matrix(X.i)) #log(BF_a0)
           lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M))
         }
@@ -386,7 +388,7 @@ missingBtest.lm <- function (data,
       if (any(covar.list[[i]] %in% NAvars)) {
         lBFi0[i] <- lBF.method(model = which(modeli))
       } else { #if there are no missings, compute the BF by the method selected
-        X.i <- cbind(X0[obsnotNA,], X.full[obsnotNA, which(modeli)])
+        X.i <- cbind(X0, X.full[,which(modeli)])[obsnotNA,]
         lBFi0[i] <- BF.approx.method(k = Dim[i], X = as.matrix(X.i))
       }
       lPriorModels[i] <- log(prior.models(i))

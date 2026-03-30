@@ -97,7 +97,7 @@
 #' model space of the factor levels}
 #' \item{method}{\code{Gibbs}}
 #'
-#' @author Carolina Mulet and Gonzalo Garcia-Donato
+#' @author Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
 #' @seealso Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
@@ -236,8 +236,14 @@ missingGibbsBVS.lm <- function (formula,
   q <- p - sum(l) + L #Number of factors and covariates to select from
   #q = p if there are no factors
 
-  #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-  positionsfac <- positions[!positionsx*1:q,]
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
+    rownames(positionsfac) <- rownames(positions)[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- 0
 
   #check if null model is contained in the full one:
   for (i in 1:p0){
@@ -359,17 +365,12 @@ missingGibbsBVS.lm <- function (formula,
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
   #George and McCulloch's Gibbs exploration
-  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
+  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
                            lprior.models, lprior.models.dummies, lBF.method,
+                           positions, positionsfac, indf, l,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
 
-  all.models.lPM <- gibbs.list$all.models.lPM
-
-  #models matrix at the covariate-factor level
-  cf.models.lPM <- all.models.lPM[,seq_len(p)] %*% t(positions)
-  cf.models.lPM <- cbind(cf.models.lPM, all.models.lPM[,p+1])
-  colnames(cf.models.lPM)[q+1] <- "logBF.PM"
-  #cf.models.PM is exactly all.models.lPM if there are no factors
+  cf.models.lPM <- gibbs.list$cf.models.lPM
 
   inclprob <- colMeans(cf.models.lPM[,-(q+1)]) #inclusion probabilities except for fixed variables
 
@@ -407,8 +408,7 @@ missingGibbsBVS.lm <- function (formula,
     deltasum <- cf.models.lPM[i, !positionsx]
     tau <- deltasum > 0
     cf.models.lBF[i, q + 1] <- cf.models.lPM[i, q + 1] -
-      lprior.models(gamma.tau) -
-      lprior.models.dummies(deltasum, tau) # lBF
+      lprior.models(gamma.tau) - lprior.models.dummies(deltasum, tau) # lBF
   }
   colnames(cf.models.lBF) <- c(depvars, "logBF")
 
@@ -489,8 +489,9 @@ missingGibbsBVS.lm <- function (formula,
   return(result)
 }
 
-GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
+GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
                         lprior.models, lprior.models.dummies, lBF.method,
+                        positions, positionsfac, indf, l,
                         init.model, n.iter, n.burnin, n.thin, Gibbs.seed) {
   #Gibbs sampling algorithm, originally proposed by George and McCulloch (1997)
   #and further studied by Garcia-Donato and Martinez-Beneito (2013), to explore
@@ -510,7 +511,18 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
   current.model <- init.model
   gamma.tau <- positions %*% current.model > 0 #covariates and/or factors active
   deltasum <- positionsfac %*% current.model #levels of factors
-  tau <- deltasum > 0 #factors
+  tau <- deltasum > 0 #active factors
+
+  #change saturated or oversaturated model for c(1,...,1,0)
+  if (sum(tau) > 0) {
+    f.check <- (deltasum == l) | ((deltasum == (l - 1)) &
+      diag(t(apply(positionsfac, 1, function(x)x*current.model))[, indf]))
+    if(any(f.check)) {
+      for (f in which(f.check)) {
+        current.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1),0)
+      }
+    }
+  }
 
   if (sum(current.model) == 0) { #null
     lBF.PMcurrent <- lprior.models(gamma.tau)
@@ -519,8 +531,12 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
                      lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
   }
   #visited models in decimal notation and the corresponding log(BF_a0*Pr(M))
-  visited.models.lBF.PM <- matrix(c(sum(current.model * 2^(0:(p-1))),
-                                    lBF.PMcurrent), nc = 2)
+  # visited.models.lBF.PM <- matrix(c(sum(current.model * 2^(0:(p-1))),
+  #                                   lBF.PMcurrent), nc = 2)
+  #visited models with hash and the corresponding log(BF_a0*Pr(M))
+  visited.models.lBF.PM <- list()
+  visited.models.lBF.PM$models <- digest::digest(current.model)
+  visited.models.lBF.PM$lBF.PM <- lBF.PMcurrent
   for (i in seq_len(n.iter + n.burnin)){
     setTxtProgressBar(pb, i)
     for (j in seq_len(p)){
@@ -528,13 +544,27 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
 
       gamma.tau <- positions %*% proposal.model > 0 #covariates and/or factors active
       deltasum <- positionsfac %*% proposal.model #levels of factors
-      tau <- deltasum > 0 #factors
+      tau <- deltasum > 0 #active factors
+
+      #change saturated or oversaturated model for c(1,...,1,0)
+      if (sum(tau) > 0) {
+        f.check <- (deltasum == l) | ((deltasum == (l - 1)) &
+          diag(t(apply(positionsfac, 1, function(x)x*proposal.model))[, indf]))
+        if(any(f.check)) {
+          for (f in which(f.check)) {
+            proposal.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1),0)
+          }
+        }
+      }
+      hash.proposal <- digest::digest(proposal.model)
 
       #avoiding recomputing the BF for models already visited
-      already.visited <- which(visited.models.lBF.PM[,1] ==
-                                 sum(proposal.model * 2^(0:(p-1))))
+      # already.visited <- which(visited.models.lBF.PM[,1] ==
+      #                            sum(proposal.model * 2^(0:(p-1))))
+      already.visited <- which(visited.models.lBF.PM$models == hash.proposal)
       if (length(already.visited) > 0) {
-        lBF.PMproposal <- visited.models.lBF.PM[already.visited, 2]
+        # lBF.PMproposal <- visited.models.lBF.PM[already.visited, 2]
+        lBF.PMproposal <- visited.models.lBF.PM$lBF.PM[already.visited]
       } else {
         #Check if proposal.model is the null model
         if(sum(proposal.model) > 0){
@@ -543,16 +573,18 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
             lBF.PMproposal <- lBF.method(model = which(proposal.model == 1)) +
               lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
           } else { #if there are no missings, compute the BF by the method selected
-            X.i <- cbind(X0[names(y),], X.full[names(y), which(proposal.model == 1)])
+            X.i <- cbind(X0, X.full[,which(proposal.model == 1)])[obsnotNA,]
             lBF.PMproposal <- BF.approx.method(k = sum(proposal.model),
                                                X = as.matrix(X.i)) +
               lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau)
           }
-        } else {
+        } else { #null
           lBF.PMproposal <- lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #BF_a0 = 1
         }
-        visited.models.lBF.PM <- rbind(visited.models.lBF.PM,
-                                       c(sum(proposal.model * 2^(0:(p-1))), lBF.PMproposal))
+        # visited.models.lBF.PM <- rbind(visited.models.lBF.PM,
+        #                                c(sum(proposal.model * 2^(0:(p-1))), lBF.PMproposal))
+        visited.models.lBF.PM$models <- c(visited.models.lBF.PM$models, hash.proposal)
+        visited.models.lBF.PM$lBF.PM <- c(visited.models.lBF.PM$lBF.PM, lBF.PMproposal)
       }
 
       ratio <- exp(lBF.PMproposal - log(exp(lBF.PMproposal) + exp(lBF.PMcurrent)))
@@ -575,5 +607,11 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
   if (n.burnin > 0) all.models.lPM <- all.models.lPM[-seq_len(n.burnin),] #remove burnin
   all.models.lPM <- all.models.lPM[seq(1, n.iter, by = n.thin), ] #keep 1 each n.thin iterations
 
-  return(list(all.models.lPM = all.models.lPM, inclprobRB = inclprobRB))
+  #models matrix at the covariate-factor level
+  cf.models.lPM <- all.models.lPM[,seq_len(p)] %*% t(positions)
+  cf.models.lPM <- cbind(cf.models.lPM, all.models.lPM[,p+1])
+  colnames(cf.models.lPM)[ncol(cf.models.lPM)] <- "logBF.PM"
+  #cf.models.PM is exactly all.models.lPM if there are no factors
+
+  return(list(cf.models.lPM = cf.models.lPM, inclprobRB = inclprobRB %*% t(positions)))
 }

@@ -20,7 +20,8 @@ Imports:
   LaplacesDemon,
   Matrix,
   utils,
-  vctrs (>= 0.7.1)
+  vctrs (>= 0.7.1),
+  digest
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true

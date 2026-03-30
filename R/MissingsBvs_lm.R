@@ -134,7 +134,7 @@
 #' Variable Selection and Model Averaging in Linear Models using R with
 #' BayesVarSel. The R Journal. 10: 329.
 #'
-#' Garcia-Donato, G. and Paulo, R. (2021)<DOI:10.1080/01621459.2021.1889565>
+#' Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
 #' Variable Selection in the Presence of Factors: A Model Selection Perspective.
 #' Journal of the American Statistical Association. 117. 1-27.
 #'
@@ -252,8 +252,14 @@ missingBVS.lm <- function (formula,
   q <- p - sum(l) + L #Number of factors and covariates to select from
   #q = p if there are no factors
 
-  #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-  positionsfac <- positions[!positionsx*1:q,]
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
+    rownames(positionsfac) <- rownames(positions)[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- 0
 
   #check if null model is contained in the full one:
   for (i in 1:p0){
@@ -386,18 +392,24 @@ missingBVS.lm <- function (formula,
     all.models.lPM[i, seq_len(p)] <- current.model
 
     gamma.tau <- positions %*% current.model > 0 #covariates and/or factors active
-    deltasum <- positionsfac %*% current.model #levels of factors
-    tau <- deltasum > 0 #factors
+    deltasum <- positionsfac %*% current.model #levels active of factors
+    tau <- deltasum > 0 #active factors
+
+    #check if the model is one among the saturated and oversaturated due to the dummies
+    if (sum(tau) > 0) {
+      f.check <- (deltasum == l) | ((deltasum == (l - 1)) &
+        diag(t(apply(positionsfac, 1, function(x)x*current.model))[, indf]))
+      if (any(f.check)) {all.models.lPM[i, p+1] <- NA; next}
+    }
 
     #check if there are NAs in the model considered to save computation time
     if (any(namesxnotnull[which(current.model == 1)] %in% NAvars)) {
       lBF.PM <- lBF.method(model = which(current.model == 1)) +
                 lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
     } else { #if there are no missings, compute the BF by the method selected
-      X.i <- cbind(X0[obsnotNA,], X.full[obsnotNA, which(current.model == 1)])
-      lBF.PM <- BF.approx.method(k = sum(current.model),
-                                 X = as.matrix(X.i)) +
-        lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau)
+      X.i <- cbind(X0, X.full[,which(current.model == 1)])[obsnotNA,]
+      lBF.PM <- BF.approx.method(k = sum(current.model), X = as.matrix(X.i)) +
+        lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
     }
     all.models.lPM[i, p+1] <- lBF.PM
   }
@@ -406,6 +418,7 @@ missingBVS.lm <- function (formula,
   #null model
   all.models.lPM[2^p, seq_len(p)] <- rep(0, p)
   all.models.lPM[2^p, p+1] <- lprior.models(rep(0, p)) #BF = 1 for null model
+  all.models.lPM <- na.omit(all.models.lPM) #remove repeated models
 
   #renormalize
   C <- sum(exp(all.models.lPM[, p+1]))
@@ -423,9 +436,9 @@ missingBVS.lm <- function (formula,
   probdim <- rep(0, q + 1)
   #compute inclusion probabilities (except for fixed variables) and
   #posterior probability of the dimension of the true model
-  for (i in seq_len(2^p)) {
-    inclprob[which(cf.models.PM[i, seq_len(q)] == 1)] <-
-      inclprob[which(cf.models.PM[i, seq_len(q)] == 1)] + cf.models.PM[i, q + 1]
+  for (i in seq_len(nrow(cf.models.PM))) {
+    inclprob[which(cf.models.PM[i, seq_len(q)] > 0)] <-
+      inclprob[which(cf.models.PM[i, seq_len(q)] > 0)] + cf.models.PM[i, q + 1]
     probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
       probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
   }
@@ -458,7 +471,7 @@ missingBVS.lm <- function (formula,
     result$positions <- positionsfac
     result$positionsx <- positionsx
   }
-
+  n.keep <- min(n.keep, nrow(cf.models.PM))
   result$modelsprob <- cf.models.PM[order(cf.models.PM[,q+1],
                                           decreasing = TRUE)[seq_len(n.keep)],]
   #The binary code for the n.keep best models and the correspondent post

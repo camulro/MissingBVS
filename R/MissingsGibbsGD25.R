@@ -266,28 +266,36 @@ missingGibbsGD25 <- function (formula,
   lBF.PMcurrent <- lBF.method(model = which(current.model == 1)) +
                    lprior.models(current.model) #log(BF_a0*Pr(M))
   #visited models in decimal notation and the corresponding log(BF_a0*Pr(M))
-  visited.models.lBF.PM <- matrix(c(sum(current.model * 2^(0:(p-1))),
-                                    lBF.PMcurrent), nc = 2)
+  # visited.models.lBF.PM <- matrix(c(sum(current.model * 2^(0:(p-1))),
+  #                                   lBF.PMcurrent), nc = 2)
+  #visited models with hash and the corresponding log(BF_a0*Pr(M))
+  visited.models.lBF.PM <- list()
+  visited.models.lBF.PM$models <- digest::digest(current.model)
+  visited.models.lBF.PM$lBF.PM <- lBF.PMcurrent
   for (i in seq_len(n.iter + n.burnin)){
     setTxtProgressBar(pb, i)
     for (j in seq_len(p)){
       proposal.model <- current.model; proposal.model[j] <- 1 - current.model[j]
-
+      hash.proposal <-  digest::digest(proposal.model)
       #avoiding recomputing the BF for models already visited
-      already.visited <- which(visited.models.lBF.PM[,1] ==
-                                 sum(proposal.model * 2^(0:(p-1))))
+      # already.visited <- which(visited.models.lBF.PM[,1] ==
+      #                            sum(proposal.model * 2^(0:(p-1))))
+      already.visited <- which(visited.models.lBF.PM$models == hash.proposal)
       if (length(already.visited) > 0) {
-        lBF.PMproposal <- visited.models.lBF.PM[already.visited, 2]
+        # lBF.PMproposal <- visited.models.lBF.PM[already.visited, 2]
+        lBF.PMproposal <- visited.models.lBF.PM$lBF.PM[already.visited]
       } else {
         #Check if proposal.model is the null model
         if(sum(proposal.model) > 0){
           lBF.PMproposal <- lBF.method(model = which(proposal.model == 1)) +
                             lprior.models(proposal.model) #log(BF_a0*Pr(M))
-        } else {
+        } else { #null
           lBF.PMproposal <- lprior.models(proposal.model) #BF_a0 = 1
         }
-        visited.models.lBF.PM <- rbind(visited.models.lBF.PM,
-                                      c(sum(proposal.model * 2^(0:(p-1))), lBF.PMproposal))
+        # visited.models.lBF.PM <- rbind(visited.models.lBF.PM,
+        #                               c(sum(proposal.model * 2^(0:(p-1))), lBF.PMproposal))
+        visited.models.lBF.PM$models <- c(visited.models.lBF.PM$models, hash.proposal)
+        visited.models.lBF.PM$lBF.PM <- c(visited.models.lBF.PM$lBF.PM, lBF.PMproposal)
       }
 
       ratio <- exp(lBF.PMproposal - log(exp(lBF.PMproposal) + exp(lBF.PMcurrent)))

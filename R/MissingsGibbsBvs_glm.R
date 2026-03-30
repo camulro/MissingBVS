@@ -113,7 +113,7 @@
 #' model space of the factor levels}
 #' \item{method}{\code{Gibbs}}
 #'
-#' @author Carolina Mulet and Gonzalo Garcia-Donato
+#' @author  Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
 #' @seealso Use \code{\link[MissingBVS]{MissingBvs.glm}} for an exact computation
@@ -269,8 +269,14 @@ missingGibbsBVS.glm <- function (formula,
   q <- p - sum(l) + L #Number of factors and covariates to select from
   #q = p if there are no factors
 
-  #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-  positionsfac <- positions[!positionsx*1:q,]
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
+    rownames(positionsfac) <- rownames(positions)[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- 0
 
   #check if null model is contained in the full one:
   for (i in 1:p0){
@@ -394,17 +400,12 @@ missingGibbsBVS.glm <- function (formula,
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
   #George and McCulloch's Gibbs exploration
-  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
+  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
                            lprior.models, lprior.models.dummies, lBF.method,
+                           positions, positionsfac, indf, l,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
 
-  all.models.lPM <- gibbs.list$all.models.lPM
-
-  #models matrix at the covariate-factor level
-  cf.models.lPM <- all.models.lPM[,seq_len(p)] %*% t(positions)
-  cf.models.lPM <- cbind(cf.models.lPM, all.models.lPM[,p+1])
-  colnames(cf.models.lPM)[q+1] <- "logBF.PM"
-  #cf.models.PM is exactly all.models.lPM if there are no factors
+  cf.models.lPM <- gibbs.list$cf.models.lPM
 
   inclprob <- colMeans(cf.models.lPM[,-(q+1)]) #inclusion probabilities except for fixed variables
 
@@ -435,15 +436,14 @@ missingGibbsBVS.glm <- function (formula,
   #compute posterior probability of the dimension of the true model and
   #save logBF for each model
   for (i in seq_len(floor(n.iter / n.thin))) {
-    probdim[sum(cf.models.PM[i, seq_len(q)]) + 1] <-
-      probdim[sum(cf.models.PM[i, seq_len(q)]) + 1] + cf.models.PM[i, q + 1]
+    probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
+      probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
 
     gamma.tau <- cf.models.lPM[i, seq_len(q)] > 0
     deltasum <- cf.models.lPM[i, !positionsx]
     tau <- deltasum > 0
     cf.models.lBF[i, q + 1] <- cf.models.lPM[i, q + 1] -
-      lprior.models(gamma.tau) -
-      lprior.models.dummies(deltasum, tau) # lBF
+      lprior.models(gamma.tau) - lprior.models.dummies(deltasum, tau) # lBF
   }
   colnames(cf.models.lBF) <- c(depvars, "logBF")
 

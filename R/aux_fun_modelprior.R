@@ -115,7 +115,7 @@ logScottBerger.d <- function(delta, tau, l) {
     return(0)
   } else {
     ltau <- l[tau] #levels of active factors
-    -sum(mylchoose(n = ltau, k = delta[tau])) - sum(log(ltau - 1)) #logarithmic scale
+    -sum(mylchoose(ltau, delta[tau])) - sum(log(ltau - 1)) #logarithmic scale
   }
 }
 
