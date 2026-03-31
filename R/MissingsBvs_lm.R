@@ -88,8 +88,9 @@
 #' @return \code{missingBVS.lm} returns an object of class \code{missingBVS}
 #' with the following elements:
 #' \item{time}{The internal time consumed in solving the problem}
-#' \item{lmfull}{The \code{lm} class object that results when the model
-#' defined by \code{formula} is fitted by \code{\link[stats]{lm}}}
+#' \item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+#' for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
+#' the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
 #' \item{lmnull}{The \code{lm} class object that results when the null model,
 #' the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 #' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -207,9 +208,6 @@ missingBVS.lm <- function (formula,
   X0 <- model.matrix.rankdef(auxnull)
   namesnull <- dimnames(X0)[[2]]
   p0 <- dim(X0)[2] #Number of fixed vars
-
-  #Eval the full model
-  lmfull <- lm(formula, data = data, y = TRUE, x = TRUE) #omits NA observations
 
   #Full design matrix for imputation
   auxfull <- model.frame(formula, data, na.action = NULL)
@@ -397,8 +395,9 @@ missingBVS.lm <- function (formula,
 
     #check if the model is one among the saturated and oversaturated due to the dummies
     if (sum(tau) > 0) {
-      f.check <- (deltasum == l) | ((deltasum == (l - 1)) &
-        diag(t(apply(positionsfac, 1, function(x)x*current.model))[, indf]))
+      M <- t(apply(positionsfac, 1, function(x) x * current.model))
+      f.check <- (deltasum == l) | ((deltasum == l - 1) &
+                                      ifelse(L > 1, diag(M)[indf], M[, indf]))
       if (any(f.check)) {all.models.lPM[i, p+1] <- NA; next}
     }
 
@@ -451,11 +450,20 @@ missingBVS.lm <- function (formula,
   mpm <- rep(0,q)
   mpm[which(inclprob >= 0.5)] <- 1
 
+  #Evaluate lm of full model with missings using Rubin's rule
+  fit <- list()
+  for (i in 1:n.imp) {
+    #remove intercept and one dummy for each factor
+    fit[[i]] <- lm(formula, data = data.frame(cbind(y, imputation.array[,-c(1, indf),i])))
+  }
+  lmfull <- mice::pool(fit)
+
   ##result
   result <- list()
   result$time <- Sys.time() - time #The time it took the program to finish
-  result$lmfull <- lmfull # The lm object for the full model (without NAs)
-  result$lmnull <- lmnull # The lm object for the null model
+  result$lmfull <- lmfull # Object of class mipo combining the estimates for the
+  # n.imp imputed datasets for the fitted full model
+  result$lmnull <- lmnull # The lm object for the null model (omits NAs)
 
   result$variables <- depvars #The name of the competing variables
   result$n <- n #number of observations

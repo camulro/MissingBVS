@@ -78,8 +78,9 @@
 #' @return \code{missingGibbsBVS.lm} returns an object of class \code{missingBVS}
 #' with the following elements:
 #' \item{time}{The internal time consumed in solving the problem}
-#' \item{glmfull}{The \code{glm} class object that results when the model
-#' defined by \code{formula} is fitted by \code{\link[stats]{glm}}}
+#' \item{glmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+#' for the model defined by \code{formula} fitted by \code{\link[stats]{glm}} over
+#' the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
 #' \item{glmnull}{The \code{glm} class object that results when the null model,
 #' the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 #' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -209,6 +210,7 @@ missingGibbsBVS.glm <- function (formula,
                  weights = weights,
                  offset = offset,
                  control = control)
+
   #Response and fixed vars for imputation
   auxnull <- model.frame(null.model, data, na.action = NULL)
   namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
@@ -218,15 +220,6 @@ missingGibbsBVS.glm <- function (formula,
   X0 <- model.matrix.rankdef(auxnull)
   namesnull <- dimnames(X0)[[2]]
   p0 <- dim(X0)[2] #Number of fixed vars
-
-  #Eval the full model
-  glmfull <- glm(formula,
-                 data,
-                 y = TRUE, x = TRUE,
-                 family = family,
-                 weights = weights,
-                 offset = offset,
-                 control = control) #omits NA observations
 
   #Full design matrix for imputation
   auxfull <- model.frame(formula, data, na.action = NULL)
@@ -402,7 +395,7 @@ missingGibbsBVS.glm <- function (formula,
   #George and McCulloch's Gibbs exploration
   gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
                            lprior.models, lprior.models.dummies, lBF.method,
-                           positions, positionsfac, indf, l,
+                           positions, positionsfac, indf, l, L,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
 
   cf.models.lPM <- gibbs.list$cf.models.lPM
@@ -455,11 +448,20 @@ missingGibbsBVS.glm <- function (formula,
   mpm <- rep(0,q)
   mpm[which(gibbs.list$inclprobRB[n.iter, ] >= 0.5)] <- 1
 
+  #Evaluate glm of full model with missings using Rubin's rule
+  fit <- list()
+  for (i in 1:n.imp) {
+    #remove intercept and one dummy for each factor
+    fit[[i]] <- glm(formula, data = data.frame(cbind(y, imputation.array[,-c(1, indf),i])))
+  }
+  glmfull <- mice::pool(fit)
+
   #result
   result <- list()
   result$time <- Sys.time() - time #The time it took the programm to finish
-  result$glmfull <- glmfull #The glm object for the full model (without NAs)
-  result$glmnull <- glmnull #The glm object for the null model
+  result$glmfull <- glmfull # Object of class mipo combining the estimates for the
+  # n.imp imputed datasets for the fitted full model
+  result$glmnull <- glmnull # The glm object for the null model (without NAs)
 
   result$variables <- depvars #The name of the competing variables
   result$n <- n #number of observations

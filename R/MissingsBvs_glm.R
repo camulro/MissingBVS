@@ -97,8 +97,9 @@
 #' @return \code{missingBVS.glm} returns an object of class \code{missingBVS}
 #' with the following elements:
 #' \item{time}{The internal time consumed in solving the problem}
-#' \item{glmfull}{The \code{glm} class object that results when the model
-#' defined by \code{formula} is fitted by \code{\link[stats]{glm}}}
+#' \item{glmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+#' for the model defined by \code{formula} fitted by \code{\link[stats]{glm}} over
+#' the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
 #' \item{glmnull}{The \code{glm} class object that results when the null model,
 #' the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 #' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -224,15 +225,6 @@ missingBVS.glm <- function (formula,
   namesnull <- dimnames(X0)[[2]]
   p0 <- dim(X0)[2] #Number of fixed vars
 
-  #Eval the full model
-  glmfull <- glm(formula,
-                 data,
-                 y = TRUE, x = TRUE,
-                 family = family,
-                 weights = weights,
-                 offset = offset,
-                 control = control) #omits NA observations
-
   #Full design matrix for imputation
   auxfull <- model.frame(formula, data, na.action = NULL)
   namesx.toimp <- dimnames(auxfull)[[2]][-1] #name of variables to imputation
@@ -274,12 +266,14 @@ missingBVS.glm <- function (formula,
   q <- p - sum(l) + L #Number of factors and covariates to select from
   #q = p if there are no factors
 
-  #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-  positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
-  rownames(positionsfac) <- rownames(positions)[!positionsx]
-  colnames(positionsfac) <- namesxnotnull
-  #vector of length L with the position of the last dummy for each factor to check for repeated models
-  indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
+    rownames(positionsfac) <- rownames(positions)[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- 0
 
   #check if null model is contained in the full one:
   for (i in 1:p0){
@@ -419,8 +413,9 @@ missingBVS.glm <- function (formula,
 
     #check if the model is one among the saturated and oversaturated due to the dummies
     if (sum(tau) > 0) {
-      f.check <- (deltasum == l) | ((deltasum == (l - 1)) &
-        diag(t(apply(positionsfac, 1, function(x)x*current.model))[, indf]))
+      M <- t(apply(positionsfac, 1, function(x) x * current.model))
+      f.check <- (deltasum == l) | ((deltasum == l - 1) &
+                                      ifelse(L > 1, diag(M)[indf], M[, indf]))
       if (any(f.check)) {all.models.lPM[i, p+1] <- NA; next}
     }
 
@@ -473,11 +468,20 @@ missingBVS.glm <- function (formula,
   mpm <- rep(0,q)
   mpm[which(inclprob >= 0.5)] <- 1
 
+  #Evaluate glm of full model with missings using Rubin's rule
+  fit <- list()
+  for (i in 1:n.imp) {
+    #remove intercept and one dummy for each factor
+    fit[[i]] <- glm(formula, data = data.frame(cbind(y, imputation.array[,-c(1, indf),i])))
+  }
+  glmfull <- mice::pool(fit)
+
   #result
   result <- list()
   result$time <- Sys.time() - time #The time it took the program to finish
-  result$glmfull <- glmfull # The lm object for the full model (without NAs)
-  result$glmnull <- glmnull # The lm object for the null model
+  result$glmfull <- glmfull # Object of class mipo combining the estimates for the
+  # n.imp imputed datasets for the fitted full model
+  result$glmnull <- glmnull # The glm object for the null model (without NAs)
 
   result$variables <- depvars #The name of the competing variables
   result$n <- n #number of observations
