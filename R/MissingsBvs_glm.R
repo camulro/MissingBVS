@@ -470,9 +470,12 @@ missingBVS.glm <- function (formula,
 
   #Evaluate glm of full model with missings using Rubin's rule
   fit <- list()
+  formula.p <- paste(formula)
   for (i in 1:n.imp) {
     #remove intercept and one dummy for each factor
-    fit[[i]] <- glm(formula, data = data.frame(cbind(y, imputation.array[,-c(1, indf),i])))
+    data.impi <- data.frame(cbind(y, imputation.array[,-c(1, indf),i]))
+    colnames(data.impi)[1] <- formula.p[2]
+    fit[[i]] <- glm(as.formula(paste(formula.p[2],"~ .")), data = data.impi)
   }
   glmfull <- mice::pool(fit)
 
