@@ -95,7 +95,7 @@ logConstant <- function(p) {
 #'
 logUser <- function(p, model, priorprobs) {
   # priorprobs[sum(model)]/sum(priorprobs) / choose(p, sum(model))
-  log(priorprobs[sum(model)]) - log(sum(priorprobs)) - lchoose(p, sum(model)) #logaritmic scale
+  log(priorprobs[sum(model) + 1]) - log(sum(priorprobs)) - lchoose(p, sum(model)) #logaritmic scale
   #prior prob for each model size divided by the number of models with that size
 }
 
