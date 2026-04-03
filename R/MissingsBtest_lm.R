@@ -61,11 +61,15 @@
 #' \item{PostProbi}{Posterior probabilities for each model in \code{models}}
 #' \item{models}{List with the entertained models.}
 #' \item{nullmodel}{Name in \code{models} of the null (simplest) model}
+#' \item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+#' combine the estimates for each model on \code{models} fitted by
+#' \code{\link[stats]{lm}} over the \code{n.imp} imputed datasets.
+#' See \code{\link[mice]{pool}} for details}
 #' \item{positions}{\code{matrix} with L rows and p plus the number of dummies
 #' resulting from factors columns - L, where L is the number of factors, with 1
 #' if the column dummy corresponds to the row factor and 0 otherwise}
-#' \item{positionsx}{Vector of length p with 1 if the variable is a numerical
-#' covariate and 0 otherwise}
+#' \item{positionsx}{Logical vector of length p indicating whether or not the
+#' variable is a numerical covariate}
 #' \item{imp.args}{List of arguments used for the imputation step}
 #' \item{BF.approx.method}{Function used to compute Bayes factors}
 #' \item{prior.betas}{\code{prior.betas}}
@@ -149,6 +153,7 @@ missingBtest.lm <- function (data,
   lBFi0 <- rep(0, N)
   lPriorModels <- rep(0, N)
   PostProbi <- rep(0, N)
+  mt <- list() #list of terms for each model
 
   #list that contains the names of the variables or factors in each model
   covar.list <- list()
@@ -162,7 +167,7 @@ missingBtest.lm <- function (data,
     Xi <- model.matrix.rankdef(model.frame(temp))
     covar.list[[i]] <- dimnames(Xi)[[2]]
     Dim[i] <- length(covar.list[[i]])
-
+    mt[[i]] <- temp$terms
   }
   ordered.SSE <- sort(SSE, index.return = TRUE, decreasing = TRUE)
   #Which acts as null model:
@@ -179,72 +184,76 @@ missingBtest.lm <- function (data,
   competing.models <- seq_len(N)[-nullmodel.pos]
 
   #Response and fixed vars for imputation
-  auxnull <- model.frame(null.model, data, na.action = NULL)
-  namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
+  framenull <- model.frame(null.model, data, na.action = NULL)
+  #Rank deficient fixed model matrix to remove vars from the regressors one
+  X0rdf <- model.matrix.rankdef(framenull)
 
   #Missing model matrix of fixed vars
-  X0 <- model.matrix.rankdef(auxnull)
+  X0 <- model.matrix(framenull, data)
   namesnull <- dimnames(X0)[[2]]
-  p0 <- dim(X0)[2] #Number of fixed vars
+  p0 <- dim(X0)[2] #Number of fixed covariates or dummies of factors
   Dim <- Dim - p0 #model dimension (without fixed vars)
 
   #Full design matrix for imputation
   formula <- as.formula(paste0(null.model[[2]], "~ ."))
-  auxfull <- model.frame(formula, data, na.action = NULL)
-  namesx.toimp <- dimnames(auxfull)[[2]][-1] #name of variables to imputation
-  namesxnotnull.toimp <- namesx.toimp[namesx.toimp %notin% namesnull.toimp]
-  X.toimp <- data[,c(namesnull.toimp, namesxnotnull.toimp)] #design matrix with missing data with fixed vars
+  framefull <- model.frame(formula, data, na.action = NULL)
+  X.toimp <- data[, attr(terms(framefull), "term.labels")] #design matrix with missing data with fixed vars
 
-  #Model matrix data with missings
-  X.full <- model.matrix.rankdef(auxfull)
+  #Rank deficient full model matrix data with missings
+  X.full <- model.matrix.rankdef(framefull)
   namesx <- dimnames(X.full)[[2]]
-  namesxnotnull <- namesx[namesx %notin% namesnull]
+  #Only the non-fixed vars
+  namesxnotnull <- namesx[namesx %notin% dimnames(X0rdf)[[2]]]
   X.full <- X.full[, namesxnotnull]
   p <- length(namesxnotnull) #Number of covariates and levels of factors
+
+  #the order for the posterior model distribution computation step
+  ordvars <- c(namesnull, namesxnotnull) #X0, X.full
+
+  #covariates and/or factors to select from
+  depvars <- setdiff(attr(terms(framefull), "term.labels"),
+                     attr(terms(framenull), "term.labels"))
 
   #Factors: positions has number of rows equal to the number of regressors
   #(factors or numeric covariates) and p columns.
   #A 1 in a row denotes the position in X of a regressor (several positions for
   #the dummies of a factor).
-  depvars <- setdiff(attr(terms(auxfull), "term.labels"),
-                     attr(terms(auxnull), "term.labels"))
-
   positions <- t(sapply(depvars, function(var) {
     if(is.factor(data[[var]])) {
       levs <- levels(data[[var]])
-      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 in the namelevel matches
-    } else ind <- which(namesxnotnull == var) #1 in the name matches
+      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
+    } else ind <- which(namesxnotnull == var) #1 if the name matches
 
     posi <- rep(0,p); posi[ind] <- 1
     posi
   }))
   colnames(positions) <- namesxnotnull
 
-  #vector of length p with 1 if numeric variable
-  positionsx <- as.numeric(colSums(positions %*% t(positions)) == 1)
+  tmp <- colSums(positions %*% t(positions))
+  positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
 
-  L <- sum(!positionsx) #Number of factors present
-  temp <- rowSums(positions %*% t(positions))
-  l <- temp[temp > 1] #Number of levels for each factor
-
-  q <- p - sum(l) + L #Number of factors and covariates
+  L <- sum(!positionsx) #Number of factors to select from
+  l <- tmp[tmp > 1] #Number of levels for each factor
+  q <- p - sum(l) + L #Number of factors and covariates to select from
   #q = p if there are no factors
 
   if (L > 0) {
     #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-    positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
-    rownames(positionsfac) <- rownames(positions)[!positionsx]
+    positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
+    rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
   } else positionsfac <- 0
 
   #The response variable
-  obsnotNA <- rownames(na.omit(auxnull)) #response variable without missings
-  y <- auxnull[obsnotNA, 1]
+  obsnotNA <- rownames(X0)
+  y <- framenull[obsnotNA, 1] #response variable without missings
   n <- length(y)
   SS0 <- SSE[nullmodel.pos]
 
+  X.full <- X.full[obsnotNA,] #remove NA obs from null model
+
   #check for missings and define variables with NAs
-  NAvars <- checkformissings.lm(y = auxnull[,1], X0, X.full, obsnotNA)
+  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
 
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
@@ -324,8 +333,9 @@ missingBtest.lm <- function (data,
                                        parallel = parallelmice,
                                        n.core = n.core)
 
-  #remove observations with missings on the response
-  imputation.array <- imputation.array[obsnotNA,,]
+  #remove observations with missings on the response or fixed vars,
+  #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
+  imputation.array <- imputation.array[obsnotNA, ordvars,]
   #function to compute log(BFa0) for a given model as an average of BF computed
   #by BF.approx.method over the imputed datasets
   lBF.method <- function (model) lBF.approx(model,
@@ -366,19 +376,19 @@ missingBtest.lm <- function (data,
       lBF <- lpriorM <- numeric(nrow(mat.ind))
       for (j in 1:nrow(mat.ind)) {
         deltaj <- mat.ind[j,]
-        deltasumj <- positionsfac[which(tau), colsi] %*% as.integer(deltaj)
+        deltasumj <- positionsfac[which(tau), colsi] %*% deltaj
 
         current.model <- as.integer(modeli)
-        current.model[colsi] <- as.integer(deltaj)
+        current.model[colsi] <- deltaj
 
         #check if there are NAs in the model considered to save computation time
         if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
           lBF[j] <- lBF.method(model = which(current.model == 1)) #log(BF_a0)
-          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M))
+          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
         } else { #if there are no missings, compute the BF by the method selected
-          X.i <- cbind(X0, X.full[,which(current.model == 1)])[obsnotNA,]
-          lBF[j] <- BF.approx.method(k = sum(current.model), X = as.matrix(X.i)) #log(BF_a0)
-          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M))
+          X.i <- cbind(X0, X.full[, which(current.model == 1)])
+          lBF[j] <- BF.approx.method(k = sum(current.model), X = X.i) #log(BF_a0)
+          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
         }
       }
       lBFi0[i] <- log(sum(exp(lBF + lpriorM)))
@@ -388,14 +398,13 @@ missingBtest.lm <- function (data,
       if (any(covar.list[[i]] %in% NAvars)) {
         lBFi0[i] <- lBF.method(model = which(modeli))
       } else { #if there are no missings, compute the BF by the method selected
-        X.i <- cbind(X0, X.full[,which(modeli)])[obsnotNA,]
-        lBFi0[i] <- BF.approx.method(k = Dim[i], X = as.matrix(X.i))
+        X.i <- cbind(X0, X.full[,which(modeli)])
+        lBFi0[i] <- BF.approx.method(k = Dim[i], X = X.i)
       }
       lPriorModels[i] <- log(prior.models(i))
     }
   }
   cat("\n")
-
   lPriorModels[nullmodel.pos] <- log(prior.models(nullmodel.pos))
   lBFi0[nullmodel.pos] <- 0
   C <- sum(exp(lBFi0 + lPriorModels))
@@ -406,11 +415,30 @@ missingBtest.lm <- function (data,
   names(PostProbi) <- names(models)
   names(lPriorModels) <- names(models)
 
+  #Evaluate lm of each model with missings using Rubin's rule
+  modelspool <- list()
+  for(j in competing.models){
+    fit <- list()
+    namesj <- namesxnotnull[namesxnotnull %in% covar.list[[j]]]
+    for (i in 1:n.imp) {
+      #remove last dummy for each factor, first q0 vars are the fixed ones
+      z <- lm.fit(x = imputation.array[,c(namesnull, namesj),i], y = y)
+      z$terms <- mt[[j]]
+      class(z) <- "lm"
+
+      fit[[i]] <- z
+    }
+    modelspool[[j]] <- mice::pool(fit)
+  }
+  modelspool[[nullmodel.pos]] <- lm(null.model, data)
+  names(modelspool) <- names(models)
+
   result <- list()
   result$lBFi0 <- lBFi0
   result$PostProbi <- PostProbi
   result$models <- models
-  result$nullmodel <- names(models)[pos.user.null.model]
+  result$nullmodel <- names(models)[nullmodel.pos]
+  result$modelspool <- modelspool
 
   if (L > 0) {
     #matrix for the factors index

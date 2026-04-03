@@ -15,9 +15,6 @@
 #' @export
 #' @param formula Formula defining the most complex (full) regression model in the
 #' analysis. See details.
-#' @param null.model Formula defining which is the simplest (null) model, which.
-#' should be nested in the full one. By default, it is defined to be the one
-#' with just the intercept.
 #' @param data Data frame containing the data.
 #' @param family String, function or the call to a family function among
 #' \code{\link[stats]{family}} to specify the error distribution and link
@@ -25,6 +22,9 @@
 #' \pkg{BAS}: \code{binomial(link = "logit")},
 #' \code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
 #' using BAS logmarginal computation is performed.
+#' @param null.model Formula defining which is the simplest (null) model, which.
+#' should be nested in the full one. By default, it is defined to be the one
+#' with just the intercept.
 #' @param BF.approx.method Method used to approximate Bayes factors with missing
 #' data (to be literally specified). Possible choices include "BIC", "TBF" and
 #' "gprior" (see details).
@@ -93,8 +93,8 @@
 #' \item{positions}{\code{matrix} with L rows and p plus the number of dummies
 #' resulting from factors columns - L, where L is the number of factors, with 1
 #' if the column dummy corresponds to the row factor and 0 otherwise}
-#' \item{positionsx}{Vector of length p with 1 if the variable is a numerical
-#' covariate and 0 otherwise}
+#' \item{positionsx}{Logical vector of length p indicating whether or not the
+#' variable is a numerical covariate}
 #' \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
 #' most probable a posteriori models and their associated Bayes factor in
 #' logaritmic scale}
@@ -155,9 +155,9 @@
 #' @examples #To be completed
 #'
 missingGibbsBVS.glm <- function (formula,
-                                 null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""), #only the intercept for now
                                  data,
                                  family = binomial(link = "logit"),
+                                 null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
                                  BF.approx.method = "BIC",
                                  prior.betas = "Robust", #if BF.approx.method = "gprior"
                                  prior.models = "ScottBerger",
@@ -174,7 +174,6 @@ missingGibbsBVS.glm <- function (formula,
                                  n.imp = 039E1, #number of imputed datasets for BF
                                  Gibbs.seed = runif(1,0,26061970), #seed for the Gibbs sampling
                                  imp.seed = runif(1,0,09011975), #seed for the imputation
-                                 #glm.fit arguments:
                                  weights = rep(1, dim(data)[1]),
                                  offset = rep(0, dim(data)[1]),
                                  control = glm.control(),
@@ -212,64 +211,39 @@ missingGibbsBVS.glm <- function (formula,
                  control = control)
 
   #Response and fixed vars for imputation
-  auxnull <- model.frame(null.model, data, na.action = NULL)
-  namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
-  q0 <- length(namesnull.toimp) + 1 # the intercept
+  framenull <- model.frame(null.model, data, na.action = NULL)
+  q0 <- dim(framenull)[2] # number of fixed covariates and/or factors,intercept always
+
+  #Rank deficient fixed model matrix to remove vars from the regressors one
+  X0rdf <- model.matrix.rankdef(framenull)
 
   #Missing model matrix of fixed vars
-  X0 <- model.matrix.rankdef(auxnull)
+  X0 <- model.matrix(framenull, data)
   namesnull <- dimnames(X0)[[2]]
-  p0 <- dim(X0)[2] #Number of fixed vars
+  p0 <- dim(X0)[2] #Number of fixed covariates or dummies of factors
 
   #Full design matrix for imputation
-  auxfull <- model.frame(formula, data, na.action = NULL)
-  namesx.toimp <- dimnames(auxfull)[[2]][-1] #name of variables to imputation
-  namesxnotnull.toimp <- namesx.toimp[namesx.toimp %notin% namesnull.toimp]
-  X.toimp <- data[,c(namesnull.toimp, namesxnotnull.toimp)] #design matrix with missing data with fixed vars
+  framefull <- model.frame(formula, data, na.action = NULL)
+  X.toimp <- data[, attr(terms(framefull), "term.labels")] #design matrix with missing data with fixed vars
 
-  #Model matrix data with missings
-  X.full <- model.matrix.rankdef(auxfull)
+  #Rank deficient full model matrix data with missings
+  X.full <- model.matrix.rankdef(framefull)
   namesx <- dimnames(X.full)[[2]]
-  namesxnotnull <- namesx[namesx %notin% namesnull]
+  #Only the non-fixed vars
+  namesxnotnull <- namesx[namesx %notin% dimnames(X0rdf)[[2]]]
   X.full <- X.full[, namesxnotnull]
   p <- length(namesxnotnull) #Number of covariates and levels of factors to select from
 
-  #Factors: positions has number of rows equal to the number of regressors
-  #(factors or numeric covariates) and p columns.
-  #A 1 in a row denotes the position in X of a regressor (several positions for
-  #the dummies of a factor).
-  depvars <- setdiff(attr(terms(auxfull), "term.labels"),
-                     attr(terms(auxnull), "term.labels"))
+  #Is there any variable to select from?
+  if (p == 0) {
+    stop(paste0("The number of fixed variables is equal to the number of\n",
+                "regressors in the full model. No model selection can be done.\n"))
+  }
 
-  positions <- t(sapply(depvars, function(var) {
-    if(is.factor(data[[var]])) {
-      levs <- levels(data[[var]])
-      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 in the namelevel matches
-    } else ind <- which(namesxnotnull == var) #1 in the name matches
-
-    posi <- rep(0,p); posi[ind] <- 1
-    posi
-  }))
-  colnames(positions) <- namesxnotnull
-
-  #vector of length p with 1 if numeric variable
-  positionsx <- as.numeric(colSums(positions %*% t(positions)) == 1)
-
-  L <- sum(!positionsx) #Number of factors to select from
-  temp <- rowSums(positions %*% t(positions))
-  l <- temp[temp > 1] #Number of levels for each factor
-
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
-  if (L > 0) {
-    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-    positionsfac <- matrix(positions[!positionsx*1:q,], ncol = p, nrow = L)
-    rownames(positionsfac) <- rownames(positions)[!positionsx]
-    colnames(positionsfac) <- namesxnotnull
-    #vector of length L with the position of the last dummy for each factor to check for repeated models
-    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-  } else positionsfac <- indf <- 0
+  if (p <= 20) {
+    warning(paste0("The number of variables is small enough to visit every model.\n",
+                   "Consider using MissingBvs.lm.\n"), immediate. = TRUE)
+  }
 
   #check if null model is contained in the full one:
   for (i in 1:p0){
@@ -278,11 +252,45 @@ missingGibbsBVS.glm <- function (formula,
     }
   }
 
-  #Is there any variable to select from?
-  if (p == p0) {
-    stop(paste0("The number of fixed variables is equal to the number of\n",
-                "regressors in the full model. No model selection can be done.\n"))
-  }
+  #the order for the posterior model distribution computation step
+  ordvars <- c(namesnull, namesxnotnull) #X0, X.full
+
+  #covariates and/or factors to select from
+  depvars <- setdiff(attr(terms(framefull), "term.labels"),
+                     attr(terms(framenull), "term.labels"))
+
+
+  #Factors: positions has number of rows equal to the number of regressors
+  #(factors or numeric covariates) and p columns.
+  #A 1 in a row denotes the position in X of a regressor (several positions for
+  #the dummies of a factor).
+  positions <- t(sapply(depvars, function(var) {
+    if(is.factor(data[[var]])) {
+      levs <- levels(data[[var]])
+      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
+    } else ind <- which(namesxnotnull == var) #1 if the name matches
+
+    posi <- rep(0,p); posi[ind] <- 1
+    posi
+  }))
+  colnames(positions) <- namesxnotnull
+
+  tmp <- colSums(positions %*% t(positions))
+  positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
+
+  L <- sum(!positionsx) #Number of factors to select from
+  l <- tmp[tmp > 1] #Number of levels for each factor
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
+
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
+    rownames(positionsfac) <- depvars[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- 0
 
   #The response variable
   y <- glmnull$y; obsnotNA <- names(y) #without missings
@@ -290,20 +298,10 @@ missingGibbsBVS.glm <- function (formula,
   n <- length(y) #observations without missings on the response
   devnull <- glmnull$deviance #deviance of the null model
 
+  X.full <- X.full[obsnotNA,] #remove NA obs from null model
+
   #check for missings and define competing variables with NAs
-  NAvars <- checkformissings.glm(y = auxnull[,1], X0, X.full, obsnotNA)
-
-  if (p <= 20) {
-    warning(paste0("The number of variables is small enough to visit every model.\n",
-                   "Consider using MissingBvs.lm.\n"), immediate. = TRUE)
-  }
-
-  #Check model priors chosen and define the function to be used
-  lprior.models <- checkforprior.models(prior.models, priorprobs, q)
-
-  if (L > 0) {
-    lprior.models.dummies <- checkforprior.models.dummies(prior.models.dummies, l)
-  } else lprior.models.dummies <- function(delta, tau) 0
+  NAvars <- checkformissings.glm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
 
   #Check the initial model:
   if (is.character(init.model) == TRUE) {
@@ -318,6 +316,13 @@ missingGibbsBVS.glm <- function (formula,
     init.model <- as.numeric(init.model > 0)
     if (length(init.model) != p) stop("Initial model with incorrect length.\n")
   }
+
+  #Check model priors chosen and define the function to be used
+  lprior.models <- checkforprior.models(prior.models, priorprobs, q)
+
+  if (L > 0) {
+    lprior.models.dummies <- checkforprior.models.dummies(prior.models.dummies, l)
+  } else lprior.models.dummies <- function(delta, tau) 0
 
   #Check approx method and priors chosen and define the function to be used
   BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
@@ -367,8 +372,9 @@ missingGibbsBVS.glm <- function (formula,
                                        parallel = parallelmice,
                                        n.core = n.core)
 
-  #remove observations with missings on the response
-  imputation.array <- imputation.array[obsnotNA,,]
+  #remove observations with missings on the response or fixed vars,
+  #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
+  imputation.array <- imputation.array[obsnotNA, ordvars,]
   #function to compute log(BFa0) for a given model as an average of BF computed
   #by BF.approx.method over the imputed datasets
   lBF.method <- function (model) lBF.approx(model,
@@ -385,8 +391,8 @@ missingGibbsBVS.glm <- function (formula,
   } else  cat(paste0("From those ", q0, " are fixed and we should select from the remaining ",
                      q, ".\n"))
 
-  cat("  Numerical covariates:", depvars[positionsx == 1], "\n")
-  if (L > 0) cat(" Factors:", depvars[positionsx == 0], "\n")
+  cat("  Numerical covariates:", depvars[positionsx], "\n")
+  if (L > 0) cat(" Factors:", depvars[!positionsx], "\n")
 
   cat("The problem has a total of", 2^p, "competing models.\n")
   cat("Of these,", n.iter + n.burnin, "are sampled with replacement.\n")
@@ -404,7 +410,7 @@ missingGibbsBVS.glm <- function (formula,
 
   cf.models.PM <- cf.models.lPM[,seq_len(q)]
   cf.models.PM <- cbind(cf.models.PM, exp(cf.models.lPM[, q + 1]))
-  colnames(cf.models.PM) <- c(depvars, "BF.PM")
+  colnames(cf.models.PM)[q+1] <- "BF.PM"
 
   #Estimation of the normalizing constant:
   K <- round(dim(cf.models.PM)[1]/2)
@@ -422,7 +428,7 @@ missingGibbsBVS.glm <- function (formula,
 
   #compute estimated posterior probabilities
   cf.models.PM[, q + 1] <- exp(cf.models.lPM[, q + 1] - log(C))
-  colnames(cf.models.PM) <- c(depvars, "Post")
+  colnames(cf.models.PM)[q+1] <- "Post"
 
   probdim <- rep(0, q + 1)
   cf.models.lBF <- cf.models.lPM
@@ -438,7 +444,7 @@ missingGibbsBVS.glm <- function (formula,
     cf.models.lBF[i, q + 1] <- cf.models.lPM[i, q + 1] -
       lprior.models(gamma.tau) - lprior.models.dummies(deltasum, tau) # lBF
   }
-  colnames(cf.models.lBF) <- c(depvars, "logBF")
+  colnames(cf.models.lBF)[q+1] <- "logBF"
 
   #HPM
   nPmax <- which.max(cf.models.lBF[, q+1])
@@ -450,12 +456,15 @@ missingGibbsBVS.glm <- function (formula,
 
   #Evaluate glm of full model with missings using Rubin's rule
   fit <- list()
-  formula.p <- paste(formula)
+  mt <- attr(framefull, "terms")
   for (i in 1:n.imp) {
-    #remove intercept and one dummy for each factor
-    data.impi <- data.frame(cbind(y, imputation.array[,-c(1, indf),i]))
-    colnames(data.impi)[1] <- formula.p[2]
-    fit[[i]] <- glm(as.formula(paste(formula.p[2],"~ .")), data = data.impi)
+    #remove last dummy for each factor, first q0 vars are the fixed ones
+    z <- glm.fit(x = imputation.array[,-c(indf + p0),i], y = y, family = family,
+                 weights = weights, offset = offset, control = control)
+    z$terms <- mt
+    class(z) <- "glm"
+
+    fit[[i]] <- z
   }
   glmfull <- mice::pool(fit)
 
@@ -471,7 +480,6 @@ missingGibbsBVS.glm <- function (formula,
   result$p <- q #number of competing vars
   result$k <- q0 #number of fixed vars
   result$HPMbin <- hpm #The binary code for the HPM model and its BF.PM
-  names(result$HPMbin) <- c(depvars, "logBF")
   result$MPMbin <- mpm #The binary code for the MPM model
   names(result$MPMbin) <- depvars
 
@@ -485,8 +493,6 @@ missingGibbsBVS.glm <- function (formula,
 
   #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
-  names(result$inclprob) <- depvars
-
   result$inclprobRB <- gibbs.list$inclprobRB #Rao-Blackwellized inclusion probability
 
   result$postprobdim <- probdim #vector with the dimension probabilities.
