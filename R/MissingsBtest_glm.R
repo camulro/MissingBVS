@@ -24,16 +24,16 @@
 #' @param models List with the entertained models and their defining formulas,
 #' with one nested in all the others. If the list is unnamed, default names are
 #' given.
-#' @param null.model Name of the null model. If \code{NULL}, the names of variables
-#' in \code{models} are used to identify the null. If provided, \code{null.model}
-#' must coincide with the one with the largest sum of squared errors and should
-#' be the one with the smallest dimension.
 #' @param family String, function or the call to a family function among
 #' \code{\link[stats]{family}} to specify the error distribution and link
 #' function to be used in the model. If it is one of the implemented families in
 #' \pkg{BAS}: \code{binomial(link = "logit")},
 #' \code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
 #' using BAS logmarginal computation is performed.
+#' @param null.model Name of the null model. If \code{NULL}, the names of variables
+#' in \code{models} are used to identify the null. If provided, \code{null.model}
+#' must coincide with the one with the largest sum of squared errors and should
+#' be the one with the smallest dimension.
 #' @param BF.approx.method Method used to approximate Bayes factors with missing
 #' data (to be literally specified). Possible choices include "BIC", "TBF" and
 #' "gprior" (see details).
@@ -127,8 +127,8 @@
 #'
 missingBtest.glm <- function (data,
                               models,
-                              null.model = NULL,
                               family = binomial(link = "logit"),
+                              null.model = NULL,
                               BF.approx.method = "BIC",
                               prior.betas = "Robust", #if BF.approx.method = "gprior"
                               prior.models = "Constant",
@@ -175,11 +175,11 @@ missingBtest.glm <- function (data,
   offset <- as.numeric(offset)
   laplace <- as.integer(laplace)
 
-  Dev <- rep(0, N) #deviances for each model
-  Dim <- rep(0, N)
-  lBFi0 <- rep(0, N)
-  lPriorModels <- rep(0, N)
-  PostProbi <- rep(0, N)
+  Dev <- numeric(N) #deviances for each model
+  Dim <- numeric(N)
+  lBFi0 <- numeric(N)
+  lPriorModels <- numeric(N)
+  PostProbi <- numeric(N)
   mt <- list() #list of terms for each model
 
   #list that contains the names of the variables in each model
@@ -277,7 +277,9 @@ missingBtest.glm <- function (data,
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
-  } else positionsfac <- 0
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- 0
 
   #The response variable
   obsnotNA <- rownames(X0)
@@ -288,7 +290,7 @@ missingBtest.glm <- function (data,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define variables with NAs
-  NAvars <- checkformissings.glm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
+  NAvars <- checkformissings.glm(y = framenull[,1], framenull[,-1], X.full)
 
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
@@ -413,17 +415,17 @@ missingBtest.glm <- function (data,
       lBF <- lpriorM <- numeric(nrow(mat.ind))
       for (j in 1:nrow(mat.ind)) {
         deltaj <- mat.ind[j,]
-        deltasumj <- positionsfac[which(tau), colsi] %*% deltaj
+        deltasumj <- positionsfac[which(tau), colsi] %*% as.integer(deltaj)
 
         current.model <- as.integer(modeli)
-        current.model[colsi] <- deltaj
+        current.model[colsi] <- as.integer(deltaj)
 
         #check if there are NAs in the model considered to save computation time
         if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
           lBF[j] <- lBF.method(model = which(current.model == 1)) #log(BF_a0)
           lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
         } else { #if there are no missings, compute the BF by the method selected
-          X.i <- cbind(X0, X.full[,which(current.model == 1)])
+          X.i <- cbind(X0, X.full[, which(current.model == 1)])
           lBF[j] <- BF.approx.method(k = sum(current.model), X = X.i) #log(BF_a0)
           lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
         }
@@ -456,10 +458,11 @@ missingBtest.glm <- function (data,
   modelspool <- list()
   for(j in competing.models){
     fit <- list()
-    namesj <- namesxnotnull[namesxnotnull %in% covar.list[[j]]]
+    namesj <- which(namesxnotnull %in% covar.list[[j]])
     for (i in 1:n.imp) {
       #remove last dummy for each factor, first q0 vars are the fixed ones
-      z <- glm.fit(x = imputation.array[,c(namesnull, namesj),i], y = y, family = family,
+      Xi <- imputation.array[,c(1:p0, namesj[namesj %notin% indf] + p0),i]
+      z <- glm.fit(x = Xi, y = y, family = family,
                    weights = weights, offset = offset, control = control)
       z$terms <- mt[[j]]
       class(z) <- "glm"
@@ -477,6 +480,7 @@ missingBtest.glm <- function (data,
   result$PostProbi <- PostProbi
   result$models <- models
   result$nullmodel <- names(models)[nullmodel.pos]
+  result$modelspool <- modelspool
 
   if (L > 0) {
     #matrix for the factors index

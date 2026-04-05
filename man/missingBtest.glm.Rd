@@ -8,8 +8,8 @@ linear models}
 missingBtest.glm(
   data,
   models,
-  null.model = NULL,
   family = binomial(link = "logit"),
+  null.model = NULL,
   BF.approx.method = "BIC",
   prior.betas = "Robust",
   prior.models = "Constant",
@@ -34,17 +34,17 @@ missingBtest.glm(
 with one nested in all the others. If the list is unnamed, default names are
 given.}
 
-\item{null.model}{Name of the null model. If \code{NULL}, the names of variables
-in \code{models} are used to identify the null. If provided, \code{null.model}
-must coincide with the one with the largest sum of squared errors and should
-be the one with the smallest dimension.}
-
 \item{family}{String, function or the call to a family function among
 \code{\link[stats]{family}} to specify the error distribution and link
 function to be used in the model. If it is one of the implemented families in
 \pkg{BAS}: \code{binomial(link = "logit")},
 \code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
 using BAS logmarginal computation is performed.}
+
+\item{null.model}{Name of the null model. If \code{NULL}, the names of variables
+in \code{models} are used to identify the null. If provided, \code{null.model}
+must coincide with the one with the largest sum of squared errors and should
+be the one with the smallest dimension.}
 
 \item{BF.approx.method}{Method used to approximate Bayes factors with missing
 data (to be literally specified). Possible choices include "BIC", "TBF" and
@@ -103,11 +103,15 @@ for more details.}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}}
 \item{models}{List with the entertained models.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model}
+\item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+combine the estimates for each model on \code{models} fitted by
+\code{\link[stats]{glm}} over the \code{n.imp} imputed datasets.
+See \code{\link[mice]{pool}} for details}
 \item{positions}{\code{matrix} with L rows and p plus the number of dummies
 resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
-\item{positionsx}{Vector of length p with 1 if the variable is a numerical
-covariate and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}

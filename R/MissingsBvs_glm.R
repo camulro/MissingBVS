@@ -314,7 +314,7 @@ missingBVS.glm <- function (formula,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define variables with NAs
-  NAvars <- checkformissings.glm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
+  NAvars <- checkformissings.glm(y = framenull[,1], framenull[,-1], X.full)
 
   #Check model priors chosen and define the function to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, q)
@@ -478,7 +478,10 @@ missingBVS.glm <- function (formula,
   mt <- attr(framefull, "terms")
   for (i in 1:n.imp) {
     #remove last dummy for each factor, first q0 vars are the fixed ones
-    z <- glm.fit(x = imputation.array[,-c(indf + p0),i], y = y, family = family,
+    if (L > 0) {
+      Xi <- imputation.array[,-c(indf + p0),i]
+    } else Xi <- imputation.array[,,i]
+    z <- glm.fit(x = Xi, y = y, family = family,
                  weights = weights, offset = offset, control = control)
     z$terms <- mt
     class(z) <- "glm"
@@ -578,7 +581,7 @@ checkforfamily <- function (family, BF.approx.method) {
   return(inBAS)
 }
 
-checkformissings.glm <- function (y, X0 = NULL, X.full, obsnotNA = NULL) {
+checkformissings.glm <- function (y, X0 = NULL, X.full) {
   #checks if there are missings on the response and regressors
   #and returns the name of non-fixed regressors with missings
 
@@ -597,7 +600,7 @@ checkformissings.glm <- function (y, X0 = NULL, X.full, obsnotNA = NULL) {
     stop(paste0("NA values not found for any of the competing variables.\n",
                 "We recommend you the BAS package instead.\n"))
   } else {
-    O <- 1*(!is.na(X.full[obsnotNA,]))
+    O <- 1*(!is.na(X.full))
     #zeros where missing observations on the data without missings on the response
     NAvars <- names(which(colSums(O) < dim(X.full)[1])) #columns with missings
   }

@@ -78,11 +78,15 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}}
 \item{models}{List with the entertained models.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model}
+\item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+combine the estimates for each model on \code{models} fitted by
+\code{\link[stats]{lm}} over the \code{n.imp} imputed datasets.
+See \code{\link[mice]{pool}} for details}
 \item{positions}{\code{matrix} with L rows and p plus the number of dummies
 resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
-\item{positionsx}{Vector of length p with 1 if the variable is a numerical
-covariate and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}

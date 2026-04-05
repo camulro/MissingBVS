@@ -301,7 +301,7 @@ missingGibbsBVS.glm <- function (formula,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define competing variables with NAs
-  NAvars <- checkformissings.glm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
+  NAvars <- checkformissings.glm(y = framenull[,1], framenull[,-1], X.full)
 
   #Check the initial model:
   if (is.character(init.model) == TRUE) {
@@ -399,7 +399,7 @@ missingGibbsBVS.glm <- function (formula,
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
   #George and McCulloch's Gibbs exploration
-  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
+  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
                            lprior.models, lprior.models.dummies, lBF.method,
                            positions, positionsfac, indf, l, L,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
@@ -459,7 +459,10 @@ missingGibbsBVS.glm <- function (formula,
   mt <- attr(framefull, "terms")
   for (i in 1:n.imp) {
     #remove last dummy for each factor, first q0 vars are the fixed ones
-    z <- glm.fit(x = imputation.array[,-c(indf + p0),i], y = y, family = family,
+    if (L > 0) {
+      Xi <- imputation.array[,-c(indf + p0),i]
+    } else Xi <- imputation.array[,,i]
+    z <- glm.fit(x = Xi, y = y, family = family,
                  weights = weights, offset = offset, control = control)
     z$terms <- mt
     class(z) <- "glm"

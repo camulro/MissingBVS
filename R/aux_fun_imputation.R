@@ -12,7 +12,7 @@
 #' @param initialimp.mice.method Method used by \code{\link[mice]{mice}} to impute the
 #' initial values. See \code{\link[mice]{mice}} for possible choices.
 #' @param time.test Logical to indicate whether to check time of performance with
-#' \code{nMC = 10} or not.
+#' \code{nMC = 30} or not.
 #'
 #' @return \code{MC.imputation} returns an object of class \code{MissingBVS.imputation}
 #' with the following elements:
@@ -44,7 +44,7 @@ MC.imputation <- function(X, nMC = 039E1,
                           time.test = FALSE){
   #(Works for continuous covariates)
 
-  if (time.test) {time <- Sys.time(); nMC <- 10} # to estimate imputation time
+  if (time.test) {time <- Sys.time(); nMC <- 30} # to estimate imputation time
   #results:
   rX.imput <- array(0, dim=c(dim(X), nMC))
   rSigma <- array(0, dim=c(dim(X)[2], dim(X)[2], nMC))

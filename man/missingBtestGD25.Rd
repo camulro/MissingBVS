@@ -31,7 +31,7 @@ dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{initialimp.mice.method}{Method for mice's imputation.}
@@ -47,6 +47,10 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
 \item{models}{List with the entertained models.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+combine the estimates for each model on \code{models} fitted by
+\code{\link[stats]{lm}} over the \code{n.imp} imputed datasets.
+See \code{\link[mice]{pool}} for details}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{prior.models}{Function used to compute the prior over the model space}
 \item{priorprobs}{Prior probabilities over the true model dimension}

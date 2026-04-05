@@ -297,7 +297,7 @@ missingBVS.lm <- function (formula,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define competing variables with NAs
-  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
+  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full)
 
   #Check model priors chosen and define the functions to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, q)
@@ -458,8 +458,11 @@ missingBVS.lm <- function (formula,
   fit <- list()
   mt <- attr(framefull, "terms")
   for (i in 1:n.imp) {
-    #remove last dummy for each factor, first q0 vars are the fixed ones
-    z <- lm.fit(x = imputation.array[,-c(indf + p0),i], y = y)
+    #remove last dummy for each factor, first p0 vars are the fixed ones
+    if (L > 0) {
+      Xi <- imputation.array[,-c(indf + p0),i]
+    } else Xi <- imputation.array[,,i]
+    z <- lm.fit(x = Xi, y = y)
     z$terms <- mt
     class(z) <- "lm"
 
@@ -532,7 +535,7 @@ missingBVS.lm <- function (formula,
   return(result)
 }
 
-checkformissings.lm <- function (y, X0 = NULL, X.full, obsnotNA = NULL) {
+checkformissings.lm <- function (y, X0 = NULL, X.full) {
   #checks if there are missings on the response and regressors
   #and returns the name of non-fixed regressors with missings
 
@@ -551,7 +554,7 @@ checkformissings.lm <- function (y, X0 = NULL, X.full, obsnotNA = NULL) {
     stop(paste0("NA values not found for any of the competing variables.\n",
                 "We recommend you the BayesVarSel package instead.\n"))
   } else {
-    O <- 1*(!is.na(X.full[obsnotNA,]))
+    O <- 1*(!is.na(X.full))
     #zeros where missing observations on the data without missings on the response
     NAvars <- names(which(colSums(O) < dim(X.full)[1])) #columns with missings
   }

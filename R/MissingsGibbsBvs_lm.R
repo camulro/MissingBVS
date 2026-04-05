@@ -272,7 +272,7 @@ missingGibbsBVS.lm <- function (formula,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define competing variables with NAs
-  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
+  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full)
 
   #Check the initial model:
   if (is.character(init.model) == TRUE) {
@@ -369,7 +369,7 @@ missingGibbsBVS.lm <- function (formula,
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
   #George and McCulloch's Gibbs exploration
-  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
+  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
                            lprior.models, lprior.models.dummies, lBF.method,
                            positions, positionsfac, indf, l, L,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
@@ -428,8 +428,11 @@ missingGibbsBVS.lm <- function (formula,
   fit <- list()
   mt <- attr(framefull, "terms")
   for (i in 1:n.imp) {
-    #remove last dummy for each factor, first q0 vars are the fixed ones
-    z <- lm.fit(x = imputation.array[,-c(indf + p0),i], y = y)
+    #remove last dummy for each factor, first p0 vars are the fixed ones
+    if (L > 0) {
+      Xi <- imputation.array[,-c(indf + p0),i]
+    } else Xi <- imputation.array[,,i]
+    z <- lm.fit(x = Xi, y = y)
     z$terms <- mt
     class(z) <- "lm"
 
@@ -440,9 +443,9 @@ missingGibbsBVS.lm <- function (formula,
   #result
   result <- list()
   result$time <- Sys.time() - time #The time it took the programm to finish
-  result$lmfull <- lmfull # Object of class mipo combining the estimates for the
+  result$lmfull <- lmfull #Object of class mipo combining the estimates for the
   # n.imp imputed datasets for the fitted full model
-  result$lmnull <- lmnull # The lm object for the null model (omits NAs)
+  result$lmnull <- lmnull #The lm object for the null model (omits NAs)
 
   result$variables <- depvars #The name of the competing variables
   result$n <- n #number of observations
@@ -504,7 +507,7 @@ missingGibbsBVS.lm <- function (formula,
   return(result)
 }
 
-GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
+GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
                         lprior.models, lprior.models.dummies, lBF.method,
                         positions, positionsfac, indf, l, L,
                         init.model, n.iter, n.burnin, n.thin, Gibbs.seed) {
@@ -576,7 +579,6 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars, obsnotNA,
       #avoiding recomputing the BF for models already visited
       already.visited <- which(visited.models.lBF.PM$models == hash.proposal)
       if (length(already.visited) > 0) {
-        # lBF.PMproposal <- visited.models.lBF.PM[already.visited, 2]
         lBF.PMproposal <- visited.models.lBF.PM$lBF.PM[already.visited]
       } else {
         #Check if proposal.model is the null model

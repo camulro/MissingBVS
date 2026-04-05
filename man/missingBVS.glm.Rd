@@ -7,9 +7,9 @@ regression models}
 \usage{
 missingBVS.glm(
   formula,
-  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   data,
   family = binomial(link = "logit"),
+  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   BF.approx.method = "BIC",
   prior.betas = "Robust",
   prior.models = "ScottBerger",
@@ -32,10 +32,6 @@ missingBVS.glm(
 \item{formula}{Formula defining the most complex (full) regression model in the
 analysis. See details.}
 
-\item{null.model}{Formula defining which is the simplest (null) model, which.
-should be nested in the full one. By default, it is defined to be the one
-with just the intercept.}
-
 \item{data}{Data frame containing the data.}
 
 \item{family}{String, function or the call to a family function among
@@ -44,6 +40,10 @@ function to be used in the model. If it is one of the implemented families in
 \pkg{BAS}: \code{binomial(link = "logit")},
 \code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
 using BAS logmarginal computation is performed.}
+
+\item{null.model}{Formula defining which is the simplest (null) model, which.
+should be nested in the full one. By default, it is defined to be the one
+with just the intercept.}
 
 \item{BF.approx.method}{Method used to approximate Bayes factors with missing
 data (to be literally specified). Possible choices include "BIC", "TBF" and
@@ -102,8 +102,9 @@ for more details.}
 \code{missingBVS.glm} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{glmfull}{The \code{glm} class object that results when the model
-defined by \code{formula} is fitted by \code{\link[stats]{glm}}}
+\item{glmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+for the model defined by \code{formula} fitted by \code{\link[stats]{glm}} over
+the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
 \item{glmnull}{The \code{glm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -115,8 +116,8 @@ the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 \item{positions}{\code{matrix} with L rows and p plus the number of dummies
 resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
-\item{positionsx}{Vector of length p with 1 if the variable is a numerical
-covariate and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
 most probable a posteriori models and their associated probability}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential

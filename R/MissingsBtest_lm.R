@@ -136,7 +136,7 @@ missingBtest.lm <- function (data,
   if (is.null(names(models))){
     if (!is.null(null.model)) stop(paste0("Please provide a name for the competing models.\n",
                                           "The null model must be in that list.\n"))
-    names(models) <- paste("model", 1:N, sep="")
+    names(models) <- paste("model", seq_len(N), sep="")
   }
 
   #Check if the given null model is one of the competing models:
@@ -148,11 +148,11 @@ missingBtest.lm <- function (data,
     }
   } else relax.nest = FALSE
 
-  SSE <- rep(0, N) #SSEs for each model
-  Dim <- rep(0, N)
-  lBFi0 <- rep(0, N)
-  lPriorModels <- rep(0, N)
-  PostProbi <- rep(0, N)
+  SSE <- numeric(N) #SSEs for each model
+  Dim <- numeric(N)
+  lBFi0 <- numeric(N)
+  lPriorModels <- numeric(N)
+  PostProbi <- numeric(N)
   mt <- list() #list of terms for each model
 
   #list that contains the names of the variables or factors in each model
@@ -242,7 +242,9 @@ missingBtest.lm <- function (data,
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
-  } else positionsfac <- 0
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- 0
 
   #The response variable
   obsnotNA <- rownames(X0)
@@ -253,7 +255,7 @@ missingBtest.lm <- function (data,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define variables with NAs
-  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full, obsnotNA)
+  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full)
 
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
@@ -376,10 +378,10 @@ missingBtest.lm <- function (data,
       lBF <- lpriorM <- numeric(nrow(mat.ind))
       for (j in 1:nrow(mat.ind)) {
         deltaj <- mat.ind[j,]
-        deltasumj <- positionsfac[which(tau), colsi] %*% deltaj
+        deltasumj <- positionsfac[which(tau), colsi] %*% as.integer(deltaj)
 
         current.model <- as.integer(modeli)
-        current.model[colsi] <- deltaj
+        current.model[colsi] <- as.integer(deltaj)
 
         #check if there are NAs in the model considered to save computation time
         if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
@@ -419,10 +421,11 @@ missingBtest.lm <- function (data,
   modelspool <- list()
   for(j in competing.models){
     fit <- list()
-    namesj <- namesxnotnull[namesxnotnull %in% covar.list[[j]]]
+    namesj <- which(namesxnotnull %in% covar.list[[j]])
     for (i in 1:n.imp) {
       #remove last dummy for each factor, first q0 vars are the fixed ones
-      z <- lm.fit(x = imputation.array[,c(namesnull, namesj),i], y = y)
+      Xi <- imputation.array[,c(1:p0, namesj[namesj %notin% indf] + p0),i]
+      z <- lm.fit(x = Xi, y = y)
       z$terms <- mt[[j]]
       class(z) <- "lm"
 
