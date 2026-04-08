@@ -49,8 +49,9 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
 \item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
 combine the estimates for each model on \code{models} fitted by
-\code{\link[stats]{lm}} over the \code{n.imp} imputed datasets.
-See \code{\link[mice]{pool}} for details}
+\code{\link[stats]{lm}} over the \code{n.imp} (if \code{> 1}) imputed
+datasets, see \code{\link[mice]{pool}} for details; and \code{lm} object
+when there are no missings}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{prior.models}{Function used to compute the prior over the model space}
 \item{priorprobs}{Prior probabilities over the true model dimension}

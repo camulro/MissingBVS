@@ -47,7 +47,7 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
   imputation.list.model$rSigma <- array(imputation.list$rSigma[model, model,],
                                         dim = c(k, k, dim(imputation.list$rSigma)[3]))
 
-  lBF.our <- rep(0, nMC)
+  lBF.our <- numeric(nMC)
   for(s in 1:nMC) {
     #posterior dist. with Jeffreys independent prior
     Sigma11 <- imputation.list.model$rSigma[,,s]
@@ -148,7 +148,7 @@ lBF.approx <- function(model, imputation.array, BF.approx.method,
                        p0 = 1, n.imp = dim(imputation.array)[3]) {
   k <- length(model)
 
-  lBF.aux <- rep(0, n.imp)
+  lBF.aux <- numeric(n.imp)
   X1.array <- imputation.array[,c(1:p0, model+p0),] #first p0 columns are fixed
   for(s in 1:n.imp) {
     lBF.aux[s] <- BF.approx.method(k = k, X = X1.array[,,s])

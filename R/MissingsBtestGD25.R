@@ -47,8 +47,9 @@
 #' \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
 #' \item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
 #' combine the estimates for each model on \code{models} fitted by
-#' \code{\link[stats]{lm}} over the \code{n.imp} imputed datasets.
-#' See \code{\link[mice]{pool}} for details}
+#' \code{\link[stats]{lm}} over the \code{n.imp} (if \code{> 1}) imputed
+#' datasets, see \code{\link[mice]{pool}} for details; and \code{lm} object
+#' when there are no missings}
 #' \item{imp.args}{List of arguments used for the imputation step}
 #' \item{prior.models}{Function used to compute the prior over the model space}
 #' \item{priorprobs}{Prior probabilities over the true model dimension}
@@ -95,10 +96,10 @@ missingBtestGD25 <- function (data,
     stop("Try the missingBtest.lm function instead.\n")
   }
 
-  Dim <- rep(0, N)
-  lBFi0 <- rep(0, N)
-  lPriorModels <- rep(0, N)
-  PostProbi <- rep(0, N)
+  Dim <- rep(0L, N)
+  lBFi0 <- numeric(N)
+  lPriorModels <- numeric(N)
+  PostProbi <- numeric(N)
   mt <- list() #list of terms for each model
 
   #list that contains the names of the covariates in each model
@@ -155,7 +156,7 @@ missingBtestGD25 <- function (data,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings
-  checkformissings.lm(y = framefull[,1], X.full = X.full)
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full)
 
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
@@ -209,11 +210,16 @@ missingBtestGD25 <- function (data,
 
   #remove observations with missings on the response
   imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA,,]
-  #function to compute log(BFa0) for a given model with García-Donato's 2025 method
-  lBF.method <- function (model) lBF.miss(model,
-                                          imputation.list = imputation.list,
-                                          BF.miss.aux = BF.miss.aux,
-                                          n = n, nMC = n.imp)
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model with García-Donato's 2025 method
+    lBF.method <- function (model) lBF.miss(model,
+                                            imputation.list = imputation.list,
+                                            BF.miss.aux = BF.miss.aux,
+                                            n = n, nMC = n.imp)
+  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model],
+                                                    Sigma11 = imputation.list$rSigma[model, model,],
+                                                    k = length(model))
+
   for (i in competing.models){
     modeli <- which(namesx %in% covar.list[[i]])
 
@@ -244,16 +250,27 @@ missingBtestGD25 <- function (data,
   #Evaluate lm of each model with missings using Rubin's rule
   modelspool <- list()
   for(j in competing.models){
-    fit <- list()
-    namesj <- namesx[namesx %in% covar.list[[j]]]
-    for (i in 1:n.imp) {
-      z <- lm.fit(x = cbind(1,imputation.list$rX.imput[,namesj,i]), y = y)
-      z$terms <- mt[[j]]
-      class(z) <- "lm"
+    namesj <- which(namesx %in% covar.list[[j]])
+    if (any(namesx[namesj] %in% NAvars)) {
+      if (n.imp > 1) {
+        fit <- list()
+        for (i in 1:n.imp) {
+          Xi <- cbind(1, imputation.list$rX.imput[,namesj,i])
+          colnames(Xi) <- c("(Intercept)", namesx[namesj])
+          z <- lm.fit(x = Xi, y = y)
+          z$terms <- mt[[j]]
+          class(z) <- "lm"
 
-      fit[[i]] <- z
-    }
-    modelspool[[j]] <- mice::pool(fit)
+          fit[[i]] <- z
+        }
+        modelspool[[j]] <- mice::pool(fit)
+      } else {
+        #compute lm.fit for the unique imputation
+        Xi <- cbind(1, imputation.list$rX.imput[,namesj])
+        colnames(Xi) <- c("(Intercept)", namesx[namesj])
+        modelspool[[j]] <- lm.fit(x = Xi, y = y)
+      }
+    } else modelspool[[j]] <- lm(models[[j]], data)
   }
   modelspool[[nullmodel.pos]] <- lm(null.model, data)
   names(modelspool) <- names(models)

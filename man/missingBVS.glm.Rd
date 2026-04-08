@@ -102,9 +102,11 @@ for more details.}
 \code{missingBVS.glm} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{glmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
-for the model defined by \code{formula} fitted by \code{\link[stats]{glm}} over
-the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
+\item{glmfull}{If missings on the competing variables, object of class
+\code{\link[mice]{mipo}} that combines the estimates for the model defined by
+\code{formula} fitted by \code{\link[stats]{glm}} over
+the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
+for details. Otherwise, it is the \code{glm} object for the \code{formula} model}
 \item{glmnull}{The \code{glm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -121,7 +123,7 @@ variable is a numerical covariate}
 \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
 most probable a posteriori models and their associated probability}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
-explanatory variables.}
+explanatory variables}
 \item{postprobdim}{Posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}

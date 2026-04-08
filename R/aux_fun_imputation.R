@@ -46,11 +46,13 @@ MC.imputation <- function(X, nMC = 039E1,
 
   if (time.test) {time <- Sys.time(); nMC <- 30} # to estimate imputation time
   #results:
-  rX.imput <- array(0, dim=c(dim(X), nMC))
-  rSigma <- array(0, dim=c(dim(X)[2], dim(X)[2], nMC))
-  rmu <- matrix(0, nr=dim(X)[2], nc=nMC)
-
   p <- dim(X)[2]; n <- dim(X)[1]
+  rX.imput <- array(0, dim=c(n, p, nMC),
+                    dimnames = list(seq_len(n), colnames(X), seq_len(nMC)))
+  rSigma <- array(0, dim=c(p, p, nMC),
+                  dimnames = list(colnames(X), colnames(X), seq_len(nMC)))
+  rmu <- matrix(0, nr=p, nc=nMC)
+
   if (p < 2) stop("It does not work with p<2")
 
   O <- 1*(!is.na(X))
@@ -87,10 +89,6 @@ MC.imputation <- function(X, nMC = 039E1,
     rmu[,s] <- mu
   }
   if (time.test) return(time <- Sys.time() - time)
-
-  dimnames(rX.imput)[[1]] <- seq_len(n)
-  dimnames(rX.imput)[[2]] <- colnames(X)
-  dimnames(rSigma)[[1]] <- dimnames(rSigma)[[2]] <- colnames(X)
 
   imputation.list <- list(rX.imput = rX.imput, rSigma = rSigma, rmu = rmu)
   class(imputation.list) <- "MissingBVS.imputation"
@@ -172,15 +170,13 @@ mice.imputation <- function(X, formula, n.imp = 039E1,
   aux <- model.matrix.rankdef(model.frame(X.formula, X, na.action = NULL))
   q <- ncol(aux)
 
-  imputation.array <- array(0, dim = c(n, q, n.imp)) #an array with the matrices imputed
+  imputation.array <- array(0, dim = c(n, q, n.imp), #an array with the matrices imputed
+                            dimnames = list(seq_len(n), colnames(aux), seq_len(n.imp)))
   for (s in seq_len(n.imp)) {
     aux.imps <- model.frame(X.formula, imps[[s]])
     imputation.array[, , s] <- model.matrix.rankdef(aux.imps) #build the model matrix
   }
   if (time.test) return(time <- Sys.time() - time)
-
-  dimnames(imputation.array)[[1]] <- seq_len(n)
-  dimnames(imputation.array)[[2]] <- colnames(aux)
 
   class(imputation.array) <- "MissingBVS.imputation"
   return(imputation.array)

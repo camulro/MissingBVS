@@ -97,9 +97,11 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \code{missingGibbsBVS.lm} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+\item{lmfull}{If missings on the competing variables, object of class
+\code{\link[mice]{mipo}} that combines the estimates
 for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
-the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
+the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
+for details. Otherwise, it is the \code{lm} object for the \code{formula} model}
 \item{lmnull}{The \code{lm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}

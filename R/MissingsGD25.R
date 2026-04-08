@@ -168,7 +168,7 @@ missingGD25 <- function (formula,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings
-  checkformissings.lm(y = framefull[,1], X.full = X.full)
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full)
 
   #Check model priors chosen and define the function to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, p)
@@ -206,6 +206,16 @@ missingGD25 <- function (formula,
                                           imputation.list = imputation.list,
                                           BF.miss.aux = BF.miss.aux,
                                           n = n, nMC = n.imp)
+
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model with García-Donato's 2025 method
+    lBF.method <- function (model) lBF.miss(model,
+                                            imputation.list = imputation.list,
+                                            BF.miss.aux = BF.miss.aux,
+                                            n = n, nMC = n.imp)
+  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model],
+                                                    Sigma11 = imputation.list$rSigma[model, model,],
+                                                    k = length(model))
 
   #Info:
   cat("Info. . .\n")
@@ -268,23 +278,31 @@ missingGD25 <- function (formula,
   mpm <- rep(0,p)
   mpm[which(inclprob >= 0.5)] <- 1
 
-  #Evaluate lm of full model with missings using Rubin's rule
-  fit <- list()
-  mt <- attr(framefull, "terms")
-  for (i in 1:n.imp) {
-    z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
-    z$terms <- mt
-    class(z) <- "lm"
+  if (!is.null(NAvars)) {
+    if (n.imp > 1) {
+      #Evaluate lm of full model with missings using Rubin's rule
+      fit <- list()
+      mt <- attr(framefull, "terms")
+      for (i in 1:n.imp) {
+        z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
+        z$terms <- mt
+        class(z) <- "lm"
 
-    fit[[i]] <- z
-  }
-  lmfull <- mice::pool(fit)
+        fit[[i]] <- z
+      }
+      lmfull <- mice::pool(fit)
+    } else {
+      #compute lm.fit for the unique imputation
+      lmfull <- lm.fit(x = cbind(1, imputation.list$rX.imput), y = y)
+    }
+  } else lmfull <- lm(formula, data)
 
   ##result
   result <- list()
   result$time <- Sys.time() - time #The time it took the program to finish
-  result$lmfull <- lmfull # Object of class mipo combining the estimates for the
-  # n.imp imputed datasets for the fitted full model
+  result$lmfull <- lmfull # If missings, object of class mipo combining the
+  # estimates for the n.imp imputed datasets for the fitted full model.
+  # Otherwise, lmfull is the lm object for the full model
   result$lmnull <- lmnull # The lm object for the null model (omits NAs)
 
   result$variables <- namesx #The name of the competing variables

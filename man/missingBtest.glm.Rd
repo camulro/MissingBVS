@@ -105,8 +105,9 @@ for more details.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model}
 \item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
 combine the estimates for each model on \code{models} fitted by
-\code{\link[stats]{glm}} over the \code{n.imp} imputed datasets.
-See \code{\link[mice]{pool}} for details}
+\code{\link[stats]{glm}} over the \code{n.imp} (if \code{> 1}) imputed
+datasets, see \code{\link[mice]{pool}} for details; and \code{glm} object
+when there are no missings}
 \item{positions}{\code{matrix} with L rows and p plus the number of dummies
 resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}

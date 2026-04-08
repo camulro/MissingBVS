@@ -76,9 +76,11 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \code{missingBVS.lm} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+\item{lmfull}{If missings on the competing variables, object of class
+\code{\link[mice]{mipo}} that combines the estimates
 for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
-the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
+the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
+for details. Otherwise, it is the \code{lm} object for the \code{formula} model}
 \item{lmnull}{The \code{lm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -95,7 +97,7 @@ variable is a numerical covariate}
 \item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
 most probable a posteriori models and their associated probability}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
-explanatory variables.}
+explanatory variables}
 \item{postprobdim}{Posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
@@ -160,7 +162,25 @@ model with fixed variables; next p components correspond to the p prior probabil
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Here we keep the 1000 most probable models a posteriori:
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + CONFUC + EQINV + safrica +
+  MUSLIM + RULELAW + YrsOpen
+dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 512)
+
+#A look at the results:
+dataS97.mBVS
+
+summary(dataS97.mBVS)
+
+#A plot with the posterior probabilities of the dimension of the
+#true model:
+plot(dataS97.mBVS)
+}
 
 }
 \references{
@@ -206,6 +226,9 @@ by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
 \seealso{
 Use \code{\link[MissingBVS]{MissingGibbsBvs.lm}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
+
+Consider \code{\link[BayesVarSel]{plot.Bvs}} for graphical summaries of the
+posterior distribution.
 }
 \author{
 Carolina Mulet and Gonzalo Garcia-Donato

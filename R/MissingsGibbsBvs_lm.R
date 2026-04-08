@@ -63,9 +63,11 @@
 #' @return \code{missingGibbsBVS.lm} returns an object of class \code{missingBVS}
 #' with the following elements:
 #' \item{time}{The internal time consumed in solving the problem}
-#' \item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+#' \item{lmfull}{If missings on the competing variables, object of class
+#' \code{\link[mice]{mipo}} that combines the estimates
 #' for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
-#' the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
+#' the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
+#' for details. Otherwise, it is the \code{lm} object for the \code{formula} model}
 #' \item{lmnull}{The \code{lm} class object that results when the null model,
 #' the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 #' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -272,7 +274,7 @@ missingGibbsBVS.lm <- function (formula,
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define competing variables with NAs
-  NAvars <- checkformissings.lm(y = framenull[,1], framenull[,-1], X.full)
+  NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
 
   #Check the initial model:
   if (is.character(init.model) == TRUE) {
@@ -300,57 +302,62 @@ missingGibbsBVS.lm <- function (formula,
                                              prior.betas,
                                              n, p, p0, y, SS0)
 
-  #Imputation of missing data
-  if (is.null(parallelmice)) {
-    if (n.imp > 120 | n*q > 50000) {
-      parallelmice <- TRUE #faster
-    } else parallelmice <- FALSE
-  }
-
-  if (imp.time.test & (n*q > 10000 | n.imp > 039E1)) {
-    #test imputation time
-    cat("Time test . . . \n")
-    time.test <- mice.imputation(X = X.toimp,
-                                 formula,
-                                 imp.mice.method = imp.mice.method,
-                                 parallel = parallelmice,
-                                 n.core = n.core,
-                                 time.test = TRUE)
-
-    estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to time
-    cat("The whole imputation can take ", estim.time,
-        "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
-    if (tolower(readline()) != "y") {
-      if (!parallelmice) {
-        cat("Do you want to faster imputation running a parallel version of mice? (y/n)\n")
-        if (tolower(readline()) == "y") {
-          parallelmice <- TRUE
-        } else stop("Reduce the number of imputed datasets.\n")
-      } else stop("Reduce the number of imputed datasets.\n")
+  if (!is.null(NAvars)) {
+    #Imputation of missing data
+    if (is.null(parallelmice)) {
+      if (n.imp > 120 | (n*q > 50000 & n.imp > 5)) {
+        parallelmice <- TRUE #faster
+      } else parallelmice <- FALSE
     }
+
+    if (imp.time.test & (n*q > 10000 | n.imp > 039E1)) {
+      #test imputation time
+      cat("Time test . . . \n")
+      time.test <- mice.imputation(X = X.toimp,
+                                   formula,
+                                   imp.mice.method = imp.mice.method,
+                                   parallel = parallelmice,
+                                   n.core = n.core,
+                                   time.test = TRUE)
+
+      estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to time
+      cat("The whole imputation can take ", estim.time,
+          "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
+      if (tolower(readline()) != "y") {
+        if (!parallelmice) {
+          cat("Do you want to faster imputation running a parallel version of mice? (y/n)\n")
+          if (tolower(readline()) == "y") {
+            parallelmice <- TRUE
+          } else stop("Reduce the number of imputed datasets.\n")
+        } else stop("Reduce the number of imputed datasets.\n")
+      }
+    }
+
+    cat("Performing imputation of missing data with mice's", imp.mice.method)
+    if (parallelmice) cat(" parallel")
+    cat(" method.\n", "Please wait . . . \n")
+
+    imputation.array <-  mice.imputation(X = X.toimp,
+                                         formula,
+                                         n.imp = n.imp,
+                                         imp.mice.method = imp.mice.method,
+                                         seed = imp.seed,
+                                         parallel = parallelmice,
+                                         n.core = n.core)
+
+    #remove observations with missings on the response or fixed vars,
+    #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
+    imputation.array <- imputation.array[obsnotNA, ordvars,]
+    if (n.imp > 1) {
+      #function to compute log(BFa0) for a given model as an average of BF computed
+      #by BF.approx.method over the imputed datasets
+      lBF.method <- function (model) lBF.approx(model,
+                                                imputation.array = imputation.array,
+                                                BF.approx.method = BF.approx.method,
+                                                p0 = p0, n.imp = n.imp)
+    } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                           X = imputation.array[,c(1:p0, model+p0)])
   }
-
-  cat("Performing imputation of missing data with mice's", imp.mice.method)
-  if (parallelmice) cat(" parallel")
-  cat(" method.\n", "Please wait . . . \n")
-
-  imputation.array <-  mice.imputation(X = X.toimp,
-                                       formula,
-                                       n.imp = n.imp,
-                                       imp.mice.method = imp.mice.method,
-                                       seed = imp.seed,
-                                       parallel = parallelmice,
-                                       n.core = n.core)
-
-  #remove observations with missings on the response or fixed vars,
-  #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
-  imputation.array <- imputation.array[obsnotNA, ordvars,]
-  #function to compute log(BFa0) for a given model as an average of BF computed
-  #by BF.approx.method over the imputed datasets
-  lBF.method <- function (model) lBF.approx(model,
-                                            imputation.array = imputation.array,
-                                            BF.approx.method = BF.approx.method,
-                                            p0 = p0, n.imp = n.imp)
 
   #Info:
   cat("Info. . .\n")
@@ -424,27 +431,38 @@ missingGibbsBVS.lm <- function (formula,
   mpm <- rep(0,q)
   mpm[which(gibbs.list$inclprobRB[n.iter, ] >= 0.5)] <- 1
 
-  #Evaluate lm of full model with missings using Rubin's rule
-  fit <- list()
-  mt <- attr(framefull, "terms")
-  for (i in 1:n.imp) {
-    #remove last dummy for each factor, first p0 vars are the fixed ones
-    if (L > 0) {
-      Xi <- imputation.array[,-c(indf + p0),i]
-    } else Xi <- imputation.array[,,i]
-    z <- lm.fit(x = Xi, y = y)
-    z$terms <- mt
-    class(z) <- "lm"
+  if (!is.null(NAvars)) {
+    if (n.imp > 1) {
+      #Evaluate lm of full model with missings using Rubin's rule
+      fit <- list()
+      mt <- attr(framefull, "terms")
+      for (i in 1:n.imp) {
+        #remove last dummy for each factor, first p0 vars are the fixed ones
+        if (L > 0) {
+          Xi <- imputation.array[,-c(indf + p0),i]
+        } else Xi <- imputation.array[,,i]
+        z <- lm.fit(x = Xi, y = y)
+        z$terms <- mt
+        class(z) <- "lm"
 
-    fit[[i]] <- z
-  }
-  lmfull <- mice::pool(fit)
+        fit[[i]] <- z
+      }
+      lmfull <- mice::pool(fit)
+    } else {
+      #compute lm.fit for the unique imputation
+      if (L > 0) {
+        Xi <- imputation.array[,-c(indf + p0)]
+      } else Xi <- imputation.array
+      lmfull <- lm.fit(x = Xi, y = y)
+    }
+  } else lmfull <- lm(formula, data)
 
   #result
   result <- list()
   result$time <- Sys.time() - time #The time it took the programm to finish
-  result$lmfull <- lmfull #Object of class mipo combining the estimates for the
-  # n.imp imputed datasets for the fitted full model
+  result$lmfull <- lmfull # If missings, object of class mipo combining the
+  # estimates for the n.imp imputed datasets for the fitted full model.
+  # Otherwise, lmfull is the lm object for the full model
   result$lmnull <- lmnull #The lm object for the null model (omits NAs)
 
   result$variables <- depvars #The name of the competing variables
@@ -487,14 +505,16 @@ missingGibbsBVS.lm <- function (formula,
   #Estimation of posterior probabilities based on C
   result$postprobs <- cf.models.PM[,"Post"]
 
-  #arguments used for imputation
-  result$imp.args <- list(parallelmice = parallelmice,
-                          imp.mice.method = imp.mice.method,
-                          n.imp = n.imp, imp.seed = imp.seed)
+  if (!is.null(NAvars)) {
+    #arguments used for imputation
+    result$imp.args <- list(parallelmice = parallelmice,
+                            imp.mice.method = imp.mice.method,
+                            n.imp = n.imp, imp.seed = imp.seed)
 
-  #save the imputed datasets for sensitivity analysis
-  # raw.imp.array <- serialize(imputation.array, NULL)
-  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+    #save the imputed datasets for sensitivity analysis
+    # raw.imp.array <- serialize(imputation.array, NULL)
+    # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+  }
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas
@@ -546,8 +566,15 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
   if (sum(current.model) == 0) { #null
     lBF.PMcurrent <- lprior.models(gamma.tau)
   } else {
-    lBF.PMcurrent <- lBF.method(model = which(current.model == 1)) +
-                     lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
+    #check if there are NAs in the model considered to save computation time
+    if (any(namesxnotnull[which(current.model == 1)] %in% NAvars)) {
+      lBF.PMcurrent <- lBF.method(model = which(current.model == 1)) +
+        lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
+    } else { #if there are no missings, compute the BF by the method selected
+      X.i <- cbind(X0, X.full[, which(current.model == 1)])
+      lBF.PMcurrent <- BF.approx.method(k = sum(current.model == 1), X = X.i) +
+        lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
+    }
   }
 
   #visited models with hash and the corresponding log(BF_a0*Pr(M))
@@ -589,7 +616,7 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
               lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
           } else { #if there are no missings, compute the BF by the method selected
             X.i <- cbind(X0, X.full[, which(proposal.model == 1)])
-            lBF.PMproposal <- BF.approx.method(k = sum(proposal.model), X = X.i) +
+            lBF.PMproposal <- BF.approx.method(k = sum(proposal.model == 1), X = X.i) +
               lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
           }
         } else { #null
