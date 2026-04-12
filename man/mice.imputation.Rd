@@ -30,7 +30,7 @@ values. See \code{\link[mice]{mice}} for possible choices.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{time.test}{Logical to indicate whether to check time of performance with
-\code{n.imp = 10} or not.}
+\code{n.imp = 30} or not.}
 
 \item{parallelmice}{Logical to indicate whether or not to use parallel
 \code{\link[mice]{mice}} imputation. By default performs parallel mice
@@ -53,7 +53,17 @@ argument, which makes the imputation a lot faster for a big number of imputation
 or huge datasets.
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+imp.S97 <- mice.imputation(X = XS97, formula = f)
+
+#Plot the results:
+plot.MissingBVS.imputation(X = XS97, imputation = imp.S97, formula = f)
+}
 
 }
 \references{

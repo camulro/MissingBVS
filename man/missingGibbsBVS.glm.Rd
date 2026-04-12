@@ -16,7 +16,7 @@ missingGibbsBVS.glm(
   prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   init.model = "Full",
-  n.iter = 5000,
+  n.iter = 10000,
   n.burnin = 500,
   n.thin = 1,
   parallelmice = NULL,
@@ -147,7 +147,7 @@ logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables}
 \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-\item{postprobdim}{Posterior probabilities over the true model dimension}
+\item{postprobdim}{Estimated posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
@@ -174,7 +174,24 @@ reliable results.
 \code{\link[MissingBVS]{MissingBvs.glm}}. See the later for common details.
 }
 \examples{
-#To be completed
+\dontrun{
+#Indian Prime Diabetes Data from VIM's package
+
+#Default choices are: BIC approximation and ScottBerger prior, 10000 iterations
+#with 500 of burn in period. Here, 100 imputations with mice's pmm method.
+diabetes.mGBVS <- missingGibbsBVS.glm(formula = Outcome ~  .,
+  data = VIM::diabetes, family = binomial(), n.imp = 100)
+
+#Show the results:
+diabetes.mGBVS
+
+#Summ up the results:
+summary(diabetes.mGBVS)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot(diabetes.mGBVS)
+}
 
 }
 \references{

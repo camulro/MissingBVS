@@ -142,7 +142,23 @@ model with fixed variables; next q components correspond to the q prior probabil
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Indian Prime Diabetes Data from VIM's package
+data.diabetes <- VIM::diabetes; data.diabetes$Outcome
+
+#Default choices are: BIC approximation, Constant prior and 390 imputed
+#datasets with mice's pmm method.
+models.list = list(M0 = Outcome ~ 1, M1 = Outcome ~ Pregnancies,
+  M2 = Outcome ~ Glucose, M3 = Outcome ~ Insulin,
+  M4 = Outcome ~ Pregnancies + Glucose, M5 = Outcome ~ Pregnancies + Insulin,
+  M6 = Outcome ~ Pregnancies + Glucose + Insulin)
+
+diabetes.mtest <- missingBtest.glm(data = VIM::diabetes,
+  models = models.list, family = binomial())
+
+#Show the results:
+diabetes.mtest
+}
 
 }
 \references{

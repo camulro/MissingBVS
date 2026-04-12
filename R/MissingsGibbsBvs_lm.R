@@ -88,7 +88,7 @@
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
 #' explanatory variables}
 #' \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-#' \item{postprobdim}{Posterior probabilities over the true model dimension}
+#' \item{postprobdim}{Estimated posterior probabilities over the true model dimension}
 #' \item{priorprobs}{Prior probabilities over the true model dimension}
 #' \item{call}{The \code{call} to the function}
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
@@ -150,27 +150,46 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Default choices are: robust and ScottBerger priors, 10000 iterations with 500
+#' #of burn in period. Here, 100 imputations with mice's pmm method.
+#' dataS97.mGBVS <- missingGibbsBVS.lm(formula = gr56092 ~ ., data = dataS97,
+#'                                     n.iter = 1000, n.burnin = 50, n.imp = 100)
+#'
+#' #Show the results:
+#' dataS97.mGBVS
+#'
+#' #Summ up the results:
+#' summary(dataS97.mGBVS)
+#'
+#' #A plot with the estimated posterior inclusion probabilities for each
+#' #competing variable and the dimension probability of the true model:
+#' plot(dataS97.mGBVS)
+#' }
 #'
 missingGibbsBVS.lm <- function (formula,
                                 data,
                                 null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
                                 BF.approx.method = "gprior",
-                                prior.betas = "Robust", #if BF.approx.method = "gprior"
+                                prior.betas = "Robust",
                                 prior.models = "ScottBerger",
                                 prior.models.dummies = "ScottBerger",
-                                priorprobs = NULL, #needed if prior.models = User
+                                priorprobs = NULL,
                                 init.model = "Full",
-                                n.iter = 10000, #number of iterations for Gibbs Sampling algorithm
+                                n.iter = 10000,
                                 n.burnin = 500,
                                 n.thin = 1,
                                 parallelmice = NULL,
                                 n.core = NULL,
                                 imp.time.test = TRUE,
-                                imp.mice.method = "pmm", #mice's default
-                                n.imp = 039E1, #number of imputed datasets for BF
-                                Gibbs.seed = runif(1,0,26061970), #seed for the Gibbs sampling
-                                imp.seed = runif(1,0,09011975)) { #seed for the imputation
+                                imp.mice.method = "pmm",
+                                n.imp = 039E1,
+                                Gibbs.seed = runif(1,0,26061970),
+                                imp.seed = runif(1,0,09011975)) {
 
   time <- Sys.time()
 
@@ -244,8 +263,7 @@ missingGibbsBVS.lm <- function (formula,
       ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
     } else ind <- which(namesxnotnull == var) #1 if the name matches
 
-    posi <- rep(0,p); posi[ind] <- 1
-    posi
+    posi <- rep(0,p); posi[ind] <- 1; posi
   }))
   colnames(positions) <- namesxnotnull
 
@@ -253,18 +271,21 @@ missingGibbsBVS.lm <- function (formula,
   positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
 
   L <- sum(!positionsx) #Number of factors to select from
-  l <- tmp[tmp > 1] #Number of levels for each factor
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
   if (L > 0) {
     #matrix of dim (Lxp) with 1 if dummy variable of the row factor
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
+
     #vector of length L with the position of the last dummy for each factor to check for repeated models
     indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-  } else positionsfac <- indf <- 0
+    checklast <- ifelse(L > 1, function(M) diag(M[, indf]),  function(M) M[, indf])
+  } else positionsfac <- l <- 0
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
 
   #The response variable
   y <- lmnull$y; obsnotNA <- names(y) #without missings
@@ -377,8 +398,8 @@ missingGibbsBVS.lm <- function (formula,
 
   #George and McCulloch's Gibbs exploration
   gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
-                           lprior.models, lprior.models.dummies, lBF.method,
-                           positions, positionsfac, indf, l, L,
+                           lprior.models, lprior.models.dummies, lBF.method, BF.approx.method,
+                           positions, positionsfac, l, L, checklast,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
 
   cf.models.lPM <- gibbs.list$cf.models.lPM
@@ -433,15 +454,13 @@ missingGibbsBVS.lm <- function (formula,
 
   if (!is.null(NAvars)) {
     if (n.imp > 1) {
+      #remove last dummy for each factor, first p0 vars are the fixed ones
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0),]
       #Evaluate lm of full model with missings using Rubin's rule
       fit <- list()
       mt <- attr(framefull, "terms")
       for (i in 1:n.imp) {
-        #remove last dummy for each factor, first p0 vars are the fixed ones
-        if (L > 0) {
-          Xi <- imputation.array[,-c(indf + p0),i]
-        } else Xi <- imputation.array[,,i]
-        z <- lm.fit(x = Xi, y = y)
+        z <- lm.fit(x = imputation.array[,,i], y = y)
         z$terms <- mt
         class(z) <- "lm"
 
@@ -450,10 +469,8 @@ missingGibbsBVS.lm <- function (formula,
       lmfull <- mice::pool(fit)
     } else {
       #compute lm.fit for the unique imputation
-      if (L > 0) {
-        Xi <- imputation.array[,-c(indf + p0)]
-      } else Xi <- imputation.array
-      lmfull <- lm.fit(x = Xi, y = y)
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0)]
+      lmfull <- lm.fit(x = imputation.array, y = y)
     }
   } else lmfull <- lm(formula, data)
 
@@ -485,7 +502,7 @@ missingGibbsBVS.lm <- function (formula,
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- gibbs.list$inclprobRB #Rao-Blackwellized inclusion probability
 
-  result$postprobdim <- probdim #vector with the dimension probabilities.
+  result$postprobdim <- probdim/sum(probdim) #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:q + q0 #dimension of the true model
 
   result$call <- match.call()
@@ -528,8 +545,8 @@ missingGibbsBVS.lm <- function (formula,
 }
 
 GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
-                        lprior.models, lprior.models.dummies, lBF.method,
-                        positions, positionsfac, indf, l, L,
+                        lprior.models, lprior.models.dummies, lBF.method, BF.approx.method,
+                        positions, positionsfac, l, L, checklast,
                         init.model, n.iter, n.burnin, n.thin, Gibbs.seed) {
   #Gibbs sampling algorithm, originally proposed by George and McCulloch (1997)
   #and further studied by Garcia-Donato and Martinez-Beneito (2013), to explore
@@ -554,11 +571,10 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
   #change saturated or oversaturated model for c(1,...,1,0)
   if (sum(tau) > 0) {
     M <- t(apply(positionsfac, 1, function(x) x * current.model))
-    f.check <- (deltasum == l) | ((deltasum == l - 1) &
-                                    ifelse(L > 1, diag(M)[indf], M[, indf]))
+    f.check <- (deltasum == l) | ((deltasum == l - 1) & checklast(M))
     if(any(f.check)) {
       for (f in which(f.check)) {
-        current.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1),0)
+        current.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1), 0)
       }
     }
   }
@@ -593,11 +609,10 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
       #change saturated or oversaturated model for c(1,...,1,0)
       if (sum(tau) > 0) {
         M <- t(apply(positionsfac, 1, function(x) x * proposal.model))
-        f.check <- (deltasum == l) | ((deltasum == l - 1) &
-                                        ifelse(L > 1, diag(M)[indf], M[, indf]))
+        f.check <- (deltasum == l) | ((deltasum == l - 1) & checklast(M))
         if(any(f.check)) {
           for (f in which(f.check)) {
-            proposal.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1),0)
+            proposal.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1), 0)
           }
         }
       }

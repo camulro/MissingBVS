@@ -41,7 +41,17 @@ continuous and normally distributed covariates to compute Bayesian Variable
 Selection in the presence of missing data.
 }
 \examples{
-#To be completed
+\dontrun{
+#Daily air quality measurements in New York
+data("airquality")
+
+Xair = airquality[,c("Ozone", "Wind", "Temp")]
+imp.air <- MC.imputation(X = Xair)
+
+#Plot the results:
+plot.MissingBVS.imputation(X = Xair, imputation = imp.air,
+  formula = Solar.R ~ 1 + Ozone + Wind + Temp)
+}
 
 }
 \references{

@@ -84,7 +84,7 @@
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
 #' explanatory variables.}
 #' \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-#' \item{postprobdim}{Posterior probabilities over the true model dimension}
+#' \item{postprobdim}{Estimated posterior probabilities over the true model dimension}
 #' \item{priorprobs}{Prior probabilities over the true model dimension}
 #' \item{call}{The \code{call} to the function}
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
@@ -123,7 +123,25 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' #Here we keep the 8 competing models:
+#' f <- Solar.R ~ 1 + Ozone + Wind + Temp
+#' airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+#'
+#' #Show the results:
+#' airq.mBVS
+#'
+#' #Summ up the results:
+#' summary(airq.mBVS)
+#'
+#' #A plot with the posterior inclusion probabilities for each competing variable
+#' #and the dimension probability of the true model:
+#' plot(airq.mBVS)
+#' }
 #'
 missingGibbsGD25 <- function (formula,
                               data,
@@ -147,15 +165,16 @@ missingGibbsGD25 <- function (formula,
   #Check for numeric covariates
   aux <- model.frame(formula, data)
   isnum <- sapply(aux, is.numeric)
-  isint <- sapply(aux, is.integer)
-  if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+  # isint <- sapply(aux, is.integer)
+  # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+  if (sum(isnum) < dim(aux)[2]) {
     stop("This method is only for continuous covariates.\n")
   }
-  cat("Be careful, this method is only for normally distributed covariates.\n",
-      "Do you want to continue? (y/n)\n")
-  if (tolower(readline()) != "y") {
-    stop("Try the missingGibbsBVS.lm function instead.\n")
-  }
+  # cat("Be careful, this method is only for normally distributed covariates.\n",
+  #     "Do you want to continue? (y/n)\n")
+  # if (tolower(readline()) != "y") {
+  #   stop("Try the missingGibbsBVS.lm function instead.\n")
+  # }
 
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
@@ -182,10 +201,8 @@ missingGibbsGD25 <- function (formula,
   n <- length(y)
   SS0 <- crossprod(lmnull$residuals) #SSE of the null model
 
-  X.full <- X.full[obsnotNA,] #remove NA obs from null model
-
   #check for missings
-  NAvars <- checkformissings(y = framefull[,1], X.full = X.full)
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Check the initial model:
   if (is.character(init.model) == TRUE) {
@@ -351,8 +368,8 @@ missingGibbsGD25 <- function (formula,
   #compute posterior probability of the dimension of the true model and
   #save logBF for each model
   for (i in seq_len(floor(n.iter / n.thin))) {
-    probdim[sum(all.models.PM[i, seq_len(p)]) + 1] <-
-      probdim[sum(all.models.PM[i, seq_len(p)]) + 1] + all.models.PM[i, p + 1]
+      probdim[sum(all.models.PM[i, seq_len(p)]) + 1] <-
+        probdim[sum(all.models.PM[i, seq_len(p)]) + 1] + all.models.PM[i, p + 1]
 
     all.models.lBF[i, p + 1] <- all.models.lPM[i, p + 1] -
       lprior.models(all.models.lPM[i, seq_len(p)]) # lBF
@@ -408,7 +425,7 @@ missingGibbsGD25 <- function (formula,
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
 
-  result$postprobdim <- probdim #vector with the dimension probabilities.
+  result$postprobdim <- probdim/sum(probdim) #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:p + 1 #dimension of the true model
 
   result$call <- match.call()

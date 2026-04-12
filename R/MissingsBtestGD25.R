@@ -69,7 +69,23 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' #Default choices are: Constant prior and 390 imputed datasets.
+#' models.list = list(M0 = Solar.R ~ 1, M1 = Solar.R ~ Ozone,
+#'   M2 = Solar.R ~ Wind, M3 = Solar.R ~ Temp,
+#'   M4 = Solar.R ~ Ozone + Wind, M5 = Solar.R ~ Ozone + Temp,
+#'   M6 = Solar.R ~ Ozone + Wind + Temp)
+#'
+#' airq.mtest <- missingBtestGD25(data = airquality, models = models.list)
+#'
+#' #Show the results:
+#' airq.mtest
+#'
+#' }
 #'
 missingBtestGD25 <- function (data,
                               models,
@@ -90,11 +106,11 @@ missingBtestGD25 <- function (data,
     names(models) <- paste("model", 1:N, sep="")
   }
 
-  cat("Be careful, this method is only for normally distributed covariates.\n",
-      "Do you want to continue? (y/n)\n")
-  if (tolower(readline()) != "y") {
-    stop("Try the missingBtest.lm function instead.\n")
-  }
+  # cat("Be careful, this method is only for normally distributed covariates.\n",
+  #     "Do you want to continue? (y/n)\n")
+  # if (tolower(readline()) != "y") {
+  #   stop("Try the missingBtest.lm function instead.\n")
+  # }
 
   Dim <- rep(0L, N)
   lBFi0 <- numeric(N)
@@ -109,8 +125,9 @@ missingBtestGD25 <- function (data,
     #Check for numeric covariates
     aux <- model.frame(formula, data)
     isnum <- sapply(aux, is.numeric)
-    isint <- sapply(aux, is.integer)
-    if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+    # isint <- sapply(aux, is.integer)
+    # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+    if (sum(isnum) < dim(aux)[2]) {
       stop("This method is only for continuous covariates.\n")
     }
     temp <- lm(formula = formula,
@@ -153,10 +170,8 @@ missingBtestGD25 <- function (data,
   namesx <- dimnames(X.full)[[2]]
   p <- length(namesx) #Number of covariates to select from
 
-  X.full <- X.full[obsnotNA,] #remove NA obs from null model
-
   #check for missings
-  NAvars <- checkformissings(y = framefull[,1], X.full = X.full)
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {

@@ -103,7 +103,7 @@
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
 #' explanatory variables}
 #' \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-#' \item{postprobdim}{Posterior probabilities over the true model dimension}
+#' \item{postprobdim}{Estimated posterior probabilities over the true model dimension}
 #' \item{priorprobs}{Prior probabilities over the true model dimension}
 #' \item{call}{The \code{call} to the function}
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
@@ -154,7 +154,25 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' #Default choices are: BIC approximation and ScottBerger prior, 10000 iterations
+#' #with 500 of burn in period. Here, 100 imputations with mice's pmm method.
+#' diabetes.mGBVS <- missingGibbsBVS.glm(formula = Outcome ~  .,
+#'   data = VIM::diabetes, family = binomial(), n.imp = 100)
+#'
+#' #Show the results:
+#' diabetes.mGBVS
+#'
+#' #Summ up the results:
+#' summary(diabetes.mGBVS)
+#'
+#' #A plot with the posterior inclusion probabilities for each competing variable
+#' #and the dimension probability of the true model:
+#' plot(diabetes.mGBVS)
+#' }
 #'
 missingGibbsBVS.glm <- function (formula,
                                  data,
@@ -166,7 +184,7 @@ missingGibbsBVS.glm <- function (formula,
                                  prior.models.dummies = "ScottBerger",
                                  priorprobs = NULL, #needed if prior.models = User
                                  init.model = "Full",
-                                 n.iter = 5000, #number of iterations for Gibbs Sampling algorithm
+                                 n.iter = 10000, #number of iterations for Gibbs Sampling algorithm
                                  n.burnin = 500,
                                  n.thin = 1,
                                  parallelmice = NULL,
@@ -192,7 +210,7 @@ missingGibbsBVS.glm <- function (formula,
   }
 
   #check whether the family chosen is among the options provided by BAS
-  inBAS <- checkforfamily(family)
+  inBAS <- checkforfamily(family, BF.approx.method)
 
   #select environment to get glm arguments
   environment(formula) <- environment()
@@ -272,8 +290,7 @@ missingGibbsBVS.glm <- function (formula,
       ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
     } else ind <- which(namesxnotnull == var) #1 if the name matches
 
-    posi <- rep(0,p); posi[ind] <- 1
-    posi
+    posi <- rep(0,p); posi[ind] <- 1; posi
   }))
   colnames(positions) <- namesxnotnull
 
@@ -281,18 +298,21 @@ missingGibbsBVS.glm <- function (formula,
   positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
 
   L <- sum(!positionsx) #Number of factors to select from
-  l <- tmp[tmp > 1] #Number of levels for each factor
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
   if (L > 0) {
     #matrix of dim (Lxp) with 1 if dummy variable of the row factor
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
+
     #vector of length L with the position of the last dummy for each factor to check for repeated models
     indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-  } else positionsfac <- indf <- 0
+    checklast <- ifelse(L > 1, function(M) diag(M[, indf]),  function(M) M[, indf])
+  } else positionsfac <- l <- 0
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
 
   #The response variable
   y <- glmnull$y; obsnotNA <- names(y) #without missings
@@ -407,8 +427,8 @@ missingGibbsBVS.glm <- function (formula,
 
   #George and McCulloch's Gibbs exploration
   gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
-                           lprior.models, lprior.models.dummies, lBF.method,
-                           positions, positionsfac, indf, l, L,
+                           lprior.models, lprior.models.dummies, lBF.method, BF.approx.method,
+                           positions, positionsfac, l, L, checklast,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
 
   cf.models.lPM <- gibbs.list$cf.models.lPM
@@ -442,8 +462,8 @@ missingGibbsBVS.glm <- function (formula,
   #compute posterior probability of the dimension of the true model and
   #save logBF for each model
   for (i in seq_len(floor(n.iter / n.thin))) {
-    probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
-      probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
+      probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
+        probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
 
     gamma.tau <- cf.models.lPM[i, seq_len(q)] > 0
     deltasum <- cf.models.lPM[i, !positionsx]
@@ -463,15 +483,13 @@ missingGibbsBVS.glm <- function (formula,
 
   if (!is.null(NAvars)) {
     if (n.imp > 1) {
+      #remove last dummy for each factor, first p0 vars are the fixed ones
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0),]
       #Evaluate glm of full model with missings using Rubin's rule
       fit <- list()
       mt <- attr(framefull, "terms")
       for (i in 1:n.imp) {
-        #remove last dummy for each factor, first q0 vars are the fixed ones
-        if (L > 0) {
-          Xi <- imputation.array[,-c(indf + p0),i]
-        } else Xi <- imputation.array[,,i]
-        z <- glm.fit(x = Xi, y = y, family = family,
+        z <- glm.fit(x = imputation.array[,,i], y = y, family = family,
                      weights = weights, offset = offset, control = control)
         z$terms <- mt
         class(z) <- "glm"
@@ -481,10 +499,8 @@ missingGibbsBVS.glm <- function (formula,
       glmfull <- mice::pool(fit)
     } else {
       #compute glm.fit for the unique imputation
-      if (L > 0) {
-        Xi <- imputation.array[,-c(indf + p0)]
-      } else Xi <- imputation.array
-      glmfull <- glm.fit(x = Xi, y = y, family = family,
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0)]
+      glmfull <- glm.fit(x = imputation.array, y = y, family = family,
                          weights = weights, offset = offset, control = control)
     }
   } else glmfull <- glm(formula,
@@ -522,7 +538,7 @@ missingGibbsBVS.glm <- function (formula,
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- gibbs.list$inclprobRB #Rao-Blackwellized inclusion probability
 
-  result$postprobdim <- probdim #vector with the dimension probabilities.
+  result$postprobdim <- probdim/sum(probdim) #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:q + q0 #dimension of the true model
 
   result$call <- match.call()

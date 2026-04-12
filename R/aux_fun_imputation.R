@@ -30,7 +30,18 @@
 #' Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' Xair = airquality[,c("Ozone", "Wind", "Temp")]
+#' imp.air <- MC.imputation(X = Xair)
+#'
+#' #Plot the results:
+#' plot.MissingBVS.imputation(X = Xair, imputation = imp.air,
+#'   formula = Solar.R ~ 1 + Ozone + Wind + Temp)
+#' }
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -117,7 +128,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #' imputation if the number of imputations is big enough (\code{n.imp > 120}).
 #' @param n.core See \code{\link[mice]{futuremice}} for details.
 #' @param time.test Logical to indicate whether to check time of performance with
-#' \code{n.imp = 10} or not.
+#' \code{n.imp = 30} or not.
 #'
 #' @return An object of class \code{MissingBVS.imputation}, an array of dimension
 #' nxpx\code{n.imp}, where n is the number of observations and p the number of
@@ -133,7 +144,18 @@ MC.imputation <- function(X, nMC = 039E1,
 #' in linear models and \code{\link[MissingBVS]{MissingBvs.glm}} for generalized
 #' linear models.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp.S97 <- mice.imputation(X = XS97, formula = f)
+#'
+#' #Plot the results:
+#' plot.MissingBVS.imputation(X = XS97, imputation = imp.S97, formula = f)
+#' }
 #'
 #' @references van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice:
 #' Multivariate Imputation by Chained Equations in R. Journal of Statistical
@@ -200,7 +222,11 @@ mice.imputation <- function(X, formula, n.imp = 039E1,
 #' \code{\link[MissingBVS]{futuremice.imputation}} for performing multiple
 #' imputed dataset for \pkg{MissingBVS}.
 #'
-#' @examples #To be completed
+#' @examples
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' missing.model(airquality)
 #'
 missing.model <- function (data, formula = NULL, show = TRUE) {
   #data is a matrix or dataframe
@@ -268,7 +294,18 @@ missing.model <- function (data, formula = NULL, show = TRUE) {
 #' \code{\link[MissingBVS]{futuremice.imputation}} for generating objects of
 #' class \code{MissingBVS.imputation}.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp.S97 <- mice.imputation(X = XS97, formula = f)
+#'
+#' #Plot the results:
+#' plot.MissingBVS.imputation(X = XS97, imputation = imp.S97, formula = f)
+#' }
 #'
 plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
   #X is a matrix or dataframe with missing data

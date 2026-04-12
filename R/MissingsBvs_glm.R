@@ -71,8 +71,10 @@
 #' @param priorprobs A p+1 (being p the number of non-fixed variables)
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details.)
-#' @param n.keep Number of the most probable models kept. By default it is set to
-#' 10 and automatically adjusted if 10 is greater than the total number of models.
+#' @param n.keep It can be either the character "all" to return the whole model
+#' space or a numeric for the exact number of the most probable models to keep.
+#' By default it is set to 10 and automatically adjusted if 10 is greater than
+#' the total number of models.
 #' @param parallelmice Logital to indicate whether or not to use parallel
 #' \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
 #' the parallel mice imputation if the number of imputations or the dataset are
@@ -162,7 +164,25 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' #Here we keep the 56 competing models:
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
+#' diabetes.mBVS <- missingBVS.glm(formula = f, data = VIM::diabetes,
+#'   family = binomial(), n.keep = 32, n.imp = 100)
+#'
+#' #Show the results:
+#' diabetes.mBVS
+#'
+#' #Summ up the results:
+#' summary(diabetes.mBVS)
+#'
+#' #A plot with the posterior inclusion probabilities for each competing variable
+#' #and the dimension probability of the true model:
+#' plot(diabetes.mBVS)
+#' }
 #'
 
 missingBVS.glm <- function (formula,
@@ -260,14 +280,6 @@ missingBVS.glm <- function (formula,
     }
   }
 
-  #n.keep > 2^p, the number of models?
-  if (n.keep > 2^p) {
-    cat(paste0("The number of models to keep (", n.keep,
-               ") is larger than the total number of models (",
-               2^p, ") and it has been set to ", 2^p,".\n"))
-    n.keep <- 2^p
-  }
-
   #the order for the posterior model distribution computation step
   ordvars <- c(namesnull, namesxnotnull) #X0, X.full
 
@@ -285,8 +297,7 @@ missingBVS.glm <- function (formula,
       ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
     } else ind <- which(namesxnotnull == var) #1 if the name matches
 
-    posi <- rep(0,p); posi[ind] <- 1
-    posi
+    posi <- rep(0,p); posi[ind] <- 1; posi
   }))
   colnames(positions) <- namesxnotnull
 
@@ -294,18 +305,36 @@ missingBVS.glm <- function (formula,
   positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
 
   L <- sum(!positionsx) #Number of factors to select from
-  l <- tmp[tmp > 1] #Number of levels for each factor
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
   if (L > 0) {
     #matrix of dim (Lxp) with 1 if dummy variable of the row factor
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
+
     #vector of length L with the position of the last dummy for each factor to check for repeated models
     indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-  } else positionsfac <- indf <- 0
+    checklast <- ifelse(L > 1, function(M) diag(M[, indf]),  function(M) M[, indf])
+  } else positionsfac <- l <- 0
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
+
+  #n.keep > 2^q, the number of models?
+  if(is.character(n.keep)) {
+    if (n.keep == "all") {
+      # n.keep <- 2^(q - L)*prod(2^l - l)
+      n.keep <- 2^q
+    } else stop("Only n.keep='all' or type the exact number of models to keep instead.\n")
+  }
+  if (n.keep > 2^q) {
+    cat(paste0("The number of models to keep (", n.keep,
+               ") is larger than the total number of models (", 2^q,
+               ") and it has been set to ", 2^q,".\n"))
+    # n.keep <- 2^(q - L)*prod(2^l - l)
+    n.keep <- 2^q
+  }
 
   #The response variable
   y <- glmnull$y; obsnotNA <- names(y) #without missings
@@ -401,7 +430,7 @@ missingBVS.glm <- function (formula,
   cat("  Numerical covariates:", depvars[positionsx], "\n")
   if (L > 0) cat(" Factors:", depvars[!positionsx], "\n")
 
-  cat("The problem has a total of", 2^p, "competing models.\n")
+  cat("The problem has a total of", 2^q, "competing models.\n")
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
   #progress bar for loop
@@ -427,8 +456,7 @@ missingBVS.glm <- function (formula,
     #check if the model is one among the saturated and oversaturated due to the dummies
     if (sum(tau) > 0) {
       M <- t(apply(positionsfac, 1, function(x) x * current.model))
-      f.check <- (deltasum == l) | ((deltasum == l - 1) &
-                                      ifelse(L > 1, diag(M)[indf], M[, indf]))
+      f.check <- (deltasum == l) | ((deltasum == l - 1) & checklast(M))
       if (any(f.check)) {all.models.lPM[i, p+1] <- NA; next}
     }
 
@@ -455,26 +483,36 @@ missingBVS.glm <- function (formula,
   all.models.PM <- all.models.lPM
   all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
 
-  #models matrix at the covariate-factor level
-  cf.models.PM <- all.models.PM[,seq_len(p)] %*% t(positions)
-  cf.models.PM <- cbind(cf.models.PM, all.models.PM[,p+1])
-  colnames(cf.models.PM)[q+1] <- "Post"
-  #cf.models.PM is exactly all.models.PM if there are no factors
+  if (L > 0) {
+    #compute models matrix at the covariate-factor level
+    cf.models.PM <- all.models.PM[,seq_len(p)] %*% t(positions)
+    cf.models.PM <- cbind(cf.models.PM, all.models.PM[,p+1])
+    colnames(cf.models.PM)[q+1] <- "Post"
+
+    modelsprob <- cbind(t(sapply(seq_len(2^q)-1,
+                                 function(j) BayesVarSel:::integer.base.b_C(j, q))), numeric(2^q))
+    for (i in seq_len(nrow(cf.models.PM))) {
+      modeli <- cf.models.PM[i, seq_len(q)] > 0
+      j <- which(apply(modelsprob[, seq_len(q)], 1, function(x) all(x == modeli)))
+      modelsprob[j, q + 1] <- modelsprob[j, q + 1] + cf.models.PM[i, q + 1]
+    }
+    colnames(modelsprob) <- colnames(cf.models.PM)
+  } else modelsprob <- all.models.PM
 
   inclprob <- rep(0, q)
   probdim <- rep(0, q + 1)
   #compute inclusion probabilities (except for fixed variables) and
   #posterior probability of the dimension of the true model
-  for (i in seq_len(nrow(cf.models.PM))) {
-    inclprob[which(cf.models.PM[i, seq_len(q)] > 0)] <-
-      inclprob[which(cf.models.PM[i, seq_len(q)] > 0)] + cf.models.PM[i, q + 1]
-    probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
-      probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
+  for (i in seq_len(nrow(modelsprob))) {
+    inclprob[which(modelsprob[i, seq_len(q)] == 1)] <-
+      inclprob[which(modelsprob[i, seq_len(q)] == 1)] + modelsprob[i, q + 1]
+    probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] <-
+      probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] + modelsprob[i, q + 1]
   }
 
   #HPM
-  nPmax <- which.max(cf.models.PM[, q+1])
-  hpm <- cf.models.PM[nPmax, ]
+  nPmax <- which.max(modelsprob[, q+1])
+  hpm <- modelsprob[nPmax, ]
 
   #MPM
   mpm <- rep(0,q)
@@ -482,15 +520,13 @@ missingBVS.glm <- function (formula,
 
   if (!is.null(NAvars)) {
     if (n.imp > 1) {
+      #remove last dummy for each factor, first p0 vars are the fixed ones
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0),]
       #Evaluate glm of full model with missings using Rubin's rule
       fit <- list()
       mt <- attr(framefull, "terms")
       for (i in 1:n.imp) {
-        #remove last dummy for each factor, first q0 vars are the fixed ones
-        if (L > 0) {
-          Xi <- imputation.array[,-c(indf + p0),i]
-        } else Xi <- imputation.array[,,i]
-        z <- glm.fit(x = Xi, y = y, family = family,
+        z <- glm.fit(x = imputation.array[,,i], y = y, family = family,
                      weights = weights, offset = offset, control = control)
         z$terms <- mt
         class(z) <- "glm"
@@ -500,10 +536,8 @@ missingBVS.glm <- function (formula,
       glmfull <- mice::pool(fit)
     } else {
       #compute glm.fit for the unique imputation
-        if (L > 0) {
-          Xi <- imputation.array[,-c(indf + p0)]
-        } else Xi <- imputation.array
-        glmfull <- glm.fit(x = Xi, y = y, family = family,
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0)]
+        glmfull <- glm.fit(x = imputation.array, y = y, family = family,
                            weights = weights, offset = offset, control = control)
     }
   } else glmfull <- glm(formula,
@@ -534,9 +568,9 @@ missingBVS.glm <- function (formula,
     result$positions <- positionsfac
     result$positionsx <- positionsx
   }
-  n.keep <- min(n.keep, nrow(cf.models.PM))
-  result$modelsprob <- cf.models.PM[order(cf.models.PM[,q+1],
-                                          decreasing = TRUE)[seq_len(n.keep)],]
+
+  result$modelsprob <- modelsprob[order(modelsprob[,q+1],
+                                        decreasing = TRUE)[seq_len(n.keep)],]
   #The binary code for the n.keep best models and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
   names(result$inclprob) <- depvars

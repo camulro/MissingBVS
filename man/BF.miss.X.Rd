@@ -31,7 +31,15 @@ with complete data, for normally distributed covariates. It employs the imputed
 data and covariance matrices of an \code{MC.imputation} object.
 }
 \examples{
-#To be completed
+#Daily air quality measurements in New York
+data("airquality")
+
+Xair = airquality[,c("Ozone", "Wind", "Temp")]
+imp1 <- MC.imputation(X = Xair, nMC = 1)
+
+lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
+lBF.imp1 <- BF.miss.X(imp1$rX.imput, imp1$rSigma,
+  y = lmnull$y, SS0 = crossprod(lmnull$residuals))
 
 }
 \references{

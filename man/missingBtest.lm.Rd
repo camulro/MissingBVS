@@ -117,7 +117,22 @@ model with fixed variables; next q components correspond to the q prior probabil
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Default choices are: robust and Constant priors and 390 imputed datasets
+#with mice's pmm method.
+models.list = list(M0 = gr56092 ~ 1, M1 = gr56092 ~ lifee060,
+  M2 = gr56092 ~ gdpsh60l, M3 = gr56092 ~ p60, M4 = gr56092 ~ lifee060 + p60,
+  M5 = gr56092 ~ lifee060 + gdpsh60l, M6 = gr56092 ~ p60 + gdpsh60l,
+  M7 = gr56092 ~ lifee060 + gdpsh60l + p60)
+
+dataS97.mtest <- missingBtest.lm(data = dataS97, models = models.list)
+
+#Show the results:
+dataS97.mtest
+}
 
 }
 \references{

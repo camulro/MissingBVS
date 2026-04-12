@@ -38,7 +38,16 @@ datasets given by an \code{MissingBVS.imputation} object and using the BF
 computation auxiliary function given by \code{BF.approx.method}.
 }
 \examples{
-#To be completed
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+
+lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+BF.fun <- function(X, k) BF.approx.BIC.lm(y = lmnull$y, X,
+  SS0 = crossprod(lmnull$residuals), k = k)
+lBF_f <- lBF.approx(1:3, imp1, BF.approx.method = BF.fun)
 
 }
 \references{

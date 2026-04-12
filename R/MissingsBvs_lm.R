@@ -71,8 +71,10 @@
 #' @param priorprobs A p+1 (being p the number of non-fixed variables)
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details).
-#' @param n.keep Number of the most probable models kept. By default it is set to
-#' 10 and automatically adjusted if 10 is greater than the total number of models.
+#' @param n.keep It can be either the character "all" to return the whole model
+#' space or a numeric for the exact number of the most probable models to keep.
+#' By default it is set to 10 and automatically adjusted if 10 is greater than
+#' the total number of models.
 #' @param parallelmice Logital to indicate whether or not to use parallel
 #' \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
 #' the parallel mice imputation if the number of imputations or the dataset are
@@ -179,18 +181,18 @@
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #'
-#' #Here we keep the 1000 most probable models a posteriori:
-#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + CONFUC + EQINV + safrica +
-#'   MUSLIM + RULELAW + YrsOpen
-#' dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 512)
+#' #Here we keep the 8 competing models:
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
 #'
-#' #A look at the results:
+#' #Show the results:
 #' dataS97.mBVS
 #'
+#' #Summ up the results:
 #' summary(dataS97.mBVS)
 #'
-#' #A plot with the posterior probabilities of the dimension of the
-#' #true model:
+#' #A plot with the posterior inclusion probabilities for each competing variable
+#' #and the dimension probability of the true model:
 #' plot(dataS97.mBVS)
 #' }
 #'
@@ -198,17 +200,17 @@ missingBVS.lm <- function (formula,
                            data,
                            null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
                            BF.approx.method = "gprior",
-                           prior.betas = "Robust", #if BF.approx.method = "gprior"
+                           prior.betas = "Robust",
                            prior.models = "ScottBerger",
                            prior.models.dummies = "ScottBerger",
-                           priorprobs = NULL, #needed if prior.models = User
+                           priorprobs = NULL,
                            n.keep = 10,
                            parallelmice = NULL,
                            n.core = NULL,
                            imp.time.test = TRUE,
-                           imp.mice.method = "pmm", #mice's default
-                           n.imp = 039E1, #number of imputed datasets for BF
-                           imp.seed = runif(1,0,09011975)) { #seed for the imputation
+                           imp.mice.method = "pmm",
+                           n.imp = 039E1,
+                           imp.seed = runif(1,0,09011975)) {
 
   time <- Sys.time()
 
@@ -266,14 +268,6 @@ missingBVS.lm <- function (formula,
     }
   }
 
-  #n.keep > 2^p, the number of models?
-  if (n.keep > 2^p) {
-    cat(paste0("The number of models to keep (", n.keep,
-               ") is larger than the total number of models (",
-               2^p, ") and it has been set to ", 2^p,".\n"))
-    n.keep <- 2^p
-  }
-
   #the order for the posterior model distribution computation step
   ordvars <- c(namesnull, namesxnotnull) #X0, X.full
 
@@ -291,8 +285,7 @@ missingBVS.lm <- function (formula,
       ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
     } else ind <- which(namesxnotnull == var) #1 if the name matches
 
-    posi <- rep(0,p); posi[ind] <- 1
-    posi
+    posi <- rep(0,p); posi[ind] <- 1; posi
   }))
   colnames(positions) <- namesxnotnull
 
@@ -300,18 +293,36 @@ missingBVS.lm <- function (formula,
   positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
 
   L <- sum(!positionsx) #Number of factors to select from
-  l <- tmp[tmp > 1] #Number of levels for each factor
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
   if (L > 0) {
     #matrix of dim (Lxp) with 1 if dummy variable of the row factor
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
+
     #vector of length L with the position of the last dummy for each factor to check for repeated models
     indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-  } else positionsfac <- indf <- 0
+    checklast <- ifelse(L > 1, function(M) diag(M[, indf]),  function(M) M[, indf])
+  } else positionsfac <- l <- 0
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
+
+  #n.keep > 2^q, the number of models?
+  if(is.character(n.keep)) {
+    if (n.keep == "all") {
+      # n.keep <- 2^(q - L)*prod(2^l - l)
+      n.keep <- 2^q
+    } else stop("Only n.keep='all' or type the exact number of models to keep instead.\n")
+  }
+  if (n.keep > 2^q) {
+    cat(paste0("The number of models to keep (", n.keep,
+               ") is larger than the total number of models (", 2^q,
+               ") and it has been set to ", 2^q,".\n"))
+    # n.keep <- 2^(q - L)*prod(2^l - l)
+    n.keep <- 2^q
+  }
 
   #The response variable
   y <- lmnull$y; obsnotNA <- names(y) #without missings
@@ -404,7 +415,7 @@ missingBVS.lm <- function (formula,
   cat("  Numerical covariates:", depvars[positionsx], "\n")
   if (L > 0) cat(" Factors:", depvars[!positionsx], "\n")
 
-  cat("The problem has a total of", 2^p, "competing models.\n")
+  cat("The problem has a total of", 2^q, "competing models.\n")
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
   #progress bar for loop
@@ -430,8 +441,7 @@ missingBVS.lm <- function (formula,
     #check if the model is one among the saturated and oversaturated due to the dummies
     if (sum(tau) > 0) {
       M <- t(apply(positionsfac, 1, function(x) x * current.model))
-      f.check <- (deltasum == l) | ((deltasum == l - 1) &
-                                      ifelse(L > 1, diag(M)[indf], M[, indf]))
+      f.check <- (deltasum == l) | ((deltasum == l - 1) & checklast(M))
       if (any(f.check)) {all.models.lPM[i, p+1] <- NA; next}
     }
 
@@ -458,26 +468,36 @@ missingBVS.lm <- function (formula,
   all.models.PM <- all.models.lPM
   all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
 
-  #models matrix at the covariate-factor level
-  cf.models.PM <- all.models.PM[,seq_len(p)] %*% t(positions)
-  cf.models.PM <- cbind(cf.models.PM, all.models.PM[,p+1])
-  colnames(cf.models.PM)[q+1] <- "Post"
-  #cf.models.PM is exactly all.models.PM if there are no factors
+  if (L > 0) {
+    #compute models matrix at the covariate-factor level
+    cf.models.PM <- all.models.PM[,seq_len(p)] %*% t(positions)
+    cf.models.PM <- cbind(cf.models.PM, all.models.PM[,p+1])
+    colnames(cf.models.PM)[q+1] <- "Post"
+
+    modelsprob <- cbind(t(sapply(seq_len(2^q)-1,
+                                 function(j) BayesVarSel:::integer.base.b_C(j, q))), numeric(2^q))
+    for (i in seq_len(nrow(cf.models.PM))) {
+      modeli <- cf.models.PM[i, seq_len(q)] > 0
+      j <- which(apply(modelsprob[, seq_len(q)], 1, function(x) all(x == modeli)))
+      modelsprob[j, q + 1] <- modelsprob[j, q + 1] + cf.models.PM[i, q + 1]
+    }
+    colnames(modelsprob) <- colnames(cf.models.PM)
+  } else modelsprob <- all.models.PM
 
   inclprob <- rep(0, q)
   probdim <- rep(0, q + 1)
   #compute inclusion probabilities (except for fixed variables) and
   #posterior probability of the dimension of the true model
-  for (i in seq_len(nrow(cf.models.PM))) {
-    inclprob[which(cf.models.PM[i, seq_len(q)] > 0)] <-
-      inclprob[which(cf.models.PM[i, seq_len(q)] > 0)] + cf.models.PM[i, q + 1]
-    probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
-      probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
+  for (i in seq_len(nrow(modelsprob))) {
+    inclprob[which(modelsprob[i, seq_len(q)] == 1)] <-
+      inclprob[which(modelsprob[i, seq_len(q)] == 1)] + modelsprob[i, q + 1]
+    probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] <-
+      probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] + modelsprob[i, q + 1]
   }
 
   #HPM
-  nPmax <- which.max(cf.models.PM[, q+1])
-  hpm <- cf.models.PM[nPmax, ]
+  nPmax <- which.max(modelsprob[, q+1])
+  hpm <- modelsprob[nPmax, ]
 
   #MPM
   mpm <- rep(0,q)
@@ -485,15 +505,13 @@ missingBVS.lm <- function (formula,
 
   if (!is.null(NAvars)) {
     if (n.imp > 1) {
+      #remove last dummy for each factor, first p0 vars are the fixed ones
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0),]
       #Evaluate lm of full model with missings using Rubin's rule
       fit <- list()
       mt <- attr(framefull, "terms")
       for (i in 1:n.imp) {
-        #remove last dummy for each factor, first p0 vars are the fixed ones
-        if (L > 0) {
-          Xi <- imputation.array[,-c(indf + p0),i]
-        } else Xi <- imputation.array[,,i]
-        z <- lm.fit(x = Xi, y = y)
+        z <- lm.fit(x = imputation.array[,,i], y = y)
         z$terms <- mt
         class(z) <- "lm"
 
@@ -502,10 +520,8 @@ missingBVS.lm <- function (formula,
       lmfull <- mice::pool(fit)
     } else {
       #compute lm.fit for the unique imputation
-      if (L > 0) {
-        Xi <- imputation.array[,-c(indf + p0)]
-      } else Xi <- imputation.array
-      lmfull <- lm.fit(x = Xi, y = y)
+      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0)]
+      lmfull <- lm.fit(x = imputation.array, y = y)
     }
   } else lmfull <- lm(formula, data)
 
@@ -530,9 +546,9 @@ missingBVS.lm <- function (formula,
     result$positions <- positionsfac
     result$positionsx <- positionsx
   }
-  n.keep <- min(n.keep, nrow(cf.models.PM))
-  result$modelsprob <- cf.models.PM[order(cf.models.PM[,q+1],
-                                          decreasing = TRUE)[seq_len(n.keep)],]
+
+  result$modelsprob <- modelsprob[order(modelsprob[,q+1],
+                                        decreasing = TRUE)[seq_len(n.keep)],]
   #The binary code for the n.keep best models and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
   names(result$inclprob) <- depvars
@@ -723,7 +739,18 @@ model.matrix.rankdef <- function (model.frame.aux) {
 #' \code{\link[MissingBVS]{MissingGD25}} or \code{\link[MissingBVS]{MissingBvs.glm}}
 #' and their Gibbs versions for creating objects of the class \code{MissingBvs}.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Here we keep the 8 competing models:
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+#'
+#' #Show the results:
+#' print(dataS97.mBVS)
+#' }
 #'
 print.MissingBvs <- function(mbvs.object,...){
 
@@ -782,7 +809,18 @@ print.MissingBvs <- function(mbvs.object,...){
 #' \code{\link[MissingBVS]{MissingGD25}} or \code{\link[MissingBVS]{MissingBvs.glm}}
 #' and their Gibbs versions for creating objects of the class \code{MissingBvs}.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Here we keep the 8 competing models:
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+#'
+#' #Summ up the results:
+#' summary(dataS97.mBVS)
+#' }
 #'
 #' @references Barbieri, M and Berger, J (2004)<DOI:10.1214/009053604000000238>
 #' Optimal Predictive Model Selection. The Annals of Statistics, 32, 870-897.

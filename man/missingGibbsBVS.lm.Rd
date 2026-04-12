@@ -122,7 +122,7 @@ logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables}
 \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-\item{postprobdim}{Posterior probabilities over the true model dimension}
+\item{postprobdim}{Estimated posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
@@ -148,7 +148,25 @@ reliable results.
 \code{\link[MissingBVS]{MissingBvs.lm}}. See the later for common details.
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Default choices are: robust and ScottBerger priors, 10000 iterations with 500
+#of burn in period. Here, 100 imputations with mice's pmm method.
+dataS97.mGBVS <- missingGibbsBVS.lm(formula = gr56092 ~ ., data = dataS97,
+                                    n.iter = 1000, n.burnin = 50, n.imp = 100)
+
+#Show the results:
+dataS97.mGBVS
+
+#Summ up the results:
+summary(dataS97.mGBVS)
+
+#A plot with the estimated posterior inclusion probabilities for each
+#competing variable and the dimension probability of the true model:
+plot(dataS97.mGBVS)
+}
 
 }
 \references{

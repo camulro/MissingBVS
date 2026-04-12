@@ -101,7 +101,25 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' #Here we keep the 8 competing models:
+#' f <- Solar.R ~ 1 + Ozone + Wind + Temp
+#' airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+#'
+#' #Show the results:
+#' airq.mBVS
+#'
+#' #Summ up the results:
+#' summary(airq.mBVS)
+#'
+#' #A plot with the posterior inclusion probabilities for each competing variable
+#' #and the dimension probability of the true model:
+#' plot(airq.mBVS)
+#' }
 #'
 missingGD25 <- function (formula,
                          data,
@@ -121,15 +139,16 @@ missingGD25 <- function (formula,
   #Check for numeric covariates
   aux <- model.frame(formula, data)
   isnum <- sapply(aux, is.numeric)
-  isint <- sapply(aux, is.integer)
-  if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+  # isint <- sapply(aux, is.integer)
+  # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+  if (sum(isnum) < dim(aux)[2]) {
     stop("This method is only for continuous covariates.\n")
   }
-  cat("Be careful, this method is only for normally distributed covariates.\n",
-      "Do you want to continue? (y/n)\n")
-  if (tolower(readline()) != "y") {
-    stop("Try the missingBVS.lm function instead.\n")
-  }
+  # cat("Be careful, this method is only for normally distributed covariates.\n",
+  #     "Do you want to continue? (y/n)\n")
+  # if (tolower(readline()) != "y") {
+  #   stop("Try the missingBVS.lm function instead.\n")
+  # }
 
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
@@ -165,10 +184,8 @@ missingGD25 <- function (formula,
   n <- length(y)
   SS0 <- crossprod(lmnull$residuals) #SSE of the null model
 
-  X.full <- X.full[obsnotNA,] #remove NA obs from null model
-
   #check for missings
-  NAvars <- checkformissings(y = framefull[,1], X.full = X.full)
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Check model priors chosen and define the function to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, p)

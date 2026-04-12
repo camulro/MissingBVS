@@ -52,8 +52,10 @@ factor levels (to be literally specified). Possible choices are "Constant" and
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
-\item{n.keep}{Number of the most probable models kept. By default it is set to
-10 and automatically adjusted if 10 is greater than the total number of models.}
+\item{n.keep}{It can be either the character "all" to return the whole model
+space or a numeric for the exact number of the most probable models to keep.
+By default it is set to 10 and automatically adjusted if 10 is greater than
+the total number of models.}
 
 \item{parallelmice}{Logital to indicate whether or not to use parallel
 \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
@@ -167,18 +169,18 @@ of the possible model dimensions.
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 data("dataS97")
 
-#Here we keep the 1000 most probable models a posteriori:
-f <- gr56092 ~ 1 + lifee060 + gdpsh60l + CONFUC + EQINV + safrica +
-  MUSLIM + RULELAW + YrsOpen
-dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 512)
+#Here we keep the 8 competing models:
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
 
-#A look at the results:
+#Show the results:
 dataS97.mBVS
 
+#Summ up the results:
 summary(dataS97.mBVS)
 
-#A plot with the posterior probabilities of the dimension of the
-#true model:
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
 plot(dataS97.mBVS)
 }
 

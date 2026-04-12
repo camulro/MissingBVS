@@ -110,23 +110,39 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Default choices are: robust and Constant priors and 390 imputed datasets
+#' #with mice's pmm method.
+#' models.list = list(M0 = gr56092 ~ 1, M1 = gr56092 ~ lifee060,
+#'   M2 = gr56092 ~ gdpsh60l, M3 = gr56092 ~ p60, M4 = gr56092 ~ lifee060 + p60,
+#'   M5 = gr56092 ~ lifee060 + gdpsh60l, M6 = gr56092 ~ p60 + gdpsh60l,
+#'   M7 = gr56092 ~ lifee060 + gdpsh60l + p60)
+#'
+#' dataS97.mtest <- missingBtest.lm(data = dataS97, models = models.list)
+#'
+#' #Show the results:
+#' dataS97.mtest
+#' }
 #'
 
 missingBtest.lm <- function (data,
                              models,
                              null.model = NULL,
                              BF.approx.method = "gprior",
-                             prior.betas = "Robust", #if BF.approx.method = "gprior"
+                             prior.betas = "Robust",
                              prior.models = "Constant",
                              prior.models.dummies = "ScottBerger",
-                             priorprobs = NULL, #needed if prior.models = "User"
+                             priorprobs = NULL,
                              parallelmice = NULL,
                              n.core = NULL,
                              imp.time.test = TRUE,
-                             imp.mice.method = "pmm", #mice's default
+                             imp.mice.method = "pmm",
                              n.imp = 039E1,
-                             imp.seed = runif(1,0,09011975)) { #seed for the imputation
+                             imp.seed = runif(1,0,09011975)) {
 
   #N is the number of models:
   N <- length(models)
@@ -225,8 +241,7 @@ missingBtest.lm <- function (data,
       ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
     } else ind <- which(namesxnotnull == var) #1 if the name matches
 
-    posi <- rep(0,p); posi[ind] <- 1
-    posi
+    posi <- rep(0,p); posi[ind] <- 1; posi
   }))
   colnames(positions) <- namesxnotnull
 
@@ -234,18 +249,19 @@ missingBtest.lm <- function (data,
   positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
 
   L <- sum(!positionsx) #Number of factors to select from
-  l <- tmp[tmp > 1] #Number of levels for each factor
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
   if (L > 0) {
     #matrix of dim (Lxp) with 1 if dummy variable of the row factor
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
     #vector of length L with the position of the last dummy for each factor to check for repeated models
     indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-  } else positionsfac <- indf <- 0
+  } else positionsfac <- indf <- l <- 0
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
 
   #The response variable
   obsnotNA <- rownames(X0)
@@ -500,7 +516,23 @@ missingBtest.lm <- function (data,
 #' \code{\link[MissingBVS]{MissingBtestGD25}} for creating objects of the class
 #' \code{MissingBtest}.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Default choices are: robust and Constant priors and 390 imputed datasets
+#' #with mice's pmm method.
+#' models.list = list(M0 = gr56092 ~ 1, M1 = gr56092 ~ lifee060,
+#'   M2 = gr56092 ~ gdpsh60l, M3 = gr56092 ~ p60, M4 = gr56092 ~ lifee060 + p60,
+#'   M5 = gr56092 ~ lifee060 + gdpsh60l, M6 = gr56092 ~ p60 + gdpsh60l,
+#'   M7 = gr56092 ~ lifee060 + gdpsh60l + p60)
+#' lifee060 + gdpsh60l + p60
+#' dataS97.mtest <- missingBtest.lm(data = dataS97, models = models.list)
+#'
+#' #Show the results:
+#' dataS97.mtest
+#' }
 #'
 print.MissingBtest <- function(mbtest.object,...){
   if (!inherits(mbtest.object, "MissingBtest")){

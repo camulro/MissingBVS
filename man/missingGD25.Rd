@@ -106,7 +106,24 @@ model with fixed covariates; next p components correspond to the p prior probabi
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Daily air quality measurements in New York
+data("airquality")
+
+#Here we keep the 8 competing models:
+f <- Solar.R ~ 1 + Ozone + Wind + Temp
+airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+
+#Show the results:
+airq.mBVS
+
+#Summ up the results:
+summary(airq.mBVS)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot(airq.mBVS)
+}
 
 }
 \references{

@@ -65,8 +65,10 @@ factor levels (to be literally specified). Possible choices are "Constant" and
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details.)}
 
-\item{n.keep}{Number of the most probable models kept. By default it is set to
-10 and automatically adjusted if 10 is greater than the total number of models.}
+\item{n.keep}{It can be either the character "all" to return the whole model
+space or a numeric for the exact number of the most probable models to keep.
+By default it is set to 10 and automatically adjusted if 10 is greater than
+the total number of models.}
 
 \item{parallelmice}{Logital to indicate whether or not to use parallel
 \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
@@ -182,7 +184,24 @@ model with fixed variables; next p components correspond to the p prior probabil
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Indian Prime Diabetes Data from VIM's package
+
+#Here we keep the 56 competing models:
+f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
+diabetes.mBVS <- missingBVS.glm(formula = f, data = VIM::diabetes,
+  family = binomial(), n.keep = 32, n.imp = 100)
+
+#Show the results:
+diabetes.mBVS
+
+#Summ up the results:
+summary(diabetes.mBVS)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot(diabetes.mBVS)
+}
 
 }
 \references{

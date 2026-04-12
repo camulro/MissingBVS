@@ -124,7 +124,24 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Indian Prime Diabetes Data from VIM's package
+#' data.diabetes <- VIM::diabetes; data.diabetes$Outcome
+#'
+#' #Default choices are: BIC approximation, Constant prior and 390 imputed
+#' #datasets with mice's pmm method.
+#' models.list = list(M0 = Outcome ~ 1, M1 = Outcome ~ Pregnancies,
+#'   M2 = Outcome ~ Glucose, M3 = Outcome ~ Insulin,
+#'   M4 = Outcome ~ Pregnancies + Glucose, M5 = Outcome ~ Pregnancies + Insulin,
+#'   M6 = Outcome ~ Pregnancies + Glucose + Insulin)
+#'
+#' diabetes.mtest <- missingBtest.glm(data = VIM::diabetes,
+#'   models = models.list, family = binomial())
+#'
+#' #Show the results:
+#' diabetes.mtest
+#' }
 #'
 missingBtest.glm <- function (data,
                               models,
@@ -168,7 +185,7 @@ missingBtest.glm <- function (data,
   } else relax.nest = FALSE
 
   #check whether the family chosen is among the options provided by BAS
-  inBAS <- checkforfamily(family)
+  inBAS <- checkforfamily(family, BF.approx.method)
 
   #for the C code
   weights <- as.numeric(weights)
@@ -198,7 +215,8 @@ missingBtest.glm <- function (data,
 
     Dev[i] <- temp$deviance
 
-    Xi <- model.matrix.rankdef(model.frame(temp))
+    framei <- model.frame(formulai, data, na.action = NULL)
+    Xi <- model.matrix.rankdef(framei)
     covar.list[[i]] <- dimnames(Xi)[[2]]
     Dim[i] <- length(covar.list[[i]])
     mt[[i]] <- temp$terms
@@ -268,24 +286,29 @@ missingBtest.glm <- function (data,
   positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
 
   L <- sum(!positionsx) #Number of factors to select from
-  l <- tmp[tmp > 1] #Number of levels for each factor
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
   if (L > 0) {
     #matrix of dim (Lxp) with 1 if dummy variable of the row factor
     positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
     rownames(positionsfac) <- depvars[!positionsx]
     colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
     #vector of length L with the position of the last dummy for each factor to check for repeated models
     indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-  } else positionsfac <- indf <- 0
+  } else positionsfac <- indf <- l <- 0
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
 
   #The response variable
   obsnotNA <- rownames(X0)
-  y <- as.numeric(framenull[obsnotNA, 1]) #response variable without missings
+  y <- model.response(framenull) #response variable without missings
   n <- length(y)
   devnull <- Dev[nullmodel.pos]
+
+  #is the response a factor?
+  if (is.factor(y)) y <- y != levels(y)[1L]
+  y[weights == 0] <- 0
 
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 

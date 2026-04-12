@@ -80,7 +80,22 @@ null model; next q components correspond to the q prior probabilities
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Daily air quality measurements in New York
+data("airquality")
+
+#Default choices are: Constant prior and 390 imputed datasets.
+models.list = list(M0 = Solar.R ~ 1, M1 = Solar.R ~ Ozone,
+  M2 = Solar.R ~ Wind, M3 = Solar.R ~ Temp,
+  M4 = Solar.R ~ Ozone + Wind, M5 = Solar.R ~ Ozone + Temp,
+  M6 = Solar.R ~ Ozone + Wind + Temp)
+
+airq.mtest <- missingBtestGD25(data = airquality, models = models.list)
+
+#Show the results:
+airq.mtest
+
+}
 
 }
 \references{

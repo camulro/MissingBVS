@@ -58,7 +58,16 @@ Computes the logarithm of the BIC approximation of Bayes factors for
 complete data in generalized linear models.
 }
 \examples{
-#To be completed
+#Indian Prime Diabetes Data from VIM's package
+
+Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
+f <- Outcome ~ Pregnancies + Glucose + Insulin
+imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+
+glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
+  x = T, y = T)
+lBF.imp1 <- BF.approx.BIC.glm(y = glmnull$y, X = imp1[,,1],
+  family = binomial(), logmargnull = 0) #returns the logmarginal approx
 
 }
 \references{
