@@ -33,7 +33,7 @@ f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
 imp.S97 <- mice.imputation(X = XS97, formula = f)
 
 #Plot the results:
-plot.MissingBVS.imputation(X = XS97, imputation = imp.S97, formula = f)
+plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
 }
 
 }

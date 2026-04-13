@@ -38,7 +38,7 @@ Xair = airquality[,c("Ozone", "Wind", "Temp")]
 imp1 <- MC.imputation(X = Xair, nMC = 1)
 
 lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
-lBF.imp1 <- BF.miss.X(imp1$rX.imput, imp1$rSigma,
+lBF.imp1 <- BF.miss.X(imp1$rX.imput[names(lmnull$y),,], imp1$rSigma[,,1],
   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
 
 }

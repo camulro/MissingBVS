@@ -36,7 +36,7 @@ f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
 imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 
 lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-lBF.imp1 <- BF.approx.BIC.lm(y = lmnull$y, X = imp1[,,1],
+lBF.imp1 <- BF.approx.BIC.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
   SS0 = crossprod(lmnull$residuals))
 
 }

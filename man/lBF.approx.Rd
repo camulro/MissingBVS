@@ -42,12 +42,12 @@ computation auxiliary function given by \code{BF.approx.method}.
 data("dataS97")
 XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
 f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
-imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+imp2 <- mice.imputation(X = XS97, formula = f, n.imp = 2)
 
 lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
 BF.fun <- function(X, k) BF.approx.BIC.lm(y = lmnull$y, X,
   SS0 = crossprod(lmnull$residuals), k = k)
-lBF_f <- lBF.approx(1:3, imp1, BF.approx.method = BF.fun)
+lBF_f <- lBF.approx(1:3, imp2[names(lmnull$y),,], BF.approx.method = BF.fun)
 
 }
 \references{

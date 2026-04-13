@@ -49,7 +49,7 @@ Xair = airquality[,c("Ozone", "Wind", "Temp")]
 imp.air <- MC.imputation(X = Xair)
 
 #Plot the results:
-plot.MissingBVS.imputation(X = Xair, imputation = imp.air,
+plot.MissingBVS.imputation(X = airquality, imputation = imp.air,
   formula = Solar.R ~ 1 + Ozone + Wind + Temp)
 }
 

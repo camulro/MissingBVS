@@ -62,7 +62,7 @@ imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
 
 glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
   x = T, y = T)
-lBF.imp1 <- BF.approx.BIC.glm.stats(y = glmnull$y, X = imp1[,,1],
+lBF.imp1 <- BF.approx.BIC.glm.stats(y = glmnull$y, X = imp1[names(glmnull$y),,1],
   family = binomial(), devnull = glmnull$deviance)
 
 }

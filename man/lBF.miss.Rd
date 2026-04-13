@@ -46,12 +46,13 @@ given by \code{BF.miss.aux}.
 data("airquality")
 
 Xair = airquality[,c("Ozone", "Wind", "Temp")]
-imp1 <- MC.imputation(X = Xair, nMC = 1)
+imp2 <- MC.imputation(X = Xair, nMC = 2)
 
 lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
+imp2$rX.imput <- imp2$rX.imput[names(lmnull$y),,]
 BF.fun <- function(X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
-lBF_f <- lBF.miss(1:3, imp1, BF.miss.aux = BF.fun)
+lBF_f <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
 
 }
 \references{

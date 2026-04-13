@@ -9,7 +9,7 @@ BF.approx.gprior.glm(
   X,
   family = binomial(link = "logit"),
   logmargnull,
-  prior.betas = BAS::robust(n = length(y)),
+  prior.betas = BAS::robust(as.numeric(length(y))),
   k = ncol(X) - p0,
   p0 = 1L,
   weights = rep(1, length(y)),
@@ -73,7 +73,7 @@ imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
 
 glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
   x = T, y = T)
-lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1[,,1],
+lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
   family = binomial(), logmargnull = 0) #returns the logmarginal
 
 }
