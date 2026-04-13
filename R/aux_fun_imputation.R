@@ -39,7 +39,7 @@
 #' imp.air <- MC.imputation(X = Xair)
 #'
 #' #Plot the results:
-#' plot.MissingBVS.imputation(X = Xair, imputation = imp.air,
+#' plot.MissingBVS.imputation(X = airquality, imputation = imp.air,
 #'   formula = Solar.R ~ 1 + Ozone + Wind + Temp)
 #' }
 #'
@@ -154,7 +154,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #' imp.S97 <- mice.imputation(X = XS97, formula = f)
 #'
 #' #Plot the results:
-#' plot.MissingBVS.imputation(X = XS97, imputation = imp.S97, formula = f)
+#' plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
 #' }
 #'
 #' @references van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice:
@@ -304,7 +304,7 @@ missing.model <- function (data, formula = NULL, show = TRUE) {
 #' imp.S97 <- mice.imputation(X = XS97, formula = f)
 #'
 #' #Plot the results:
-#' plot.MissingBVS.imputation(X = XS97, imputation = imp.S97, formula = f)
+#' plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
 #' }
 #'
 plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
@@ -326,17 +326,28 @@ plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
 
   missing.matrix <- missing.model(X.full, show = FALSE)
   NAvars <- names(which(missing.matrix["Total",] > 0)) #original vars with missings
+  pm <- length(NAvars)
   missings <- missing.matrix[-nrow(missing.matrix), NAvars]
 
-  n <- dim(missings)[1]
-  p <- dim(missings)[2]
   n.imp <- dim(imputation.array)[3]
-
+  if (pm == 0) stop("There are no missings in the data provided.\n")
   #keep imputed vars
-  imputation.array.model <- array(imputation.array[rownames(missings),NAvars,],
-                                  dim = c(n, p, n.imp)) #intercept removed
-  dimnames(imputation.array.model)[[1]] <- rownames(missings)
-  dimnames(imputation.array.model)[[2]] <- NAvars
+  if (pm == 1) {
+    n <- length(missings)
+    p <- 1
+    imputation.array.model <- array(imputation.array[names(missings),NAvars,],
+                                    dim = c(n, p, n.imp),
+                                    dimnames = list(names(missings),
+                                                 NAvars, 1:n.imp)) #intercept removed
+  } else {
+    n <- dim(missings)[1]
+    p <- dim(missings)[2]
+
+    imputation.array.model <- array(imputation.array[rownames(missings),NAvars,],
+                                    dim = c(n, p, n.imp),
+                                    dimnames = list(rownames(missings),
+                                                    NAvars, 1:n.imp))
+  }
 
   #calculate how to grid the composed plot
   if (is.null(mfrow)) {
@@ -349,7 +360,10 @@ plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
   } else par(mfrow = mfrow, mar = c(2.5,2,0.5,0.5), mgp = c(1.5, 0.5, 0))
 
   for (i in NAvars) {
-    x.mi <- as.vector(imputation.array.model[which(missings[,i] == 0),i,]) #imputed
+    if (pm == 1) {
+      x.mi <- as.vector(imputation.array.model[which(missings == 0),i,]) #imputed
+    } else x.mi <- as.vector(imputation.array.model[which(missings[,i] == 0),i,]) #imputed
+
     x.oi <- X.full[!is.na(X.full[,i]), i] #observed
     x.i <- c(x.mi, x.oi)
 

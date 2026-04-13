@@ -36,12 +36,13 @@
 #' data("airquality")
 #'
 #' Xair = airquality[,c("Ozone", "Wind", "Temp")]
-#' imp1 <- MC.imputation(X = Xair, nMC = 1)
+#' imp2 <- MC.imputation(X = Xair, nMC = 2)
 #'
 #' lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
+#' imp2$rX.imput <- imp2$rX.imput[names(lmnull$y),,]
 #' BF.fun <- function(X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
 #'   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
-#' lBF_f <- lBF.miss(1:3, imp1, BF.miss.aux = BF.fun)
+#' lBF_f <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -108,7 +109,7 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
 #' imp1 <- MC.imputation(X = Xair, nMC = 1)
 #'
 #' lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
-#' lBF.imp1 <- BF.miss.X(imp1$rX.imput, imp1$rSigma,
+#' lBF.imp1 <- BF.miss.X(imp1$rX.imput[names(lmnull$y),,], imp1$rSigma[,,1],
 #'   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
@@ -159,12 +160,12 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 #' data("dataS97")
 #' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
 #' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
-#' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+#' imp2 <- mice.imputation(X = XS97, formula = f, n.imp = 2)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
 #' BF.fun <- function(X, k) BF.approx.BIC.lm(y = lmnull$y, X,
 #'   SS0 = crossprod(lmnull$residuals), k = k)
-#' lBF_f <- lBF.approx(1:3, imp1, BF.approx.method = BF.fun)
+#' lBF_f <- lBF.approx(1:3, imp2[names(lmnull$y),,], BF.approx.method = BF.fun)
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -223,7 +224,7 @@ lBF.approx <- function(model, imputation.array, BF.approx.method,
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-#' lBF.imp1 <- BF.approx.BIC.lm(y = lmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.BIC.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
 #'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
@@ -276,7 +277,7 @@ BF.approx.BIC.lm <- function(y, X, SS0,
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-#' lBF.imp1 <- BF.approx.TBF.lm(y = lmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.TBF.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
 #'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
@@ -333,7 +334,7 @@ BF.approx.TBF.lm <- function(y, X, SS0, prior.betas = "gBF",
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-#' lBF.imp1 <- BF.approx.gprior.lm(y = lmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.gprior.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
 #'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references García-Donato, G. and Forte, A. (2018) Bayesian Testing,
@@ -412,7 +413,7 @@ BF.approx.gprior.lm <- function(y, X, SS0, prior.betas = "RobustBF",
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-#' lBF.imp1 <- BF.approx.FLS.lm(y = lmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.FLS.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
 #'   SS0 = crossprod(lmnull$residuals), dmax = ncol(XS97))
 #'
 #' @references García-Donato, G. and Forte, A. (2018) Bayesian Testing,
@@ -481,7 +482,7 @@ c_glm.fit <- utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute l
 #'
 #' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
 #'   x = T, y = T)
-#' lBF.imp1 <- BF.approx.BIC.glm(y = glmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.BIC.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
 #'   family = binomial(), logmargnull = 0) #returns the logmarginal approx
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
@@ -494,7 +495,6 @@ c_glm.fit <- utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute l
 BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
                               logmargnull,
                               k = ncol(X)-p0, p0 = 1L,
-                              #glm.fit arguments:
                               weights = rep(1, length(y)),
                               offset = rep(0, length(y)),
                               control = glm.control(),
@@ -552,7 +552,7 @@ BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
 #'
 #' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
 #'   x = T, y = T)
-#' lBF.imp1 <- BF.approx.BIC.glm.stats(y = glmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.BIC.glm.stats(y = glmnull$y, X = imp1[names(glmnull$y),,1],
 #'   family = binomial(), devnull = glmnull$deviance)
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
@@ -561,7 +561,6 @@ BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
 BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
                                     devnull,
                                     n = length(y), k = ncol(X)-p0, p0 = 1L,
-                                    #glm.fit arguments
                                     weights = rep(1, n),
                                     offset = rep(0, n),
                                     control = glm.control()) {
@@ -623,7 +622,7 @@ BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
 #'
 #' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
 #'   x = T, y = T)
-#' lBF.imp1 <- BF.approx.TBF.glm(y = glmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.TBF.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
 #'   family = binomial(), devnull = glmnull$deviance)
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
@@ -637,7 +636,6 @@ BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
 BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
                               devnull, prior.betas = BAS::g.prior(g = length(y)),
                               k = ncol(X)-p0, p0 = 1L,
-                              #glm.fit arguments
                               weights = rep(1, length(y)),
                               offset = rep(0, length(y)),
                               control = glm.control(),
@@ -695,7 +693,7 @@ BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
 #'
 #' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
 #'   x = T, y = T)
-#' lBF.imp1 <- BF.approx.TBF.glm.stats(y = glmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.TBF.glm.stats(y = glmnull$y, X = imp1[names(glmnull$y),,1],
 #'   family = binomial(), devnull = glmnull$deviance)
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
@@ -706,7 +704,6 @@ BF.approx.TBF.glm.stats <- function(y, X,
                                     family = binomial(link = "logit"),
                                     devnull,
                                     n = length(y), k = ncol(X)-p0, p0 = 1,
-                                    #glm.fit arguments
                                     weights = rep(1, n),
                                     offset = rep(0, n),
                                     control = glm.control()) {
@@ -771,7 +768,7 @@ BF.approx.TBF.glm.stats <- function(y, X,
 #'
 #' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
 #'   x = T, y = T)
-#' lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1[,,1],
+#' lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
 #'   family = binomial(), logmargnull = 0) #returns the logmarginal
 #'
 #' @references Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
@@ -784,9 +781,8 @@ BF.approx.TBF.glm.stats <- function(y, X,
 #'
 #'
 BF.approx.gprior.glm <- function(y, X, family = binomial(link = "logit"),
-                                 logmargnull, prior.betas = BAS::robust(n = length(y)),
+                                 logmargnull, prior.betas = BAS::robust(as.numeric(length(y))),
                                  k = ncol(X)-p0, p0 = 1L,
-                                 #glm.fit arguments
                                  weights = rep(1, length(y)),
                                  offset = rep(0, length(y)),
                                  control = glm.control(),

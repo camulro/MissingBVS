@@ -659,11 +659,11 @@ checkforprior.betas.glm <- function (BF.approx.method, prior.betas, inBAS,
 
         switch (prior.betas, # change the string for the corresponding BAS function
                 gZellner = {prior.betas <- BAS::g.prior(g = n)}, #fixed g=n
-                Robust = {prior.betas <- BAS::robust(n = n)}, #random g
+                Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
                 Liangetal = {prior.betas <- BAS::hyper.g.n(alpha = 3, n = n)}, #random g: hyper-g/n with a=3
                 # `Zellner-Siow` = {prior.betas <- "ZSBF"}, #random g: cauchy prior, Jeffreys in BAS?
                 FLS = {prior.betas <- BAS::g.prior(g = max(n, p^2))}, #fixed Benchmark prior: g=max(n, p*p)
-                `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(n = n)} #intrinsic prior from Womack, Novelo and Casella (2014)
+                `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))} #intrinsic prior from Womack, Novelo and Casella (2014)
                 # IHG = {prior.betas <- "geointrinsicBF"} #intrinsic hyper-g prior, not available in BAS?
         )
 
