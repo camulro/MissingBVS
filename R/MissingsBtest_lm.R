@@ -16,7 +16,7 @@
 #' parameter vector, where q is the number of diferent sizes among \code{models},
 #' with the model dimension prior probabilities through \code{priorprobs}.
 #' The first component of \code{priorprobs} must contain the probability of the
-#' model with fixed covariates; next q components correspond to the q prior probabilities
+#' model with fixed variables; next q components correspond to the q prior probabilities
 #' of the possible model dimensions.
 #'
 #' @export
@@ -24,7 +24,7 @@
 #' @param models List with the entertained models and their defining formulas,
 #' with one nested in all the others. If the list is unnamed, default names are
 #' given.
-#' @param null.model Name of the null model. If \code{NULL}, the names of covariates
+#' @param null.model Name of the null model. If \code{NULL}, the names of variables
 #' in \code{models} are used to identify the null. If provided, \code{null.model}
 #' must coincide with the one with the largest sum of squared errors and should
 #' be the one with the smallest dimension.
@@ -37,7 +37,10 @@
 #' "FLS", "intrinsic.MGC" and "IHG" (see details).
 #' @param prior.models Prior distribution over the model space (literally specified).
 #' Possible choices are "Constant", "ScottBerger" and "User" (see details).
-#' @param priorprobs A p+1 (being p the number of non-fixed covariates)
+#' @param prior.models.dummies Prior distribution over the model space of the
+#' factor levels (to be literally specified). Possible choices are "Constant" and
+#' "ScottBerger" (see details).
+#' @param priorprobs A p+1 (being p the number of non-fixed variables)
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details).
 #' @param parallelmice Logital to indicate whether or not to use parallel
@@ -46,7 +49,7 @@
 #' big enough.
 #' @param n.core See \code{\link[mice]{futuremice}} for details.
 #' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 10} if the number of variables or
+#' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
@@ -54,14 +57,26 @@
 
 #' @return \code{\link[MissingBVS]{MissingBtest.lm}} returns an object of type
 #' \code{MissingBtest} with the following elements:
-#' \item{lBFi0}{Bayes factor in logaritmic scale of each model to the null.}
-#' \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
+#' \item{lBFi0}{Bayes factor in logaritmic scale of each model to the null}
+#' \item{PostProbi}{Posterior probabilities for each model in \code{models}}
 #' \item{models}{List with the entertained models.}
-#' \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+#' \item{nullmodel}{Name in \code{models} of the null (simplest) model}
+#' \item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+#' combine the estimates for each model on \code{models} fitted by
+#' \code{\link[stats]{lm}} over the \code{n.imp} (if \code{> 1}) imputed
+#' datasets, see \code{\link[mice]{pool}} for details; and \code{lm} object
+#' when there are no missings}
+#' \item{positions}{\code{matrix} with L rows and p plus the number of dummies
+#' resulting from factors columns - L, where L is the number of factors, with 1
+#' if the column dummy corresponds to the row factor and 0 otherwise}
+#' \item{positionsx}{Logical vector of length p indicating whether or not the
+#' variable is a numerical covariate}
 #' \item{imp.args}{List of arguments used for the imputation step}
 #' \item{BF.approx.method}{Function used to compute Bayes factors}
 #' \item{prior.betas}{\code{prior.betas}}
 #' \item{prior.models}{Function used to compute the prior over the model space}
+#' \item{logprior.models.dumm}{Function used to compute the log-prior over the
+#' model space of the factor levels}
 #' \item{priorprobs}{Prior probabilities over the true model dimension}
 #'
 #' @author Carolina Mulet and Gonzalo García-Donato
@@ -78,6 +93,10 @@
 #' Variable Selection and Model Averaging in Linear Models using R with
 #' BayesVarSel. The R Journal. 10: 329.
 #'
+#' Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
+#' Variable Selection in the Presence of Factors: A Model Selection Perspective.
+#' Journal of the American Statistical Association. 117. 1-27.
+#'
 #' Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 #' Statistics. 6: 461–464.
 #'
@@ -91,22 +110,39 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Default choices are: robust and Constant priors and 390 imputed datasets
+#' #with mice's pmm method.
+#' models.list = list(M0 = gr56092 ~ 1, M1 = gr56092 ~ lifee060,
+#'   M2 = gr56092 ~ gdpsh60l, M3 = gr56092 ~ p60, M4 = gr56092 ~ lifee060 + p60,
+#'   M5 = gr56092 ~ lifee060 + gdpsh60l, M6 = gr56092 ~ p60 + gdpsh60l,
+#'   M7 = gr56092 ~ lifee060 + gdpsh60l + p60)
+#'
+#' dataS97.mtest <- missingBtest.lm(data = dataS97, models = models.list)
+#'
+#' #Show the results:
+#' dataS97.mtest
+#' }
 #'
 
 missingBtest.lm <- function (data,
                              models,
                              null.model = NULL,
                              BF.approx.method = "gprior",
-                             prior.betas = "Robust", #if BF.approx.method = "gprior"
+                             prior.betas = "Robust",
                              prior.models = "Constant",
-                             priorprobs = NULL, #needed if prior.models = "User"
+                             prior.models.dummies = "ScottBerger",
+                             priorprobs = NULL,
                              parallelmice = NULL,
                              n.core = NULL,
                              imp.time.test = TRUE,
-                             imp.mice.method = "pmm", #mice's default
+                             imp.mice.method = "pmm",
                              n.imp = 039E1,
-                             imp.seed = runif(1,0,09011975)) { #seed for the imputation
+                             imp.seed = runif(1,0,09011975)) {
 
   #N is the number of models:
   N <- length(models)
@@ -117,7 +153,7 @@ missingBtest.lm <- function (data,
   if (is.null(names(models))){
     if (!is.null(null.model)) stop(paste0("Please provide a name for the competing models.\n",
                                           "The null model must be in that list.\n"))
-    names(models) <- paste("model", 1:N, sep="")
+    names(models) <- paste("model", seq_len(N), sep="")
   }
 
   #Check if the given null model is one of the competing models:
@@ -129,22 +165,26 @@ missingBtest.lm <- function (data,
     }
   } else relax.nest = FALSE
 
-  SSE <- rep(0, N) #SSEs for each model
-  Dim <- rep(0, N)
-  lBFi0 <- rep(0, N)
-  lPriorModels <- rep(0, N)
-  PostProbi <- rep(0, N)
+  SSE <- numeric(N) #SSEs for each model
+  Dim <- rep(0L,N)
+  lBFi0 <- numeric(N)
+  lPriorModels <- numeric(N)
+  PostProbi <- numeric(N)
+  mt <- list() #list of terms for each model
 
-  #list that contains the names of the covariates in each model
+  #list that contains the names of the variables or factors in each model
   covar.list <- list()
   for (i in seq_len(N)) {
     temp <- lm(formula = as.formula(models[[i]]),
                data = data,
                y = TRUE, x = TRUE)
 
-    SSE[i] <- sum(temp$residuals^2)
-    Dim[i] <- length(temp$coefficients)
-    covar.list[[i]] <- dimnames(temp$x)[[2]]
+    SSE[i] <- crossprod(temp$residuals)
+
+    Xi <- model.matrix.rankdef(model.frame(temp))
+    covar.list[[i]] <- dimnames(Xi)[[2]]
+    Dim[i] <- length(covar.list[[i]])
+    mt[[i]] <- temp$terms
   }
   ordered.SSE <- sort(SSE, index.return = TRUE, decreasing = TRUE)
   #Which acts as null model:
@@ -161,37 +201,78 @@ missingBtest.lm <- function (data,
   competing.models <- seq_len(N)[-nullmodel.pos]
 
   #Response and fixed vars for imputation
-  auxnull <- model.frame(null.model, data, na.action = NULL)
-  namesnull.toimp <- dimnames(auxnull)[[2]][-1] #name of fixed variables to imputation
+  framenull <- model.frame(null.model, data, na.action = NULL)
+  #Rank deficient fixed model matrix to remove vars from the regressors one
+  X0rdf <- model.matrix.rankdef(framenull)
 
-  #Missing model matrix of fixed covariates
-  X0 <- model.matrix(null.model, auxnull)
+  #Missing model matrix of fixed vars
+  X0 <- model.matrix(framenull, data)
   namesnull <- dimnames(X0)[[2]]
-  p0 <- dim(X0)[2] #Number of covariates to select from
-  Dim <- Dim - p0 #model dimension (without fixed cov)
+  p0 <- dim(X0)[2] #Number of fixed covariates or dummies of factors
+  Dim <- Dim - p0 #model dimension (without fixed vars)
 
   #Full design matrix for imputation
   formula <- as.formula(paste0(null.model[[2]], "~ ."))
-  auxfull <- model.frame(formula, data, na.action = NULL)
-  namesx.toimp <- dimnames(auxfull)[[2]][-1] #name of variables to imputation
-  namesxnotnull.toimp <- namesx.toimp[namesx.toimp %notin% namesnull.toimp]
-  X.toimp <- data[,c(namesnull.toimp, namesxnotnull.toimp)] #design matrix with missing data with fixed cov
+  framefull <- model.frame(formula, data, na.action = NULL)
+  X.toimp <- data[, attr(terms(framefull), "term.labels")] #design matrix with missing data with fixed vars
 
-  #Model matrix data with missings
-  X.full <- model.matrix(formula, auxfull)
+  #Rank deficient full model matrix data with missings
+  X.full <- model.matrix.rankdef(framefull)
   namesx <- dimnames(X.full)[[2]]
-  namesxnotnull <- namesx[namesx %notin% namesnull]
+  #Only the non-fixed vars
+  namesxnotnull <- namesx[namesx %notin% dimnames(X0rdf)[[2]]]
   X.full <- X.full[, namesxnotnull]
-  p <- dim(X.full)[2] #Number of covariates to select from
+  p <- length(namesxnotnull) #Number of covariates and levels of factors
+
+  #the order for the posterior model distribution computation step
+  ordvars <- c(namesnull, namesxnotnull) #X0, X.full
+
+  #covariates and/or factors to select from
+  depvars <- setdiff(attr(terms(framefull), "term.labels"),
+                     attr(terms(framenull), "term.labels"))
+
+  #Factors: positions has number of rows equal to the number of regressors
+  #(factors or numeric covariates) and p columns.
+  #A 1 in a row denotes the position in X of a regressor (several positions for
+  #the dummies of a factor).
+  positions <- t(sapply(depvars, function(var) {
+    if(is.factor(data[[var]])) {
+      levs <- levels(data[[var]])
+      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
+    } else ind <- which(namesxnotnull == var) #1 if the name matches
+
+    posi <- rep(0,p); posi[ind] <- 1; posi
+  }))
+  colnames(positions) <- namesxnotnull
+
+  tmp <- colSums(positions %*% t(positions))
+  positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
+
+  L <- sum(!positionsx) #Number of factors to select from
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
+    rownames(positionsfac) <- depvars[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+  } else positionsfac <- indf <- l <- 0
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
 
   #The response variable
-  obsnotNA <- rownames(na.omit(auxnull)) #response variable without missings
-  y <- auxnull[obsnotNA, 1]
+  obsnotNA <- rownames(X0)
+  y <- framenull[obsnotNA, 1] #response variable without missings
   n <- length(y)
   SS0 <- SSE[nullmodel.pos]
 
-  #check for missings and define covariates with NAs
-  NAvars <- checkformissings.lm(y = auxnull[,1], X0, X.full, obsnotNA)
+  X.full <- X.full[obsnotNA,] #remove NA obs from null model
+
+  #check for missings and define variables with NAs
+  NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
 
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
@@ -214,64 +295,80 @@ missingBtest.lm <- function (data,
             prior.models <- function(modeli) priorprobs[modeli]}
   )
 
+  #Check model priors for dummies chosen and define the function to be used
+  if (prior.models.dummies %notin% c("ScottBerger", "Constant")) {
+    stop("Only priors 'ScottBerger' and 'Constant' supported.\n")
+  }
+  switch (prior.models.dummies, #change the string for the corresponding function
+          Constant = {lprior.models.dummies <-
+            function (deltai, ltau) {-sum(log(2^(ltau) - 1 - ltau))}},
+          ScottBerger = {lprior.models.dummies <-
+            function (deltai, ltau) {-sum(mylchoose(ltau, deltai)) - sum(log(ltau - 1))}}
+  )
+
   #Check approx method and priors chosen and define the function to be used
-  BF.approx.method <- checkforprior.betas.lm(BF.approx.method,
-                                             prior.betas,
+  BF.approx.method <- checkforprior.betas.lm(BF.approx.method, prior.betas,
                                              n, p = max(Dim), p0, y, SS0)
 
-  #Imputation of missing data
-  if (is.null(parallelmice)) {
-    if (n.imp > 120 | n*p > 50000) {
-      parallelmice <- TRUE #faster
-    } else parallelmice <- FALSE
-  }
-
-  if (imp.time.test & (n*p > 10000 | n.imp > 039E1)) {
-    #test imputation time
-    cat("Time test . . . \n")
-    time.test <- mice.imputation(X = X.toimp,
-                                 formula,
-                                 imp.mice.method = imp.mice.method,
-                                 parallel = parallelmice,
-                                 n.core = n.core,
-                                 time.test = TRUE)
-
-    estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to time
-    cat("The whole imputation can take ", estim.time,
-        "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
-    if (tolower(readline()) != "y") {
-      if (!parallelmice) {
-        cat("Do you want to faster imputation running a parallel version of mice? (y/n)\n")
-        if (tolower(readline()) == "y") {
-          parallelmice <- TRUE
-        } else stop("Reduce the number of imputed datasets.\n")
-      } else stop("Reduce the number of imputed datasets.\n")
+  if (!is.null(NAvars)) {
+    #Imputation of missing data
+    if (is.null(parallelmice)) {
+      if (n.imp > 120 | (n*q > 50000 & n.imp > 5)) {
+        parallelmice <- TRUE #faster
+      } else parallelmice <- FALSE
     }
+
+    if (imp.time.test & (n*q > 10000 | n.imp > 039E1)) {
+      #test imputation time
+      cat("Time test . . . \n")
+      time.test <- mice.imputation(X = X.toimp,
+                                   formula,
+                                   imp.mice.method = imp.mice.method,
+                                   parallel = parallelmice,
+                                   n.core = n.core,
+                                   time.test = TRUE)
+
+      estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to time
+      cat("The whole imputation can take ", estim.time,
+          "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
+      if (tolower(readline()) != "y") {
+        if (!parallelmice) {
+          cat("Do you want to faster imputation running a parallel version of mice? (y/n)\n")
+          if (tolower(readline()) == "y") {
+            parallelmice <- TRUE
+          } else stop("Reduce the number of imputed datasets.\n")
+        } else stop("Reduce the number of imputed datasets.\n")
+      }
+    }
+
+    cat("Performing imputation of missing data with mice's", imp.mice.method)
+    if (parallelmice) cat(" parallel")
+    cat(" method.\n", "Please wait . . . \n")
+
+    imputation.array <-  mice.imputation(X = X.toimp,
+                                         formula,
+                                         n.imp = n.imp,
+                                         imp.mice.method = imp.mice.method,
+                                         seed = imp.seed,
+                                         parallel = parallelmice,
+                                         n.core = n.core)
+
+    #remove observations with missings on the response or fixed vars,
+    #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
+    imputation.array <- imputation.array[obsnotNA, ordvars,]
+    if (n.imp > 1) {
+      #function to compute log(BFa0) for a given model as an average of BF computed
+      #by BF.approx.method over the imputed datasets
+      lBF.method <- function (model) lBF.approx(model,
+                                                imputation.array = imputation.array,
+                                                BF.approx.method = BF.approx.method,
+                                                p0 = p0, n.imp = n.imp)
+    } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                           X = imputation.array[,c(1:p0, model+p0)])
   }
-
-  cat("Performing imputation of missing data with mice's", imp.mice.method)
-  if (parallelmice) cat(" parallel")
-  cat(" method.\n", "Please wait . . . \n")
-
-  imputation.array <-  mice.imputation(X = X.toimp,
-                                       formula,
-                                       n.imp = n.imp,
-                                       imp.mice.method = imp.mice.method,
-                                       seed = imp.seed,
-                                       parallel = parallelmice,
-                                       n.core = n.core)
-
-  #remove observations with missings on the response
-  imputation.array <- imputation.array[obsnotNA,,]
-  #function to compute log(BFa0) for a given model as an average of BF computed
-  #by BF.approx.method over the imputed datasets
-  lBF.method <- function (model) lBF.approx(model,
-                                            imputation.array = imputation.array,
-                                            BF.approx.method = BF.approx.method,
-                                            p0 = p0, n.imp = n.imp)
 
   for (i in competing.models){
-    modeli <- which(namesxnotnull %in% covar.list[[i]])
+    modeli <- namesxnotnull %in% covar.list[[i]]
 
     #check whether the null is nested in the other ones
     if (!relax.nest & any(namesnull %notin% covar.list[[i]])) {
@@ -279,17 +376,59 @@ missingBtest.lm <- function (data,
                   "Please define explicitly the null model if it is the case.\n"))
     }
 
-    #check if there are NAs in the model considered to save computation time
-    if (any(covar.list[[i]] %in% NAvars)) {
-      lBFi0[i] <- lBF.method(model = modeli)
-    } else { #if there are no missings, compute the BF by the method selected
-      X.i <- cbind(X0[obsnotNA,], X.full[obsnotNA, modeli])
-      lBFi0[i] <- BF.approx.method(k = Dim[i], X = as.matrix(X.i))
+    tau <- (positionsfac %*% modeli) > 0; ltau <- (positionsfac %*% modeli)[tau]
+    m2 <- sum(tau) #number of factors active
+    if (m2 > 0) {
+      colsi <- which(colSums(matrix(positionsfac[which(tau),], nrow = m2)) > 0)
+      ind <- t(sapply(2:(2^ltau[1])-1, FUN =
+                        function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[1])))
+      rep <- which((rowSums(ind) == ltau[1]) |
+                     ((rowSums(ind) == (ltau[1] - 1)) &  ind[,ltau[1]]))
+      mat.ind <- matrix(ind[-rep,], ncol = ltau[1])
+      if (m2 > 1) {
+        for(j in 2:m2){
+          ind <- t(sapply(2:(2^ltau[j])-1, FUN =
+                            function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[j])))
+          rep <- which((rowSums(ind) == ltau[j]) |
+                         ((rowSums(ind) == (ltau[j] - 1)) &  ind[,ltau[j]]))
+          ind <- matrix(ind[-rep,], ncol = ltau[j])
+          mat.ind <- merge(mat.ind, ind, by = NULL)
+        }
+      }
+      colnames(mat.ind) <- colsi
+
+      lBF <- lpriorM <- numeric(nrow(mat.ind))
+      for (j in 1:nrow(mat.ind)) {
+        deltaj <- mat.ind[j,]
+        deltasumj <- positionsfac[which(tau), colsi] %*% as.integer(deltaj)
+
+        current.model <- as.integer(modeli)
+        current.model[colsi] <- as.integer(deltaj)
+
+        #check if there are NAs in the model considered to save computation time
+        if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
+          lBF[j] <- lBF.method(model = which(current.model == 1)) #log(BF_a0)
+          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
+        } else { #if there are no missings, compute the BF by the method selected
+          X.i <- cbind(X0, X.full[, which(current.model == 1)])
+          lBF[j] <- BF.approx.method(k = sum(current.model == 1), X = X.i) #log(BF_a0)
+          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
+        }
+      }
+      lBFi0[i] <- log(sum(exp(lBF + lpriorM)))
+      lPriorModels[i] <- log(prior.models(i))
+    } else {
+      #check if there are NAs in the model considered to save computation time
+      if (any(covar.list[[i]] %in% NAvars)) {
+        lBFi0[i] <- lBF.method(model = which(modeli))
+      } else { #if there are no missings, compute the BF by the method selected
+        X.i <- cbind(X0, X.full[,which(modeli)])
+        lBFi0[i] <- BF.approx.method(k = Dim[i], X = X.i)
+      }
+      lPriorModels[i] <- log(prior.models(i))
     }
-    lPriorModels[i] <- log(prior.models(i))
   }
   cat("\n")
-
   lPriorModels[nullmodel.pos] <- log(prior.models(nullmodel.pos))
   lBFi0[nullmodel.pos] <- 0
   C <- sum(exp(lBFi0 + lPriorModels))
@@ -300,24 +439,61 @@ missingBtest.lm <- function (data,
   names(PostProbi) <- names(models)
   names(lPriorModels) <- names(models)
 
+  #Evaluate lm of each model with missings using Rubin's rule
+  modelspool <- list()
+  for(j in competing.models){
+    namesj <- which(namesxnotnull %in% covar.list[[j]])
+    if (any(namesxnotnull[namesj] %in% NAvars)) {
+      if (n.imp > 1) {
+        fit <- list()
+        for (i in 1:n.imp) {
+          #remove last dummy for each factor, first q0 vars are the fixed ones
+          Xi <- imputation.array[,c(1:p0, namesj[namesj %notin% indf] + p0),i]
+          z <- lm.fit(x = Xi, y = y)
+          z$terms <- mt[[j]]
+          class(z) <- "lm"
+
+          fit[[i]] <- z
+        }
+        modelspool[[j]] <- mice::pool(fit)
+      } else {
+        #compute lm.fit for the unique imputation
+        Xi <- imputation.array[,c(1:p0, namesj[namesj %notin% indf] + p0)]
+        modelspool[[j]] <- lm.fit(x = Xi, y = y)
+      }
+    } else modelspool[[j]] <- lm(models[[j]], data)
+  }
+  modelspool[[nullmodel.pos]] <- lm(null.model, data)
+  names(modelspool) <- names(models)
+
   result <- list()
   result$lBFi0 <- lBFi0
   result$PostProbi <- PostProbi
   result$models <- models
-  result$nullmodel <- names(models)[pos.user.null.model]
+  result$nullmodel <- names(models)[nullmodel.pos]
+  result$modelspool <- modelspool
 
-  #arguments used for imputation
-  result$imp.args <- list(parallelmice = parallelmice,
-                          imp.mice.method = imp.mice.method,
-                          n.imp = n.imp, imp.seed = imp.seed)
+  if (L > 0) {
+    #matrix for the factors index
+    result$positions <- positionsfac
+    result$positionsx <- positionsx
+  }
 
-  #save the imputed datasets for sensitivity analysis
-  # raw.imp.array <- serialize(imputation.array, NULL)
-  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+  if (!is.null(NAvars)) {
+    #arguments used for imputation
+    result$imp.args <- list(parallelmice = parallelmice,
+                            imp.mice.method = imp.mice.method,
+                            n.imp = n.imp, imp.seed = imp.seed)
+
+    #save the imputed datasets for sensitivity analysis
+    # raw.imp.array <- serialize(imputation.array, NULL)
+    # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+  }
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas
   result$prior.models <- prior.models #function used for model prior
+  result$logprior.models.dumm <- lprior.models.dummies
   result$priorprobs <- exp(lPriorModels)
 
   class(result) <- "MissingBtest"
@@ -340,7 +516,23 @@ missingBtest.lm <- function (data,
 #' \code{\link[MissingBVS]{MissingBtestGD25}} for creating objects of the class
 #' \code{MissingBtest}.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Default choices are: robust and Constant priors and 390 imputed datasets
+#' #with mice's pmm method.
+#' models.list = list(M0 = gr56092 ~ 1, M1 = gr56092 ~ lifee060,
+#'   M2 = gr56092 ~ gdpsh60l, M3 = gr56092 ~ p60, M4 = gr56092 ~ lifee060 + p60,
+#'   M5 = gr56092 ~ lifee060 + gdpsh60l, M6 = gr56092 ~ p60 + gdpsh60l,
+#'   M7 = gr56092 ~ lifee060 + gdpsh60l + p60)
+#' lifee060 + gdpsh60l + p60
+#' dataS97.mtest <- missingBtest.lm(data = dataS97, models = models.list)
+#'
+#' #Show the results:
+#' dataS97.mtest
+#' }
 #'
 print.MissingBtest <- function(mbtest.object,...){
   if (!inherits(mbtest.object, "MissingBtest")){

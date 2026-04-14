@@ -41,7 +41,15 @@ Computes the logarithm of the Bayes factors derived from the
 Fernandez, Ley and Steel (2001) Benchmark prior for complete data in linear models.
 }
 \examples{
-#To be completed
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+
+lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+lBF.imp1 <- BF.approx.FLS.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
+  SS0 = crossprod(lmnull$residuals), dmax = ncol(XS97))
 
 }
 \references{

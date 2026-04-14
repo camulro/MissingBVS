@@ -31,7 +31,18 @@
 #' Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' Xair = airquality[,c("Ozone", "Wind", "Temp")]
+#' imp2 <- MC.imputation(X = Xair, nMC = 2)
+#'
+#' lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
+#' imp2$rX.imput <- imp2$rX.imput[names(lmnull$y),,]
+#' BF.fun <- function(X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
+#'   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
+#' lBF_f <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -47,7 +58,7 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
   imputation.list.model$rSigma <- array(imputation.list$rSigma[model, model,],
                                         dim = c(k, k, dim(imputation.list$rSigma)[3]))
 
-  lBF.our <- rep(0, nMC)
+  lBF.our <- numeric(nMC)
   for(s in 1:nMC) {
     #posterior dist. with Jeffreys independent prior
     Sigma11 <- imputation.list.model$rSigma[,,s]
@@ -90,7 +101,16 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
 #' matrices. Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' Xair = airquality[,c("Ozone", "Wind", "Temp")]
+#' imp1 <- MC.imputation(X = Xair, nMC = 1)
+#'
+#' lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
+#' lBF.imp1 <- BF.miss.X(imp1$rX.imput[names(lmnull$y),,], imp1$rSigma[,,1],
+#'   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -135,7 +155,17 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp2 <- mice.imputation(X = XS97, formula = f, n.imp = 2)
+#'
+#' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+#' BF.fun <- function(X, k) BF.approx.BIC.lm(y = lmnull$y, X,
+#'   SS0 = crossprod(lmnull$residuals), k = k)
+#' lBF_f <- lBF.approx(1:3, imp2[names(lmnull$y),,], BF.approx.method = BF.fun)
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -148,7 +178,7 @@ lBF.approx <- function(model, imputation.array, BF.approx.method,
                        p0 = 1, n.imp = dim(imputation.array)[3]) {
   k <- length(model)
 
-  lBF.aux <- rep(0, n.imp)
+  lBF.aux <- numeric(n.imp)
   X1.array <- imputation.array[,c(1:p0, model+p0),] #first p0 columns are fixed
   for(s in 1:n.imp) {
     lBF.aux[s] <- BF.approx.method(k = k, X = X1.array[,,s])
@@ -186,7 +216,16 @@ lBF.approx <- function(model, imputation.array, BF.approx.method,
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+#'
+#' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+#' lBF.imp1 <- BF.approx.BIC.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
+#'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
 #' Annals of Statistics. 6(2): 461–464.
@@ -230,7 +269,16 @@ BF.approx.BIC.lm <- function(y, X, SS0,
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+#'
+#' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+#' lBF.imp1 <- BF.approx.TBF.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
+#'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
 #' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
@@ -278,7 +326,16 @@ BF.approx.TBF.lm <- function(y, X, SS0, prior.betas = "gBF",
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+#'
+#' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+#' lBF.imp1 <- BF.approx.gprior.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
+#'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references García-Donato, G. and Forte, A. (2018) Bayesian Testing,
 #' Variable Selection and Model Averaging in Linear Models using R with
@@ -348,7 +405,16 @@ BF.approx.gprior.lm <- function(y, X, SS0, prior.betas = "RobustBF",
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
+#'
+#' lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+#' lBF.imp1 <- BF.approx.FLS.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
+#'   SS0 = crossprod(lmnull$residuals), dmax = ncol(XS97))
 #'
 #' @references García-Donato, G. and Forte, A. (2018) Bayesian Testing,
 #' Variable Selection and Model Averaging in Linear Models using R with
@@ -407,7 +473,17 @@ c_glm.fit <- utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute l
 #' an exact computation of the model posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
+#'   x = T, y = T)
+#' lBF.imp1 <- BF.approx.BIC.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
+#'   family = binomial(), logmargnull = 0) #returns the logmarginal approx
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
 #' Annals of Statistics. 6: 461–464.
@@ -419,7 +495,6 @@ c_glm.fit <- utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute l
 BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
                               logmargnull,
                               k = ncol(X)-p0, p0 = 1L,
-                              #glm.fit arguments:
                               weights = rep(1, length(y)),
                               offset = rep(0, length(y)),
                               control = glm.control(),
@@ -468,7 +543,17 @@ BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
 #' an exact computation of the model posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
+#'   x = T, y = T)
+#' lBF.imp1 <- BF.approx.BIC.glm.stats(y = glmnull$y, X = imp1[names(glmnull$y),,1],
+#'   family = binomial(), devnull = glmnull$deviance)
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
 #' Annals of Statistics. 6(2): 461–464.
@@ -476,7 +561,6 @@ BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
 BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
                                     devnull,
                                     n = length(y), k = ncol(X)-p0, p0 = 1L,
-                                    #glm.fit arguments
                                     weights = rep(1, n),
                                     offset = rep(0, n),
                                     control = glm.control()) {
@@ -529,7 +613,17 @@ BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
+#'   x = T, y = T)
+#' lBF.imp1 <- BF.approx.TBF.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
+#'   family = binomial(), devnull = glmnull$deviance)
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
 #' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
@@ -542,7 +636,6 @@ BF.approx.BIC.glm.stats <- function(y, X, family = binomial(link = "logit"),
 BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
                               devnull, prior.betas = BAS::g.prior(g = length(y)),
                               k = ncol(X)-p0, p0 = 1L,
-                              #glm.fit arguments
                               weights = rep(1, length(y)),
                               offset = rep(0, length(y)),
                               control = glm.control(),
@@ -591,7 +684,17 @@ BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
+#'   x = T, y = T)
+#' lBF.imp1 <- BF.approx.TBF.glm.stats(y = glmnull$y, X = imp1[names(glmnull$y),,1],
+#'   family = binomial(), devnull = glmnull$deviance)
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
 #' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
@@ -601,7 +704,6 @@ BF.approx.TBF.glm.stats <- function(y, X,
                                     family = binomial(link = "logit"),
                                     devnull,
                                     n = length(y), k = ncol(X)-p0, p0 = 1,
-                                    #glm.fit arguments
                                     weights = rep(1, n),
                                     offset = rep(0, n),
                                     control = glm.control()) {
@@ -657,7 +759,17 @@ BF.approx.TBF.glm.stats <- function(y, X,
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
+#'   x = T, y = T)
+#' lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
+#'   family = binomial(), logmargnull = 0) #returns the logmarginal
 #'
 #' @references Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
 #' Bayesian Adaptive Sampling. R package version 2.0.2
@@ -669,9 +781,8 @@ BF.approx.TBF.glm.stats <- function(y, X,
 #'
 #'
 BF.approx.gprior.glm <- function(y, X, family = binomial(link = "logit"),
-                                 logmargnull, prior.betas = BAS::robust(n = length(y)),
+                                 logmargnull, prior.betas = BAS::robust(as.numeric(length(y))),
                                  k = ncol(X)-p0, p0 = 1L,
-                                 #glm.fit arguments
                                  weights = rep(1, length(y)),
                                  offset = rep(0, length(y)),
                                  control = glm.control(),

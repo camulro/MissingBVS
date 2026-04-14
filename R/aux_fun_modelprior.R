@@ -95,6 +95,140 @@ logConstant <- function(p) {
 #'
 logUser <- function(p, model, priorprobs) {
   # priorprobs[sum(model)]/sum(priorprobs) / choose(p, sum(model))
-  log(priorprobs[sum(model)]) - log(sum(priorprobs)) - lchoose(p, sum(model)) #logaritmic scale
+  log(priorprobs[sum(model) + 1]) - log(sum(priorprobs)) - lchoose(p, sum(model)) #logaritmic scale
   #prior prob for each model size divided by the number of models with that size
 }
+
+#auxiliar function for lprior.model.dummies computation
+#returns the number of different models given an active factor
+#i.e., lchoose(n, k) if k < n -1 and 1 otherwise (k <= n)
+mylchoose <- function(n, k) {
+  ifelse(k < (n - 1), lchoose(n, k), 0)
+}
+
+#' Logarithm of the Scott and Berger model prior for the dummy level
+#'
+#' If there are factors present, computes the logarithm of the prior that assigns
+#' an uniform distribution to model size (Scott and Berger, 2010) on the level
+#' of the dummies that make up each different factor. It assumes independence
+#' among the dummy variables corresponding to different factors.
+#'
+#' It is derived by assigning an independent Bernouilli distribution with
+#' probability Beta(1,1) to the a priori inclusion probability of each
+#' competing dummy variable.
+#'
+#' @export
+#' @param delta Integer vector of length \code{L} specifying the number of
+#' active levels for each factor, where \code{L} is the number of factors.
+#' @param tau Logical vector of length \code{L} denoting whether or not a factor
+#' is active.
+#' @param l Integer vector of length \code{L} specifying the number of levels
+#' making up each factor.
+#'
+#' @return \code{logScottBerger.d} returns the logarithm of the Scott and Berger
+#' prior at the dummies level, assuming independence between factors.
+#'
+#' @author Carolina Mulet
+#'
+#' @seealso \code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+#' \code{\link[MissingBVS]{logConstant.d}}.
+#'
+#' @references Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes
+#' multiplicity adjustment in the variable-selection problem. The Annals of
+#' Statistics. 38: 2587–2619.
+#'
+#' Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
+#' Variable Selection in the Presence of Factors: A Model Selection Perspective.
+#' Journal of the American Statistical Association. 117. 1-27.
+#'
+#' @examples
+#' logScottBerger.d(0:3, c(F,rep(T,3)), c(3,2,4,3))
+#'
+logScottBerger.d <- function(delta, tau, l) {
+  if (sum(tau) == 0) {
+    return(0)
+  } else {
+    ltau <- l[tau] #levels of active factors
+    -sum(mylchoose(ltau, delta[tau])) - sum(log(ltau - 1)) #logarithmic scale
+  }
+}
+
+#' Logarithm of the Constant model prior for the dummy level
+#'
+#' Computes the logarithm of the prior that assigns an uniform distribution to
+#' the model space on the level of the dummies that make up each different
+#' factor. It assumes independence among the dummy variables corresponding to
+#' different factors.
+#'
+#' It is derived by assigning an independent Bernouilli distribution with fixed
+#' probability 0.5 to the a priori inclusion probability of each competing
+#' dummy variable.
+#'
+#' @export
+#' @param tau Logical vector of length \code{L} denoting whether or not a factor
+#' is active, where \code{L} is the number of factors.
+#' @param l Integer vector of length \code{L} specifying the number of levels
+#' making up each factor.
+#'
+#' @return \code{logConstant.d} returns the logarithm of the Constant prior
+#' at the dummies level, assuming independence between factors.
+#'
+#' @author Carolina Mulet
+#'
+#' @seealso \code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+#' \code{\link[MissingBVS]{logScottBerger.d}}.
+#'
+#' @examples
+#' logConstant.d(c(F,rep(T,3)), c(3,2,4,3))
+#'
+logConstant.d <- function(tau, l) {
+  if (sum(tau) == 0) {
+    return(0)
+  } else {
+    ltau <- l[tau] #levels of active factors
+    -sum(log(2^ltau - 1 - ltau)) #logarithmic scale
+  }
+}
+
+## García-Donato and Paulo (2022)'s hierarchical prior:
+#auxiliar function to calculate the number of models with r dummies active
+# lG <- function(r, ltau) {
+#   m2 <- length(ltau) #number of factors active
+#
+#   mat.ind <- matrix(1:ltau[1], nc = 1)
+#   if(m2 > 1) {
+#     for (i in 2:m2) {
+#       mat.ind <- merge(mat.ind, 1:ltau[i], by = NULL)
+#     }
+#   }
+#
+#   ind.r <- which(rowSums(mat.ind) == r)
+#   Gtau.r <- mat.ind[ind.r,]
+#
+#   if (length(ind.r) > 1) {
+#     res <- 0
+#     for (j in 1:dim(Gtau.r)[1]) {
+#       res <- res + exp(sum(mylchoose(ltau + 1, as.numeric(Gtau.r[j,]))))
+#     }
+#   } else res <- exp(sum(mylchoose(ltau + 1, as.numeric(Gtau.r))))
+#   log(res)
+# }
+#
+# #l is a vector of length L with the number of levels for each factor,
+# #where L is the number of factors
+# #delta is a vector of length L with the number of active dummies for each factor
+# #tau is a vector of length L with 1 if the factor is active
+# logScottBerger.d <- function(delta, tau, l) {
+#   if (sum(tau) == 0) {
+#     return(0)
+#   } else {
+#     ltau <- l[tau] #levels of active factors
+#     -lG(sum(delta), ltau - 1) - log(sum(ltau) - 2*sum(tau) + 1) #logarithmic scale
+#   }
+# }
+#
+# logConstant.d <- function(tau, l) {
+#   if (sum(tau) == 0) {
+#     return(0)
+#   } else -sum(l) * log(2) #logaritmic scale of 1 / (2^sum(l))
+# }

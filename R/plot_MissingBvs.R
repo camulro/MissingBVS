@@ -24,7 +24,16 @@
 #' \code{MissingBvs}.
 #'
 #' @examples
-#' # To be completed
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' #Here we keep the 8 competing models:
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+#'
+#' #A plot with the posterior inclusion probabilities for each competing variable
+#' #and the dimension probability of the true model:
+#' plot.MissingBvs(dataS97.mBVS)
 
 plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
 

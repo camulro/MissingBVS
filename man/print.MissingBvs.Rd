@@ -18,7 +18,17 @@ and their posterior probability (or an estimation if the object was created
 by a Gibbs function).
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Here we keep the 8 competing models:
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+
+#Show the results:
+print(dataS97.mBVS)
+}
 
 }
 \seealso{

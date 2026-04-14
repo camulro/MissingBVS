@@ -46,8 +46,8 @@
 #' @param n.keep Number of the most probable models kept. By default it is set to
 #' 10 and automatically adjusted if 10 is greater than the total number of models.
 #' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 10} if the number of variables or
-#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>30}).
+#' of the imputation process with \code{n.imp = 30} if the number of variables or
+#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param initialimp.mice.method Method for mice's imputation.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
 #' @param imp.seed Seed for imputation.
@@ -55,8 +55,9 @@
 #' @return \code{missingGD25} returns an object of class \code{missingBVS}
 #' with the following elements:
 #' \item{time}{The internal time consumed in solving the problem}
-#' \item{lmfull}{The \code{lm} class object that results when the model
-#' defined by \code{formula} is fitted by \code{\link[stats]{lm}}}
+#' \item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+#' for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
+#' the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
 #' \item{lmnull}{The \code{lm} class object that results when the null model,
 #' the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 #' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -100,7 +101,25 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' #Here we keep the 8 competing models:
+#' f <- Solar.R ~ 1 + Ozone + Wind + Temp
+#' airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+#'
+#' #Show the results:
+#' airq.mBVS
+#'
+#' #Summ up the results:
+#' summary(airq.mBVS)
+#'
+#' #A plot with the posterior inclusion probabilities for each competing variable
+#' #and the dimension probability of the true model:
+#' plot(airq.mBVS)
+#' }
 #'
 missingGD25 <- function (formula,
                          data,
@@ -120,36 +139,37 @@ missingGD25 <- function (formula,
   #Check for numeric covariates
   aux <- model.frame(formula, data)
   isnum <- sapply(aux, is.numeric)
-  isint <- sapply(aux, is.integer)
-  if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+  # isint <- sapply(aux, is.integer)
+  # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+  if (sum(isnum) < dim(aux)[2]) {
     stop("This method is only for continuous covariates.\n")
   }
+  # cat("Be careful, this method is only for normally distributed covariates.\n",
+  #     "Do you want to continue? (y/n)\n")
+  # if (tolower(readline()) != "y") {
+  #   stop("Try the missingBVS.lm function instead.\n")
+  # }
 
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
 
-  #Eval the full model
-  lmfull <- lm(formula, data = data, y = TRUE, x = TRUE) #omits NA observations
-
   #Full design matrix
-  auxfull <- model.frame(formula, data, na.action = NULL)
-  X.full <- model.matrix(formula, auxfull)[,-1]
+  framefull <- model.frame(formula, data, na.action = NULL)
+  X.full <- framefull[,-1] #remove intercept
   namesx <- dimnames(X.full)[[2]]
-  p <- dim(X.full)[2] #Number of covariates to select from
+  p <- length(namesx) #Number of covariates to select from
 
   #Is there any variable to select from?
-  if (length(namesx) == 0) { #only the intercept can be fixed
+  if (p == 0) { #only the intercept can be fixed
     stop(paste0("The number of fixed covariates is equal to the number of\n",
                 "covariates in the full model. No model selection can be done.\n"))
   }
 
-  #The response variable
-  y <- lmnull$y; obsnotNA <- names(y) #without missings
-  n <- length(y)
-  SS0 <- crossprod(lmnull$residuals) #SSE of the null model
-
-  #check for missings
-  checkformissings.lm(y = auxfull[,1], X.full = X.full)
+  #check if the number of regressors is too big.
+  if (p > 20) {
+    warning("Number of covariates too big. . . consider using missingGibbsBvs.lm.\n",
+            immediate. = TRUE)
+  }
 
   #n.keep > 2^p, the number of models?
   if (n.keep > 2^p) {
@@ -159,32 +179,30 @@ missingGD25 <- function (formula,
     n.keep <- 2^p
   }
 
-  #check if the number of covariates is too big.
-  if (p > 20) {
-    stop("Number of covariates too big. . . consider using missingGibbsBvs.lm.\n")
-  }
+  #The response variable
+  y <- lmnull$y; obsnotNA <- names(y) #without missings
+  n <- length(y)
+  SS0 <- crossprod(lmnull$residuals) #SSE of the null model
+
+  #check for missings
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Check model priors chosen and define the function to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, p)
 
   #Check methods and options
-  cat("Be careful, this method is only for normally distributed covariates.\n",
-      "Do you want to continue? (y/n)\n")
-  if (tolower(readline()) != "y") {
-    stop("Try the missingBVS.lm function instead.\n")
-  }
   BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
                                                            y = y, SS0 = SS0,
                                                            n = n, k)
 
   #Imputation of missing data
-  if (imp.time.test & (p > 20 | n.imp > 039E1)) {
+  if (imp.time.test & (p*n > 10000 | n.imp > 039E1)) {
     #test imputation time
     cat("Time test . . . \n")
     time.test <- MC.imputation(X = X.full,
                                time.test = TRUE)
 
-    estim.time <- time.test * n.imp / (60 * 10) #10 imputed datasets used to test
+    estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to test
     cat("The whole imputation would take ", estim.time,
         "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
     if (tolower(readline()) != "y") {
@@ -205,6 +223,16 @@ missingGD25 <- function (formula,
                                           imputation.list = imputation.list,
                                           BF.miss.aux = BF.miss.aux,
                                           n = n, nMC = n.imp)
+
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model with García-Donato's 2025 method
+    lBF.method <- function (model) lBF.miss(model,
+                                            imputation.list = imputation.list,
+                                            BF.miss.aux = BF.miss.aux,
+                                            n = n, nMC = n.imp)
+  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model],
+                                                    Sigma11 = imputation.list$rSigma[model, model,],
+                                                    k = length(model))
 
   #Info:
   cat("Info. . .\n")
@@ -246,7 +274,6 @@ missingGD25 <- function (formula,
   C <- sum(exp(all.models.lPM[, p+1]))
   all.models.PM <- all.models.lPM
   all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
-
   colnames(all.models.PM) <- c(namesx, "Post")
 
   inclprob <- rep(0, p)
@@ -268,18 +295,38 @@ missingGD25 <- function (formula,
   mpm <- rep(0,p)
   mpm[which(inclprob >= 0.5)] <- 1
 
+  if (!is.null(NAvars)) {
+    if (n.imp > 1) {
+      #Evaluate lm of full model with missings using Rubin's rule
+      fit <- list()
+      mt <- attr(framefull, "terms")
+      for (i in 1:n.imp) {
+        z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
+        z$terms <- mt
+        class(z) <- "lm"
+
+        fit[[i]] <- z
+      }
+      lmfull <- mice::pool(fit)
+    } else {
+      #compute lm.fit for the unique imputation
+      lmfull <- lm.fit(x = cbind(1, imputation.list$rX.imput), y = y)
+    }
+  } else lmfull <- lm(formula, data)
+
   ##result
   result <- list()
   result$time <- Sys.time() - time #The time it took the program to finish
-  result$lmfull <- lmfull # The lm object for the full model (without NAs)
-  result$lmnull <- lmnull # The lm object for the null model
+  result$lmfull <- lmfull # If missings, object of class mipo combining the
+  # estimates for the n.imp imputed datasets for the fitted full model.
+  # Otherwise, lmfull is the lm object for the full model
+  result$lmnull <- lmnull # The lm object for the null model (omits NAs)
 
   result$variables <- namesx #The name of the competing variables
   result$n <- n #number of observations
   result$p <- p #number of competing variables
   result$k <- 1 # intercept #number of fixed covariates
   result$HPMbin <- hpm #The binary code for the HPM model
-  names(result$HPMbin) <- c(namesx, "Post")
   result$MPMbin <- mpm #The binary code for the MPM model
   names(result$MPMbin) <- namesx
 

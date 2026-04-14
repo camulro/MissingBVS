@@ -24,7 +24,17 @@ vs the imputed, given by \code{imputation}, values for each numerical regressor
 given by \code{formula}.
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+imp.S97 <- mice.imputation(X = XS97, formula = f)
+
+#Plot the results:
+plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
+}
 
 }
 \seealso{

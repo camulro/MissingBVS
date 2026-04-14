@@ -31,7 +31,7 @@ dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{initialimp.mice.method}{Method for mice's imputation.}
@@ -47,6 +47,11 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
 \item{models}{List with the entertained models.}
 \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+combine the estimates for each model on \code{models} fitted by
+\code{\link[stats]{lm}} over the \code{n.imp} (if \code{> 1}) imputed
+datasets, see \code{\link[mice]{pool}} for details; and \code{lm} object
+when there are no missings}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{prior.models}{Function used to compute the prior over the model space}
 \item{priorprobs}{Prior probabilities over the true model dimension}
@@ -75,7 +80,22 @@ null model; next q components correspond to the q prior probabilities
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Daily air quality measurements in New York
+data("airquality")
+
+#Default choices are: Constant prior and 390 imputed datasets.
+models.list = list(M0 = Solar.R ~ 1, M1 = Solar.R ~ Ozone,
+  M2 = Solar.R ~ Wind, M3 = Solar.R ~ Temp,
+  M4 = Solar.R ~ Ozone + Wind, M5 = Solar.R ~ Ozone + Temp,
+  M6 = Solar.R ~ Ozone + Wind + Temp)
+
+airq.mtest <- missingBtestGD25(data = airquality, models = models.list)
+
+#Show the results:
+airq.mtest
+
+}
 
 }
 \references{

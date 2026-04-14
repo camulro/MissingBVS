@@ -12,7 +12,7 @@
 #' @param initialimp.mice.method Method used by \code{\link[mice]{mice}} to impute the
 #' initial values. See \code{\link[mice]{mice}} for possible choices.
 #' @param time.test Logical to indicate whether to check time of performance with
-#' \code{nMC = 10} or not.
+#' \code{nMC = 30} or not.
 #'
 #' @return \code{MC.imputation} returns an object of class \code{MissingBVS.imputation}
 #' with the following elements:
@@ -30,7 +30,18 @@
 #' Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20).
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' Xair = airquality[,c("Ozone", "Wind", "Temp")]
+#' imp.air <- MC.imputation(X = Xair)
+#'
+#' #Plot the results:
+#' plot.MissingBVS.imputation(X = airquality, imputation = imp.air,
+#'   formula = Solar.R ~ 1 + Ozone + Wind + Temp)
+#' }
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -44,13 +55,15 @@ MC.imputation <- function(X, nMC = 039E1,
                           time.test = FALSE){
   #(Works for continuous covariates)
 
-  if (time.test) {time <- Sys.time(); nMC <- 10} # to estimate imputation time
+  if (time.test) {time <- Sys.time(); nMC <- 30} # to estimate imputation time
   #results:
-  rX.imput <- array(0, dim=c(dim(X), nMC))
-  rSigma <- array(0, dim=c(dim(X)[2], dim(X)[2], nMC))
-  rmu <- matrix(0, nr=dim(X)[2], nc=nMC)
-
   p <- dim(X)[2]; n <- dim(X)[1]
+  rX.imput <- array(0, dim=c(n, p, nMC),
+                    dimnames = list(seq_len(n), colnames(X), seq_len(nMC)))
+  rSigma <- array(0, dim=c(p, p, nMC),
+                  dimnames = list(colnames(X), colnames(X), seq_len(nMC)))
+  rmu <- matrix(0, nr=p, nc=nMC)
+
   if (p < 2) stop("It does not work with p<2")
 
   O <- 1*(!is.na(X))
@@ -88,10 +101,6 @@ MC.imputation <- function(X, nMC = 039E1,
   }
   if (time.test) return(time <- Sys.time() - time)
 
-  dimnames(rX.imput)[[1]] <- seq_len(n)
-  dimnames(rX.imput)[[2]] <- colnames(X)
-  dimnames(rSigma)[[1]] <- dimnames(rSigma)[[2]] <- colnames(X)
-
   imputation.list <- list(rX.imput = rX.imput, rSigma = rSigma, rmu = rmu)
   class(imputation.list) <- "MissingBVS.imputation"
   return(imputation.list)
@@ -119,7 +128,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #' imputation if the number of imputations is big enough (\code{n.imp > 120}).
 #' @param n.core See \code{\link[mice]{futuremice}} for details.
 #' @param time.test Logical to indicate whether to check time of performance with
-#' \code{n.imp = 10} or not.
+#' \code{n.imp = 30} or not.
 #'
 #' @return An object of class \code{MissingBVS.imputation}, an array of dimension
 #' nxpx\code{n.imp}, where n is the number of observations and p the number of
@@ -135,7 +144,18 @@ MC.imputation <- function(X, nMC = 039E1,
 #' in linear models and \code{\link[MissingBVS]{MissingBvs.glm}} for generalized
 #' linear models.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp.S97 <- mice.imputation(X = XS97, formula = f)
+#'
+#' #Plot the results:
+#' plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
+#' }
 #'
 #' @references van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice:
 #' Multivariate Imputation by Chained Equations in R. Journal of Statistical
@@ -169,21 +189,16 @@ mice.imputation <- function(X, formula, n.imp = 039E1,
   #Get final dim of full imputed datasets
   n <- nrow(X)
   X.formula <- as.formula(paste(formula[1], formula[3]))
-  aux <- model.matrix(X.formula, model.frame(X.formula, X, na.action = NULL))
+  aux <- model.matrix.rankdef(model.frame(X.formula, X, na.action = NULL))
   q <- ncol(aux)
 
-  imputation.array <- array(0, dim = c(n, q, n.imp)) #an array with the matrices imputed
+  imputation.array <- array(0, dim = c(n, q, n.imp), #an array with the matrices imputed
+                            dimnames = list(seq_len(n), colnames(aux), seq_len(n.imp)))
   for (s in seq_len(n.imp)) {
-    # Xs <- as.matrix(imps[[s]])
-    # mu <- colMeans(Xs)
-    # imputation.array[, , s] <- cbind(1, Xs - matrix(mu, n, p, byrow = TRUE)) #for numerical cov
-
-    imputation.array[, , s] <- model.matrix(X.formula, imps[[s]],) #build the model matrix
+    aux.imps <- model.frame(X.formula, imps[[s]])
+    imputation.array[, , s] <- model.matrix.rankdef(aux.imps) #build the model matrix
   }
   if (time.test) return(time <- Sys.time() - time)
-
-  dimnames(imputation.array)[[1]] <- seq_len(n)
-  dimnames(imputation.array)[[2]] <- colnames(aux)
 
   class(imputation.array) <- "MissingBVS.imputation"
   return(imputation.array)
@@ -207,7 +222,11 @@ mice.imputation <- function(X, formula, n.imp = 039E1,
 #' \code{\link[MissingBVS]{futuremice.imputation}} for performing multiple
 #' imputed dataset for \pkg{MissingBVS}.
 #'
-#' @examples #To be completed
+#' @examples
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' missing.model(airquality)
 #'
 missing.model <- function (data, formula = NULL, show = TRUE) {
   #data is a matrix or dataframe
@@ -275,7 +294,18 @@ missing.model <- function (data, formula = NULL, show = TRUE) {
 #' \code{\link[MissingBVS]{futuremice.imputation}} for generating objects of
 #' class \code{MissingBVS.imputation}.
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
+#' data("dataS97")
+#'
+#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp.S97 <- mice.imputation(X = XS97, formula = f)
+#'
+#' #Plot the results:
+#' plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
+#' }
 #'
 plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
   #X is a matrix or dataframe with missing data
@@ -296,17 +326,28 @@ plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
 
   missing.matrix <- missing.model(X.full, show = FALSE)
   NAvars <- names(which(missing.matrix["Total",] > 0)) #original vars with missings
+  pm <- length(NAvars)
   missings <- missing.matrix[-nrow(missing.matrix), NAvars]
 
-  n <- dim(missings)[1]
-  p <- dim(missings)[2]
   n.imp <- dim(imputation.array)[3]
-
+  if (pm == 0) stop("There are no missings in the data provided.\n")
   #keep imputed vars
-  imputation.array.model <- array(imputation.array[rownames(missings),NAvars,],
-                                  dim = c(n, p, n.imp)) #intercept removed
-  dimnames(imputation.array.model)[[1]] <- rownames(missings)
-  dimnames(imputation.array.model)[[2]] <- NAvars
+  if (pm == 1) {
+    n <- length(missings)
+    p <- 1
+    imputation.array.model <- array(imputation.array[names(missings),NAvars,],
+                                    dim = c(n, p, n.imp),
+                                    dimnames = list(names(missings),
+                                                 NAvars, 1:n.imp)) #intercept removed
+  } else {
+    n <- dim(missings)[1]
+    p <- dim(missings)[2]
+
+    imputation.array.model <- array(imputation.array[rownames(missings),NAvars,],
+                                    dim = c(n, p, n.imp),
+                                    dimnames = list(rownames(missings),
+                                                    NAvars, 1:n.imp))
+  }
 
   #calculate how to grid the composed plot
   if (is.null(mfrow)) {
@@ -319,7 +360,10 @@ plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
   } else par(mfrow = mfrow, mar = c(2.5,2,0.5,0.5), mgp = c(1.5, 0.5, 0))
 
   for (i in NAvars) {
-    x.mi <- as.vector(imputation.array.model[which(missings[,i] == 0),i,]) #imputed
+    if (pm == 1) {
+      x.mi <- as.vector(imputation.array.model[which(missings == 0),i,]) #imputed
+    } else x.mi <- as.vector(imputation.array.model[which(missings[,i] == 0),i,]) #imputed
+
     x.oi <- X.full[!is.na(X.full[,i]), i] #observed
     x.i <- c(x.mi, x.oi)
 

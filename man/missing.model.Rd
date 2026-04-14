@@ -19,7 +19,10 @@ Generates a matrix with 0 if the original entry was missing and 1 otherwise
 for observations with missing data and summarizes by variable.
 }
 \examples{
-#To be completed
+#Daily air quality measurements in New York
+data("airquality")
+
+missing.model(airquality)
 
 }
 \seealso{

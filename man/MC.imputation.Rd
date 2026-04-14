@@ -24,7 +24,7 @@ defining the Bayes factor.}
 initial values. See \code{\link[mice]{mice}} for possible choices.}
 
 \item{time.test}{Logical to indicate whether to check time of performance with
-\code{nMC = 10} or not.}
+\code{nMC = 30} or not.}
 }
 \value{
 \code{MC.imputation} returns an object of class \code{MissingBVS.imputation}
@@ -41,7 +41,17 @@ continuous and normally distributed covariates to compute Bayesian Variable
 Selection in the presence of missing data.
 }
 \examples{
-#To be completed
+\dontrun{
+#Daily air quality measurements in New York
+data("airquality")
+
+Xair = airquality[,c("Ozone", "Wind", "Temp")]
+imp.air <- MC.imputation(X = Xair)
+
+#Plot the results:
+plot.MissingBVS.imputation(X = airquality, imputation = imp.air,
+  formula = Solar.R ~ 1 + Ozone + Wind + Temp)
+}
 
 }
 \references{

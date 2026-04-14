@@ -19,17 +19,26 @@ probabilities.}
 }
 \description{
 Plots to summarize graphically the results in an object of class
-\code{MissingBvs}, including prior and posterior probabilities obtained. 
-Two summaries are available: the model size probability if \code{plotdim}=TRUE 
-and the inclusion probabilities if  \code{plotpip}=TRUE. By default, 
+\code{MissingBvs}, including prior and posterior probabilities obtained.
+Two summaries are available: the model size probability if \code{plotdim}=TRUE
+and the inclusion probabilities if  \code{plotpip}=TRUE. By default,
 both plots are shown.
 }
 \examples{
-# To be completed
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Here we keep the 8 competing models:
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot.MissingBvs(dataS97.mBVS)
 }
 \seealso{
-See \code{\link[MissingBVS]{MissingBvs.lm}}, 
-\code{\link[MissingBVS]{MissingBvs.glm}}, 
+See \code{\link[MissingBVS]{MissingBvs.lm}},
+\code{\link[MissingBVS]{MissingBvs.glm}},
 \code{\link[MissingBVS]{MissingGibbsBvs.lm}} and
 \code{\link[MissingBVS]{MissingGibbsBvs.glm}} for creating objects of class
 \code{MissingBvs}.

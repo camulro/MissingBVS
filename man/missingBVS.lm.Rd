@@ -6,11 +6,12 @@
 \usage{
 missingBVS.lm(
   formula,
-  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   data,
+  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   BF.approx.method = "gprior",
   prior.betas = "Robust",
   prior.models = "ScottBerger",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   n.keep = 10,
   parallelmice = NULL,
@@ -25,11 +26,11 @@ missingBVS.lm(
 \item{formula}{Formula defining the most complex (full) regression model in the
 analysis. See details.}
 
+\item{data}{Data frame containing the data.}
+
 \item{null.model}{Formula defining which is the simplest (null) model, which.
 should be nested in the full one. By default, it is defined to be the one
 with just the intercept.}
-
-\item{data}{Data frame containing the data.}
 
 \item{BF.approx.method}{Method used to approximate Bayes factors with missing
 data (to be literally specified). Possible choices include "BIC", "TBF" and
@@ -43,12 +44,18 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (to be literally specified).
 Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
-\item{n.keep}{Number of the most probable models kept. By default it is set to
-10 and automatically adjusted if 10 is greater than the total number of models.}
+\item{n.keep}{It can be either the character "all" to return the whole model
+space or a numeric for the exact number of the most probable models to keep.
+By default it is set to 10 and automatically adjusted if 10 is greater than
+the total number of models.}
 
 \item{parallelmice}{Logital to indicate whether or not to use parallel
 \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
@@ -58,7 +65,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
@@ -71,8 +78,11 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \code{missingBVS.lm} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{lmfull}{The \code{lm} class object that results when the model
-defined by \code{formula} is fitted by \code{\link[stats]{lm}}}
+\item{lmfull}{If missings on the competing variables, object of class
+\code{\link[mice]{mipo}} that combines the estimates
+for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
+the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
+for details. Otherwise, it is the \code{lm} object for the \code{formula} model}
 \item{lmnull}{The \code{lm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -81,10 +91,15 @@ the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{k}{Number of fixed variables}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
 most probable a posteriori models and their associated probability}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
-explanatory variables.}
+explanatory variables}
 \item{postprobdim}{Posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
@@ -94,6 +109,8 @@ the model space)}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{method}{\code{Full}}
 }
 \description{
@@ -103,7 +120,7 @@ in problems of small to moderate size when missingness occurs in linear models.
 \details{
 The set of competing models is made up by all the possible subsets of
 regressors specified by \code{formula}: Mi for i in 1,...,2^p, being p the number
-of potential (non-fixed) covariates in the variable selection problem. The simplest,
+of potential (non-fixed) regressors in the variable selection problem. The simplest,
 nested in all of them, contains only the intercept. \code{MissingBvs} performs
 \code{n.imp} imputations given by \code{imp.mice.method} with the mice package and
 computes the posterior distribution over this model space through Bayes' theorem:
@@ -143,11 +160,29 @@ every possible model dimension and, therefore, accounts for multiplicity issues
 If \code{prior.models}="User" is chosen, user has to provide a p+1 dimensional
 parameter vector with the model dimension prior probabilities through \code{priorprobs}.
 The first component of \code{priorprobs} must contain the probability of the
-model with fixed covariates; next p components correspond to the p prior probabilities
+model with fixed variables; next p components correspond to the p prior probabilities
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Here we keep the 8 competing models:
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+
+#Show the results:
+dataS97.mBVS
+
+#Summ up the results:
+summary(dataS97.mBVS)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot(dataS97.mBVS)
+}
 
 }
 \references{
@@ -158,6 +193,10 @@ Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 García-Donato, G. and Forte, A. (2018) Bayesian Testing,
 Variable Selection and Model Averaging in Linear Models using R with
 BayesVarSel. The R Journal. 10: 329.
+
+Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
+Variable Selection in the Presence of Factors: A Model Selection Perspective.
+Journal of the American Statistical Association. 117. 1-27.
 
 Bayarri, M.J., Berger, J.O., Forte, A. and Garcia-Donato, G.
 (2012)<DOI:10.1214/12-aos1013> Criteria for Bayesian Model choice with
@@ -189,6 +228,9 @@ by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
 \seealso{
 Use \code{\link[MissingBVS]{MissingGibbsBvs.lm}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
+
+Consider \code{\link[BayesVarSel]{plot.Bvs}} for graphical summaries of the
+posterior distribution.
 }
 \author{
 Carolina Mulet and Gonzalo Garcia-Donato

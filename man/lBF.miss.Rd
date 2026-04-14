@@ -42,7 +42,17 @@ by approximating the integral via a MonteCarlo scheme with an
 given by \code{BF.miss.aux}.
 }
 \examples{
-#To be completed
+#Daily air quality measurements in New York
+data("airquality")
+
+Xair = airquality[,c("Ozone", "Wind", "Temp")]
+imp2 <- MC.imputation(X = Xair, nMC = 2)
+
+lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
+imp2$rX.imput <- imp2$rX.imput[names(lmnull$y),,]
+BF.fun <- function(X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
+  y = lmnull$y, SS0 = crossprod(lmnull$residuals))
+lBF_f <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
 
 }
 \references{

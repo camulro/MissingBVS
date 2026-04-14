@@ -7,11 +7,12 @@ using Gibbs sampling}
 \usage{
 missingGibbsBVS.lm(
   formula,
-  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   data,
+  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   BF.approx.method = "gprior",
   prior.betas = "Robust",
   prior.models = "ScottBerger",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   init.model = "Full",
   n.iter = 10000,
@@ -30,11 +31,11 @@ missingGibbsBVS.lm(
 \item{formula}{Formula defining the most complex (full) regression model in the
 analysis. See details.}
 
+\item{data}{Data frame containing the data.}
+
 \item{null.model}{Formula defining which is the simplest (null) model, which.
 should be nested in the full one. By default, it is defined to be the one
 with just the intercept.}
-
-\item{data}{Data frame containing the data.}
 
 \item{BF.approx.method}{Method used to approximate Bayes factors with missing
 data (to be literally specified). Possible choices include "BIC", "TBF" and
@@ -48,15 +49,19 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (to be literally specified). Possible
 choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details.)}
 
 \item{init.model}{The model at which the simulation process starts. Options
-include "Null" (the model only with the covariates specified in
+include "Null" (the model only with the variables specified in
 \code{null.model}), "Full" (the model defined by \code{formula}), "Random" (a
-randomly selected model) and a vector with p (the number of covariates to
-select from) zeros and ones defining a model.}
+randomly selected model) and a vector with p (the number of factors and/or
+covariates to select from) zeros and ones defining a model.}
 
 \item{n.iter}{The total number of iterations performed after the burn in
 process.}
@@ -77,7 +82,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
@@ -92,8 +97,11 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \code{missingGibbsBVS.lm} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{lmfull}{The \code{lm} class object that results when the model
-defined by \code{formula} is fitted by \code{\link[stats]{lm}}}
+\item{lmfull}{If missings on the competing variables, object of class
+\code{\link[mice]{mipo}} that combines the estimates
+for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
+the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
+for details. Otherwise, it is the \code{lm} object for the \code{formula} model}
 \item{lmnull}{The \code{lm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -103,13 +111,18 @@ the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model using
 \code{inclprobRB}}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
 most probable a posteriori models and their associated Bayes factor in
 logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables}
 \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-\item{postprobdim}{Posterior probabilities over the true model dimension}
+\item{postprobdim}{Estimated posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
@@ -117,6 +130,8 @@ explanatory variables}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{method}{\code{Gibbs}}
 }
 \description{
@@ -133,7 +148,25 @@ reliable results.
 \code{\link[MissingBVS]{MissingBvs.lm}}. See the later for common details.
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Default choices are: robust and ScottBerger priors, 10000 iterations with 500
+#of burn in period. Here, 100 imputations with mice's pmm method.
+dataS97.mGBVS <- missingGibbsBVS.lm(formula = gr56092 ~ ., data = dataS97,
+                                    n.iter = 1000, n.burnin = 50, n.imp = 100)
+
+#Show the results:
+dataS97.mGBVS
+
+#Summ up the results:
+summary(dataS97.mGBVS)
+
+#A plot with the estimated posterior inclusion probabilities for each
+#competing variable and the dimension probability of the true model:
+plot(dataS97.mGBVS)
+}
 
 }
 \references{
@@ -184,7 +217,7 @@ Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
 of the model posterior distribution (recommended when p<20).
 }
 \author{
-Carolina Mulet and Gonzalo Garcia-Donato
+Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
 \keyword{package}

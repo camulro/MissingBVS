@@ -33,8 +33,8 @@ dimensional vector defining the prior model probabilities (used for chosen
 10 and automatically adjusted if 10 is greater than the total number of models.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>30}).}
+of the imputation process with \code{n.imp = 30} if the number of variables or
+the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{initialimp.mice.method}{Method for mice's imputation.}
 
@@ -46,8 +46,9 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>30})
 \code{missingGD25} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{lmfull}{The \code{lm} class object that results when the model
-defined by \code{formula} is fitted by \code{\link[stats]{lm}}}
+\item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
+for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
+the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
 \item{lmnull}{The \code{lm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -105,7 +106,24 @@ model with fixed covariates; next p components correspond to the p prior probabi
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Daily air quality measurements in New York
+data("airquality")
+
+#Here we keep the 8 competing models:
+f <- Solar.R ~ 1 + Ozone + Wind + Temp
+airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+
+#Show the results:
+airq.mBVS
+
+#Summ up the results:
+summary(airq.mBVS)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot(airq.mBVS)
+}
 
 }
 \references{

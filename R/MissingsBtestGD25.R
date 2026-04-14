@@ -33,7 +33,7 @@
 #' dimensional vector defining the prior model probabilities (used for chosen
 #' \code{prior.models}= "User"; see details).
 #' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 10} if the number of variables or
+#' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param initialimp.mice.method Method for mice's imputation.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
@@ -45,6 +45,11 @@
 #' \item{PostProbi}{Posterior probabilities for each model in \code{models}.}
 #' \item{models}{List with the entertained models.}
 #' \item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+#' \item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+#' combine the estimates for each model on \code{models} fitted by
+#' \code{\link[stats]{lm}} over the \code{n.imp} (if \code{> 1}) imputed
+#' datasets, see \code{\link[mice]{pool}} for details; and \code{lm} object
+#' when there are no missings}
 #' \item{imp.args}{List of arguments used for the imputation step}
 #' \item{prior.models}{Function used to compute the prior over the model space}
 #' \item{priorprobs}{Prior probabilities over the true model dimension}
@@ -64,7 +69,23 @@
 #'
 #' @keywords package
 #'
-#' @examples #To be completed
+#' @examples
+#' \dontrun{
+#' #Daily air quality measurements in New York
+#' data("airquality")
+#'
+#' #Default choices are: Constant prior and 390 imputed datasets.
+#' models.list = list(M0 = Solar.R ~ 1, M1 = Solar.R ~ Ozone,
+#'   M2 = Solar.R ~ Wind, M3 = Solar.R ~ Temp,
+#'   M4 = Solar.R ~ Ozone + Wind, M5 = Solar.R ~ Ozone + Temp,
+#'   M6 = Solar.R ~ Ozone + Wind + Temp)
+#'
+#' airq.mtest <- missingBtestGD25(data = airquality, models = models.list)
+#'
+#' #Show the results:
+#' airq.mtest
+#'
+#' }
 #'
 missingBtestGD25 <- function (data,
                               models,
@@ -85,10 +106,17 @@ missingBtestGD25 <- function (data,
     names(models) <- paste("model", 1:N, sep="")
   }
 
-  Dim <- rep(0, N)
-  lBFi0 <- rep(0, N)
-  lPriorModels <- rep(0, N)
-  PostProbi <- rep(0, N)
+  # cat("Be careful, this method is only for normally distributed covariates.\n",
+  #     "Do you want to continue? (y/n)\n")
+  # if (tolower(readline()) != "y") {
+  #   stop("Try the missingBtest.lm function instead.\n")
+  # }
+
+  Dim <- rep(0L, N)
+  lBFi0 <- numeric(N)
+  lPriorModels <- numeric(N)
+  PostProbi <- numeric(N)
+  mt <- list() #list of terms for each model
 
   #list that contains the names of the covariates in each model
   covar.list <- list()
@@ -97,8 +125,9 @@ missingBtestGD25 <- function (data,
     #Check for numeric covariates
     aux <- model.frame(formula, data)
     isnum <- sapply(aux, is.numeric)
-    isint <- sapply(aux, is.integer)
-    if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+    # isint <- sapply(aux, is.integer)
+    # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
+    if (sum(isnum) < dim(aux)[2]) {
       stop("This method is only for continuous covariates.\n")
     }
     temp <- lm(formula = formula,
@@ -107,20 +136,21 @@ missingBtestGD25 <- function (data,
 
     Dim[i] <- length(temp$coefficients)
     covar.list[[i]] <- dimnames(temp$x)[[2]]
+    mt[[i]] <- temp$terms
   }
-  pos.user.null.model <- which(covar.list == "(Intercept)")
+  nullmodel.pos <- which(covar.list == "(Intercept)")
   #Check if null model is one of the competing models:
-  if (length(pos.user.null.model) > 0) {
-    competing.models <- (seq_len(N))[-pos.user.null.model]
-    null.model <- as.formula(paste(as.formula(models[[pos.user.null.model]])[[2]], " ~ 1", sep=""))
+  if (length(nullmodel.pos) > 0) {
+    competing.models <- (seq_len(N))[-nullmodel.pos]
+    null.model <- as.formula(models[[nullmodel.pos]])
     #the null model has to be the one with the intercept
   } else {
     competing.models <- seq_len(N) #null.model is not provided by user
     null.model <- as.formula(paste(as.formula(models[[1]])[[2]], " ~ 1", sep=""))
     #the null model has to be the one with the intercept
-    pos.user.null.model <- N + 1
-    Dim[pos.user.null.model] <- 1
-    models[[pos.user.null.model]] <- null.model
+    nullmodel.pos <- N + 1
+    Dim[nullmodel.pos] <- 1
+    models[[nullmodel.pos]] <- null.model
     cat("Null model", paste(as.formula(models[[1]])[[2]], " ~ 1", sep=""),
         "added to the list of competing models.\n")
   }
@@ -135,13 +165,13 @@ missingBtestGD25 <- function (data,
 
   #Full design matrix
   formula <- as.formula(paste0(null.model[[2]], "~ ."))
-  auxfull <- model.frame(formula, data, na.action = NULL)
-  X.full <- model.matrix(formula, auxfull)[,-1]
+  framefull <- model.frame(formula, data, na.action = NULL)
+  X.full <- framefull[,-1] #remove intercept
   namesx <- dimnames(X.full)[[2]]
-  p <- dim(X.full)[2] #Number of covariates to select from
+  p <- length(namesx) #Number of covariates to select from
 
   #check for missings
-  checkformissings.lm(y = auxfull[,1], X.full = X.full)
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
@@ -156,7 +186,7 @@ missingBtestGD25 <- function (data,
               stop("User prior selected but no prior probabilities provided.\n")
             }
             if (length(priorprobs) != length(models)) {
-              if (pos.user.null.model == N + 1) {
+              if (nullmodel.pos == N + 1) {
                 stop(paste0("User prior selected but the length of prior probabilities is not correct (", length(models),").\n",
                             "Make sure to provide a prior for the null model, the one with the intercept.\n"))
               } else stop(paste0("User prior selected but the length of prior probabilities is not correct (", length(models),").\n"))
@@ -168,23 +198,18 @@ missingBtestGD25 <- function (data,
   )
 
   #Check methods and options
-  cat("Be careful, this method is only for normally distributed covariates.\n",
-      "Do you want to continue? (y/n)\n")
-  if (tolower(readline()) != "y") {
-    stop("Try the missingBtest.lm function instead.\n")
-  }
   BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
                                                            y = y, SS0 = SS0,
                                                            n = n, k)
 
   #Imputation of missing data
-  if (imp.time.test & (p > 20 | n.imp > 039E1)) {
+  if (imp.time.test & (p*n > 10000 | n.imp > 039E1)) {
     #test imputation time
     cat("Time test . . . \n")
     time.test <- MC.imputation(X = X.full,
                                time.test = TRUE)
 
-    estim.time <- time.test * n.imp / (60 * 10) #10 imputed datasets used to test
+    estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to test
     cat("The whole imputation would take ", estim.time,
         "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
     if (tolower(readline()) != "y") {
@@ -197,46 +222,80 @@ missingBtestGD25 <- function (data,
                                    nMC = n.imp,
                                    seed = imp.seed,
                                    initialimp.mice.method = initialimp.mice.method)
+
   #remove observations with missings on the response
-  imputation.list$rX.imput <- imputation.list$rX.imput[names(y),,]
-  #function to compute log(BFa0) for a given model with García-Donato's 2025 method
-  lBF.method <- function (model) lBF.miss(model,
-                                          imputation.list = imputation.list,
-                                          BF.miss.aux = BF.miss.aux,
-                                          n = n, nMC = n.imp)
+  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA,,]
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model with García-Donato's 2025 method
+    lBF.method <- function (model) lBF.miss(model,
+                                            imputation.list = imputation.list,
+                                            BF.miss.aux = BF.miss.aux,
+                                            n = n, nMC = n.imp)
+  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model],
+                                                    Sigma11 = imputation.list$rSigma[model, model,],
+                                                    k = length(model))
+
   for (i in competing.models){
     modeli <- which(namesx %in% covar.list[[i]])
 
     lBFi0[i] <- lBF.method(model = modeli)
     lPriorModels[i] <- log(prior.models(i))
   }
-
-  lPriorModels[pos.user.null.model] <- log(prior.models(pos.user.null.model))
-  lBFi0[pos.user.null.model] <- 0
+  lPriorModels[nullmodel.pos] <- log(prior.models(nullmodel.pos))
+  lBFi0[nullmodel.pos] <- 0
   C <- sum(exp(lBFi0 + lPriorModels))
   PostProbi <- exp(lBFi0 + lPriorModels - log(C))
 
-  if (names(models)[pos.user.null.model] == "") {
-    names(models)[pos.user.null.model] <-
+  if (names(models)[nullmodel.pos] == "") {
+    names(models)[nullmodel.pos] <-
       paste("(", as.formula(models[[1]])[[2]], " ~ 1)", sep="")
     names(lBFi0) <-
       paste(names(models), ".to.(",
             paste(as.formula(models[[1]])[[2]], " ~ 1)", sep=""), sep = "")
-    names(PostProbi) <- c(names(models)[-pos.user.null.model],
+    names(PostProbi) <- c(names(models)[-nullmodel.pos],
                           paste(as.formula(models[[1]])[[2]], " ~ 1", sep=""))
     names(lPriorModels) <- names(PostProbi)
   } else {
     names(lBFi0) <-
-      paste(names(models), ".to.", names(models)[pos.user.null.model], sep = "")
+      paste(names(models), ".to.", names(models)[nullmodel.pos], sep = "")
     names(PostProbi) <- names(models)
     names(lPriorModels) <- names(models)
   }
+
+  #Evaluate lm of each model with missings using Rubin's rule
+  modelspool <- list()
+  for(j in competing.models){
+    namesj <- which(namesx %in% covar.list[[j]])
+    if (any(namesx[namesj] %in% NAvars)) {
+      if (n.imp > 1) {
+        fit <- list()
+        for (i in 1:n.imp) {
+          Xi <- cbind(1, imputation.list$rX.imput[,namesj,i])
+          colnames(Xi) <- c("(Intercept)", namesx[namesj])
+          z <- lm.fit(x = Xi, y = y)
+          z$terms <- mt[[j]]
+          class(z) <- "lm"
+
+          fit[[i]] <- z
+        }
+        modelspool[[j]] <- mice::pool(fit)
+      } else {
+        #compute lm.fit for the unique imputation
+        Xi <- cbind(1, imputation.list$rX.imput[,namesj])
+        colnames(Xi) <- c("(Intercept)", namesx[namesj])
+        modelspool[[j]] <- lm.fit(x = Xi, y = y)
+      }
+    } else modelspool[[j]] <- lm(models[[j]], data)
+  }
+  modelspool[[nullmodel.pos]] <- lm(null.model, data)
+  names(modelspool) <- names(models)
 
   result <- list()
   result$lBFi0 <- lBFi0
   result$PostProbi <- PostProbi
   result$models <- models
-  result$nullmodel <- names(models)[pos.user.null.model]
+  result$nullmodel <- names(models)[nullmodel.pos]
+  result$modelspool <- modelspool
 
   #arguments used for imputation
   result$imp.args <- list(initialimp.mice.method = initialimp.mice.method,

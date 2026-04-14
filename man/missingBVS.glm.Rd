@@ -7,12 +7,13 @@ regression models}
 \usage{
 missingBVS.glm(
   formula,
-  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   data,
   family = binomial(link = "logit"),
+  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   BF.approx.method = "BIC",
   prior.betas = "Robust",
   prior.models = "ScottBerger",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   n.keep = 10,
   parallelmice = NULL,
@@ -31,10 +32,6 @@ missingBVS.glm(
 \item{formula}{Formula defining the most complex (full) regression model in the
 analysis. See details.}
 
-\item{null.model}{Formula defining which is the simplest (null) model, which.
-should be nested in the full one. By default, it is defined to be the one
-with just the intercept.}
-
 \item{data}{Data frame containing the data.}
 
 \item{family}{String, function or the call to a family function among
@@ -43,6 +40,10 @@ function to be used in the model. If it is one of the implemented families in
 \pkg{BAS}: \code{binomial(link = "logit")},
 \code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
 using BAS logmarginal computation is performed.}
+
+\item{null.model}{Formula defining which is the simplest (null) model, which.
+should be nested in the full one. By default, it is defined to be the one
+with just the intercept.}
 
 \item{BF.approx.method}{Method used to approximate Bayes factors with missing
 data (to be literally specified). Possible choices include "BIC", "TBF" and
@@ -56,12 +57,18 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (to be literally specified). Possible
 choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details.)}
 
-\item{n.keep}{Number of the most probable models kept. By default it is set to
-10 and automatically adjusted if 10 is greater than the total number of models.}
+\item{n.keep}{It can be either the character "all" to return the whole model
+space or a numeric for the exact number of the most probable models to keep.
+By default it is set to 10 and automatically adjusted if 10 is greater than
+the total number of models.}
 
 \item{parallelmice}{Logital to indicate whether or not to use parallel
 \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
@@ -71,7 +78,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
@@ -97,8 +104,11 @@ for more details.}
 \code{missingBVS.glm} returns an object of class \code{missingBVS}
 with the following elements:
 \item{time}{The internal time consumed in solving the problem}
-\item{glmfull}{The \code{glm} class object that results when the model
-defined by \code{formula} is fitted by \code{\link[stats]{glm}}}
+\item{glmfull}{If missings on the competing variables, object of class
+\code{\link[mice]{mipo}} that combines the estimates for the model defined by
+\code{formula} fitted by \code{\link[stats]{glm}} over
+the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
+for details. Otherwise, it is the \code{glm} object for the \code{formula} model}
 \item{glmnull}{The \code{glm} class object that results when the null model,
 the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 \item{variables}{Names of all the potential (non-fixed) explanatory variables}
@@ -107,10 +117,15 @@ the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
 \item{k}{Number of fixed variables}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
 most probable a posteriori models and their associated probability}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
-explanatory variables.}
+explanatory variables}
 \item{postprobdim}{Posterior probabilities over the true model dimension}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 \item{call}{The \code{call} to the function}
@@ -120,6 +135,8 @@ model space)}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{method}{\code{Full}}
 }
 \description{
@@ -130,7 +147,7 @@ linear models.
 \details{
 The set of competing models is made up by all the possible subsets of
 regressors specified by \code{formula}: Mi for i in 1,...,2^p, being p the number
-of potential (non-fixed) covariates in the variable selection problem. The simplest,
+of potential (non-fixed) regressors in the variable selection problem. The simplest,
 nested in all of them, contains only the intercept. \code{MissingBvs} performs
 \code{n.imp} imputations given by \code{imp.mice.method} with the mice package and
 computes the posterior distribution over this model space through Bayes' theorem:
@@ -163,11 +180,28 @@ every possible model dimension and, therefore, accounts for multiplicity issues
 If \code{prior.models}="User" is chosen, user has to provide a p+1 dimensional
 parameter vector with the model dimension prior probabilities through \code{priorprobs}.
 The first component of \code{priorprobs} must contain the probability of the
-model with fixed covariates; next p components correspond to the p prior probabilities
+model with fixed variables; next p components correspond to the p prior probabilities
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Indian Prime Diabetes Data from VIM's package
+
+#Here we keep the 56 competing models:
+f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
+diabetes.mBVS <- missingBVS.glm(formula = f, data = VIM::diabetes,
+  family = binomial(), n.keep = 32, n.imp = 100)
+
+#Show the results:
+diabetes.mBVS
+
+#Summ up the results:
+summary(diabetes.mBVS)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot(diabetes.mBVS)
+}
 
 }
 \references{

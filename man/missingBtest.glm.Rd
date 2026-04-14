@@ -8,11 +8,12 @@ linear models}
 missingBtest.glm(
   data,
   models,
-  null.model = NULL,
   family = binomial(link = "logit"),
+  null.model = NULL,
   BF.approx.method = "BIC",
   prior.betas = "Robust",
   prior.models = "Constant",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   imp.mice.method = "pmm",
   parallelmice = NULL,
@@ -33,17 +34,17 @@ missingBtest.glm(
 with one nested in all the others. If the list is unnamed, default names are
 given.}
 
-\item{null.model}{Name of the null model. If \code{NULL}, the names of covariates
-in \code{models} are used to identify the null. If provided, \code{null.model}
-must coincide with the one with the largest sum of squared errors and should
-be the one with the smallest dimension.}
-
 \item{family}{String, function or the call to a family function among
 \code{\link[stats]{family}} to specify the error distribution and link
 function to be used in the model. If it is one of the implemented families in
 \pkg{BAS}: \code{binomial(link = "logit")},
 \code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
 using BAS logmarginal computation is performed.}
+
+\item{null.model}{Name of the null model. If \code{NULL}, the names of variables
+in \code{models} are used to identify the null. If provided, \code{null.model}
+must coincide with the one with the largest sum of squared errors and should
+be the one with the smallest dimension.}
 
 \item{BF.approx.method}{Method used to approximate Bayes factors with missing
 data (to be literally specified). Possible choices include "BIC", "TBF" and
@@ -57,7 +58,11 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (to be literally specified).
 Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
@@ -71,7 +76,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
@@ -94,14 +99,26 @@ for more details.}
 \value{
 \code{\link[MissingBVS]{MissingBtest.glm}} returns an object of type
 \code{MissingBtest} with the following elements:
-\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null.}
-\item{PostProbi}{Posterior probabilities for each model in \code{models}.}
+\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null}
+\item{PostProbi}{Posterior probabilities for each model in \code{models}}
 \item{models}{List with the entertained models.}
-\item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{nullmodel}{Name in \code{models} of the null (simplest) model}
+\item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+combine the estimates for each model on \code{models} fitted by
+\code{\link[stats]{glm}} over the \code{n.imp} (if \code{> 1}) imputed
+datasets, see \code{\link[mice]{pool}} for details; and \code{glm} object
+when there are no missings}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{prior.models}{Function used to compute the prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 }
 \description{
@@ -121,11 +138,27 @@ If \code{prior.models}="User" is chosen, user has to provide a q+1 dimensional
 parameter vector, where q is the number of diferent sizes among \code{models},
 with the model dimension prior probabilities through \code{priorprobs}.
 The first component of \code{priorprobs} must contain the probability of the
-model with fixed covariates; next q components correspond to the q prior probabilities
+model with fixed variables; next q components correspond to the q prior probabilities
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Indian Prime Diabetes Data from VIM's package
+data.diabetes <- VIM::diabetes; data.diabetes$Outcome
+
+#Default choices are: BIC approximation, Constant prior and 390 imputed
+#datasets with mice's pmm method.
+models.list = list(M0 = Outcome ~ 1, M1 = Outcome ~ Pregnancies,
+  M2 = Outcome ~ Glucose, M3 = Outcome ~ Insulin,
+  M4 = Outcome ~ Pregnancies + Glucose, M5 = Outcome ~ Pregnancies + Insulin,
+  M6 = Outcome ~ Pregnancies + Glucose + Insulin)
+
+diabetes.mtest <- missingBtest.glm(data = VIM::diabetes,
+  models = models.list, family = binomial())
+
+#Show the results:
+diabetes.mtest
+}
 
 }
 \references{

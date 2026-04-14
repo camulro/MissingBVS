@@ -17,7 +17,17 @@ probabilities and a representation of the Median Probability Model and the
 Highest Posterior probability Model.
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Here we keep the 8 competing models:
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+
+#Summ up the results:
+summary(dataS97.mBVS)
+}
 
 }
 \references{

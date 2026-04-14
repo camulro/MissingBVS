@@ -12,6 +12,7 @@ missingBtest.lm(
   BF.approx.method = "gprior",
   prior.betas = "Robust",
   prior.models = "Constant",
+  prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   parallelmice = NULL,
   n.core = NULL,
@@ -28,7 +29,7 @@ missingBtest.lm(
 with one nested in all the others. If the list is unnamed, default names are
 given.}
 
-\item{null.model}{Name of the null model. If \code{NULL}, the names of covariates
+\item{null.model}{Name of the null model. If \code{NULL}, the names of variables
 in \code{models} are used to identify the null. If provided, \code{null.model}
 must coincide with the one with the largest sum of squared errors and should
 be the one with the smallest dimension.}
@@ -45,7 +46,11 @@ in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
 \item{prior.models}{Prior distribution over the model space (literally specified).
 Possible choices are "Constant", "ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
+\item{prior.models.dummies}{Prior distribution over the model space of the
+factor levels (to be literally specified). Possible choices are "Constant" and
+"ScottBerger" (see details).}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
@@ -57,7 +62,7 @@ big enough.}
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 10} if the number of variables or
+of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
 \item{imp.mice.method}{Method for mice's imputation.}
@@ -69,14 +74,26 @@ the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}
 \value{
 \code{\link[MissingBVS]{MissingBtest.lm}} returns an object of type
 \code{MissingBtest} with the following elements:
-\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null.}
-\item{PostProbi}{Posterior probabilities for each model in \code{models}.}
+\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null}
+\item{PostProbi}{Posterior probabilities for each model in \code{models}}
 \item{models}{List with the entertained models.}
-\item{nullmodel}{Name in \code{models} of the null (simplest) model.}
+\item{nullmodel}{Name in \code{models} of the null (simplest) model}
+\item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
+combine the estimates for each model on \code{models} fitted by
+\code{\link[stats]{lm}} over the \code{n.imp} (if \code{> 1}) imputed
+datasets, see \code{\link[mice]{pool}} for details; and \code{lm} object
+when there are no missings}
+\item{positions}{\code{matrix} with L rows and p plus the number of dummies
+resulting from factors columns - L, where L is the number of factors, with 1
+if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positionsx}{Logical vector of length p indicating whether or not the
+variable is a numerical covariate}
 \item{imp.args}{List of arguments used for the imputation step}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{prior.models}{Function used to compute the prior over the model space}
+\item{logprior.models.dumm}{Function used to compute the log-prior over the
+model space of the factor levels}
 \item{priorprobs}{Prior probabilities over the true model dimension}
 }
 \description{
@@ -96,11 +113,26 @@ If \code{prior.models}="User" is chosen, user has to provide a q+1 dimensional
 parameter vector, where q is the number of diferent sizes among \code{models},
 with the model dimension prior probabilities through \code{priorprobs}.
 The first component of \code{priorprobs} must contain the probability of the
-model with fixed covariates; next q components correspond to the q prior probabilities
+model with fixed variables; next q components correspond to the q prior probabilities
 of the possible model dimensions.
 }
 \examples{
-#To be completed
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Default choices are: robust and Constant priors and 390 imputed datasets
+#with mice's pmm method.
+models.list = list(M0 = gr56092 ~ 1, M1 = gr56092 ~ lifee060,
+  M2 = gr56092 ~ gdpsh60l, M3 = gr56092 ~ p60, M4 = gr56092 ~ lifee060 + p60,
+  M5 = gr56092 ~ lifee060 + gdpsh60l, M6 = gr56092 ~ p60 + gdpsh60l,
+  M7 = gr56092 ~ lifee060 + gdpsh60l + p60)
+
+dataS97.mtest <- missingBtest.lm(data = dataS97, models = models.list)
+
+#Show the results:
+dataS97.mtest
+}
 
 }
 \references{
@@ -111,6 +143,10 @@ Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 García-Donato, G. and Forte, A. (2018) Bayesian Testing,
 Variable Selection and Model Averaging in Linear Models using R with
 BayesVarSel. The R Journal. 10: 329.
+
+Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
+Variable Selection in the Presence of Factors: A Model Selection Perspective.
+Journal of the American Statistical Association. 117. 1-27.
 
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 Statistics. 6: 461–464.
