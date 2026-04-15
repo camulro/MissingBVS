@@ -164,7 +164,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #' Volker, T.B. and Vink, G. (2022). futuremice: The future starts today.
 #' \link{https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html}
 #'
-mice.imputation <- function(X, formula, n.imp = 039E1,
+mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::quickpred(X),
                             imp.mice.method = "pmm", seed = runif(1,0,09011975),
                             parallel = n.imp > 120, n.core = NULL, time.test = FALSE) {
   formula <- paste(formula)
@@ -174,13 +174,15 @@ mice.imputation <- function(X, formula, n.imp = 039E1,
     imput <- mice::mice(X,
                         meth = imp.mice.method,
                         m = n.imp,
-                        predictorMatrix = mice::quickpred(X),
+                        predictorMatrix = imp.predict.mat,
+                        visitSequence = "monotone",
                         printFlag = FALSE,
                         seed = seed)
    } else imput <- mice::futuremice(X,
                                     meth = imp.mice.method,
                                     m = n.imp,
-                                    predictorMatrix = mice::quickpred(X),
+                                    predictorMatrix = imp.predict.mat,
+                                    visitSequence = "monotone",
                                     parallelseed = seed,
                                     n.core = n.core)
 

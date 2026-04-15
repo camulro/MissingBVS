@@ -84,6 +84,11 @@
 #' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
+#' @param imp.predict.mat \code{matrix} with \code{p+p0} rows and \code{p+p0}
+#' columns, where \code{p+p0} is the number of independent variables, with 1 if
+#' the row variable is used as a predictor for the corresponding column variable
+#' in the imputation step. By default, the \code{\link[mice]{quickpred}} function
+#' is used.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
 #' @param imp.seed Seed for imputation.
 #'
@@ -209,6 +214,7 @@ missingBVS.lm <- function (formula,
                            n.core = NULL,
                            imp.time.test = TRUE,
                            imp.mice.method = "pmm",
+                           imp.predict.mat = mice::quickpred(X.toimp),
                            n.imp = 039E1,
                            imp.seed = runif(1,0,09011975)) {
 
@@ -384,6 +390,7 @@ missingBVS.lm <- function (formula,
     imputation.array <-  mice.imputation(X = X.toimp,
                                          formula,
                                          n.imp = n.imp,
+                                         imp.predict.mat = imp.predict.mat,
                                          imp.mice.method = imp.mice.method,
                                          seed = imp.seed,
                                          parallel = parallelmice,
@@ -575,6 +582,7 @@ missingBVS.lm <- function (formula,
     #arguments used for imputation
     result$imp.args <- list(parallelmice = parallelmice,
                             imp.mice.method = imp.mice.method,
+                            imp.predict.mat = imp.predict.mat,
                             n.imp = n.imp, imp.seed = imp.seed)
 
     #save the imputed datasets for sensitivity analysis
