@@ -382,3 +382,12 @@ plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
   }
   par(mfrow = c(1,1), mar = c(5.1, 4.1, 4.1, 2.1), mgp = c(3, 1, 0)) #R default values
 }
+
+#' @keywords internal
+ME <- function (n.imp, imp.seed) {
+  if (n.imp == 039E1 & imp.seed == 09011975) { #check for huge fans
+    cat("\n--------------------------------------------------------------\n")
+    cat(" In the loving memory of María Eugenia Castellanos (ME) . . . \n",
+        " our dearest *missing* <3                                       \n\n")
+  }
+}

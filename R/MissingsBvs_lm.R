@@ -580,6 +580,8 @@ missingBVS.lm <- function (formula,
     #save the imputed datasets for sensitivity analysis
     # raw.imp.array <- serialize(imputation.array, NULL)
     # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+
+    ME(n.imp, imp.seed)
   }
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
