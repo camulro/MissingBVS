@@ -62,6 +62,12 @@
 #' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
+#' @param imp.predict.mat \code{matrix} with p1 rows and p2 columns, where p1 is
+#' the number of independent variables given by \code{formula} with \code{NAs}
+#' and p2 is the number of variables used to impute. Each entry equals 1 if the
+#' column variable is used as a predictor for the corresponding row variable in the
+#' imputation step. By default, the \code{\link[mice]{quickpred}} function
+#' is used for the variables with NAs in formula and 0s for the rest of them.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
 #' @param Gibbs.seed Seed for the Gibbs sampler algorithm.
 #' @param imp.seed Seed for imputation.
@@ -179,21 +185,22 @@ missingGibbsBVS.glm <- function (formula,
                                  family = binomial(link = "logit"),
                                  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
                                  BF.approx.method = "BIC",
-                                 prior.betas = "Robust", #if BF.approx.method = "gprior"
+                                 prior.betas = "Robust",
                                  prior.models = "ScottBerger",
                                  prior.models.dummies = "ScottBerger",
-                                 priorprobs = NULL, #needed if prior.models = User
+                                 priorprobs = NULL,
                                  init.model = "Full",
-                                 n.iter = 10000, #number of iterations for Gibbs Sampling algorithm
+                                 n.iter = 10000,
                                  n.burnin = 500,
                                  n.thin = 1,
                                  parallelmice = NULL,
                                  n.core = NULL,
                                  imp.time.test = TRUE,
-                                 imp.mice.method = "pmm", #mice's default
-                                 n.imp = 039E1, #number of imputed datasets for BF
-                                 Gibbs.seed = runif(1,0,26061970), #seed for the Gibbs sampling
-                                 imp.seed = runif(1,0,09011975), #seed for the imputation
+                                 imp.mice.method = "pmm",
+                                 imp.predict.mat = NULL,
+                                 n.imp = 039E1,
+                                 Gibbs.seed = runif(1,0,26061970),
+                                 imp.seed = runif(1,0,09011975),
                                  weights = rep(1, dim(data)[1]),
                                  offset = rep(0, dim(data)[1]),
                                  control = glm.control(),
@@ -244,13 +251,11 @@ missingGibbsBVS.glm <- function (formula,
 
   #Full design matrix for imputation
   framefull <- model.frame(formula, data, na.action = NULL)
-  X.toimp <- data[, attr(terms(framefull), "term.labels")] #design matrix with missing data with fixed vars
-
   #Rank deficient full model matrix data with missings
   X.full <- model.matrix.rankdef(framefull)
   namesx <- dimnames(X.full)[[2]]
   #Only the non-fixed vars
-  namesxnotnull <- namesx[namesx %notin% dimnames(X0rdf)[[2]]]
+  namesxnotnull <- setdiff(namesx, dimnames(X0rdf)[[2]])
   X.full <- X.full[, namesxnotnull]
   p <- length(namesxnotnull) #Number of covariates and levels of factors to select from
 
@@ -325,6 +330,27 @@ missingGibbsBVS.glm <- function (formula,
   #check for missings and define competing variables with NAs
   NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
 
+  if (!is.null(NAvars)) {
+    #Impute just competing variables with NAs
+    fulldataframe <- model.frame(paste0(formula[[2]], "~."), data, na.action = NULL)
+    X.toimp <- fulldataframe[,-1] #full observed design matrix
+    quickpredict.mat <- mice::quickpred(X.toimp)
+    if (!is.null(imp.predict.mat)) { #if given by user
+      #check predict imputation matrix
+      imp.vars <- rownames(imp.predict.mat)
+      if (any(NAvars %notin% imp.vars)) {
+        stop(paste0("Imputation prediction matrix rows given do not contain all the variables ",
+                    "given by formula with NAs.", "Make sure to include them all.\n"))
+      }
+      quickpredict.mat[imp.vars, colnames(imp.predict.mat)] <- imp.predict.mat
+      quickpredict.mat[imp.vars, colnames(quickpredict.mat) %notin% colnames(imp.predict.mat)] <- 0
+    } else imp.vars <- NAvars
+
+    #Do not impute variables with missings that are not in imp.vars (also in NAvars)
+    not.imp.vars <- setdiff(attr(terms(fulldataframe), "term.labels"), imp.vars)
+    quickpredict.mat[not.imp.vars, ] <- 0
+  }
+
   #Check the initial model:
   if (is.character(init.model) == TRUE) {
     im <- substr(tolower(init.model), 1, 1)
@@ -365,6 +391,7 @@ missingGibbsBVS.glm <- function (formula,
       cat("Time test . . . \n")
       time.test <- mice.imputation(X = X.toimp,
                                    formula,
+                                   imp.predict.mat = quickpredict.mat,
                                    imp.mice.method = imp.mice.method,
                                    parallel = parallelmice,
                                    n.core = n.core,
@@ -390,6 +417,7 @@ missingGibbsBVS.glm <- function (formula,
     imputation.array <-  mice.imputation(X = X.toimp,
                                          formula,
                                          n.imp = n.imp,
+                                         imp.predict.mat = quickpredict.mat,
                                          imp.mice.method = imp.mice.method,
                                          seed = imp.seed,
                                          parallel = parallelmice,
@@ -562,6 +590,7 @@ missingGibbsBVS.glm <- function (formula,
     #arguments used for imputation
     result$imp.args <- list(parallelmice = parallelmice,
                             imp.mice.method = imp.mice.method,
+                            imp.predict.mat = imp.predict.mat,
                             n.imp = n.imp, imp.seed = imp.seed)
 
     #save the imputed datasets for sensitivity analysis

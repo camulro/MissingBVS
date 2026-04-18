@@ -84,11 +84,12 @@
 #' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
-#' @param imp.predict.mat \code{matrix} with \code{p+p0} rows and \code{p+p0}
-#' columns, where \code{p+p0} is the number of independent variables, with 1 if
-#' the row variable is used as a predictor for the corresponding column variable
-#' in the imputation step. By default, the \code{\link[mice]{quickpred}} function
-#' is used.
+#' @param imp.predict.mat \code{matrix} with p1 rows and p2 columns, where p1 is
+#' the number of independent variables given by \code{formula} with \code{NAs}
+#' and p2 is the number of variables used to impute. Each entry equals 1 if the
+#' column variable is used as a predictor for the corresponding row variable in the
+#' imputation step. By default, the \code{\link[mice]{quickpred}} function
+#' is used for the variables with NAs in formula and 0s for the rest of them.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
 #' @param imp.seed Seed for imputation.
 #'
@@ -130,7 +131,7 @@
 #' model space of the factor levels}
 #' \item{method}{\code{Full}}
 #'
-#' @author Carolina Mulet and Gonzalo Garcia-Donato
+#' @author Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
 #' @seealso Use \code{\link[MissingBVS]{MissingGibbsBvs.lm}} for a heuristic
@@ -214,7 +215,7 @@ missingBVS.lm <- function (formula,
                            n.core = NULL,
                            imp.time.test = TRUE,
                            imp.mice.method = "pmm",
-                           imp.predict.mat = mice::quickpred(X.toimp),
+                           imp.predict.mat = NULL,
                            n.imp = 039E1,
                            imp.seed = runif(1,0,09011975)) {
 
@@ -243,15 +244,13 @@ missingBVS.lm <- function (formula,
   namesnull <- dimnames(X0)[[2]]
   p0 <- dim(X0)[2] #Number of fixed covariates or dummies of factors
 
-  #Full design matrix for imputation
+  #Full design matrix given by formula
   framefull <- model.frame(formula, data, na.action = NULL)
-  X.toimp <- data[, attr(terms(framefull), "term.labels")] #design matrix with missing data with fixed vars
-
   #Rank deficient full model matrix data with missings
   X.full <- model.matrix.rankdef(framefull)
   namesx <- dimnames(X.full)[[2]]
   #Only the non-fixed vars
-  namesxnotnull <- namesx[namesx %notin% dimnames(X0rdf)[[2]]]
+  namesxnotnull <- setdiff(namesx, dimnames(X0rdf)[[2]])
   X.full <- X.full[, namesxnotnull]
   p <- length(namesxnotnull) #Number of covariates and levels of factors to select from
 
@@ -340,6 +339,27 @@ missingBVS.lm <- function (formula,
   #check for missings and define competing variables with NAs
   NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
 
+  if (!is.null(NAvars)) {
+    #Impute just competing variables with NAs
+    fulldataframe <- model.frame(paste0(formula[[2]], "~."), data, na.action = NULL)
+    X.toimp <- fulldataframe[,-1] #full observed design matrix
+    quickpredict.mat <- mice::quickpred(X.toimp)
+    if (!is.null(imp.predict.mat)) { #if given by user
+      #check predict imputation matrix
+      imp.vars <- rownames(imp.predict.mat)
+      if (any(NAvars %notin% imp.vars)) {
+        stop(paste0("Imputation prediction matrix rows given do not contain all the variables ",
+                    "given by formula with NAs.", "Make sure to include them all.\n"))
+      }
+      quickpredict.mat[imp.vars, colnames(imp.predict.mat)] <- imp.predict.mat
+      quickpredict.mat[imp.vars, colnames(quickpredict.mat) %notin% colnames(imp.predict.mat)] <- 0
+    } else imp.vars <- NAvars
+
+    #Do not impute variables with missings that are not in imp.vars (also in NAvars)
+    not.imp.vars <- setdiff(attr(terms(fulldataframe), "term.labels"), imp.vars)
+    quickpredict.mat[not.imp.vars, ] <- 0
+  }
+
   #Check model priors chosen and define the functions to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, q)
 
@@ -365,6 +385,7 @@ missingBVS.lm <- function (formula,
       cat("Time test . . . \n")
       time.test <- mice.imputation(X = X.toimp,
                                    formula,
+                                   imp.predict.mat = quickpredict.mat,
                                    imp.mice.method = imp.mice.method,
                                    parallel = parallelmice,
                                    n.core = n.core,
@@ -390,7 +411,7 @@ missingBVS.lm <- function (formula,
     imputation.array <-  mice.imputation(X = X.toimp,
                                          formula,
                                          n.imp = n.imp,
-                                         imp.predict.mat = imp.predict.mat,
+                                         imp.predict.mat = quickpredict.mat,
                                          imp.mice.method = imp.mice.method,
                                          seed = imp.seed,
                                          parallel = parallelmice,

@@ -197,7 +197,7 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
   imputation.array <- array(0, dim = c(n, q, n.imp), #an array with the matrices imputed
                             dimnames = list(seq_len(n), colnames(aux), seq_len(n.imp)))
   for (s in seq_len(n.imp)) {
-    aux.imps <- model.frame(X.formula, imps[[s]])
+    aux.imps <- model.frame(X.formula, imps[[s]], na.action = NULL)
     imputation.array[, , s] <- model.matrix.rankdef(aux.imps) #build the model matrix
   }
   if (time.test) return(time <- Sys.time() - time)
@@ -387,7 +387,7 @@ plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
 
 #' @keywords internal
 ME <- function (n.imp, imp.seed) {
-  if (n.imp == 039E1 & imp.seed == 09011975) { #check for huge fans
+  if (n.imp == 039 & imp.seed == 09011975) { #check for huge fans
     cat("\n--------------------------------------------------------------\n")
     cat(" In the loving memory of María Eugenia Castellanos (ME) . . . \n",
         " our dearest *missing* <3                                       \n\n")

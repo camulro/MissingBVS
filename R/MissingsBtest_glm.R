@@ -58,6 +58,12 @@
 #' of the imputation process with \code{n.imp = 30} if the number of variables or
 #' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
 #' @param imp.mice.method Method for mice's imputation.
+#' @param imp.predict.mat \code{matrix} with p1 rows and p2 columns, where p1 is
+#' the number of independent variables given by \code{formula} with \code{NAs}
+#' and p2 is the number of variables used to impute. Each entry equals 1 if the
+#' column variable is used as a predictor for the corresponding row variable in the
+#' imputation step. By default, the \code{\link[mice]{quickpred}} function
+#' is used for the variables with NAs in formula and 0s for the rest of them.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
 #' @param imp.seed Seed for imputation.
 #' @param weights NULL or numeric vector of the same length as \code{y} to
@@ -148,16 +154,17 @@ missingBtest.glm <- function (data,
                               family = binomial(link = "logit"),
                               null.model = NULL,
                               BF.approx.method = "BIC",
-                              prior.betas = "Robust", #if BF.approx.method = "gprior"
+                              prior.betas = "Robust",
                               prior.models = "Constant",
                               prior.models.dummies = "ScottBerger",
-                              priorprobs = NULL, #needed if prior.models = "User"
-                              imp.mice.method = "pmm", #mice's default
+                              priorprobs = NULL,
+                              imp.mice.method = "pmm",
+                              imp.predict.mat = NULL,
                               parallelmice = NULL,
                               n.core = NULL,
                               imp.time.test = TRUE,
                               n.imp = 039E1,
-                              imp.seed = runif(1,0,09011975), #seed for the imputation
+                              imp.seed = runif(1,0,09011975),
                               weights = rep.int(1, nrow(data)),
                               offset = rep.int(0, nrow(data)),
                               control = glm.control(),
@@ -250,13 +257,11 @@ missingBtest.glm <- function (data,
   #Full design matrix for imputation
   formula <- as.formula(paste0(null.model[[2]], "~ ."))
   framefull <- model.frame(formula, data, na.action = NULL)
-  X.toimp <- data[, attr(terms(framefull), "term.labels")] #design matrix with missing data with fixed vars
-
   #Rank deficient full model matrix data with missings
   X.full <- model.matrix.rankdef(framefull)
   namesx <- dimnames(X.full)[[2]]
   #Only the non-fixed vars
-  namesxnotnull <- namesx[namesx %notin% dimnames(X0rdf)[[2]]]
+  namesxnotnull <- setdiff(namesx, dimnames(X0rdf)[[2]])
   X.full <- X.full[, namesxnotnull]
   p <- length(namesxnotnull) #Number of covariates and levels of factors
 
@@ -315,6 +320,26 @@ missingBtest.glm <- function (data,
   #check for missings and define variables with NAs
   NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
 
+  if (!is.null(NAvars)) {
+    #Impute just competing variables with NAs
+    X.toimp <- framefull[,-1] #full observed design matrix
+    quickpredict.mat <- mice::quickpred(X.toimp)
+    if (!is.null(imp.predict.mat)) { #if given by user
+      #check predict imputation matrix
+      imp.vars <- rownames(imp.predict.mat)
+      if (any(NAvars %notin% imp.vars)) {
+        stop(paste0("Imputation prediction matrix rows given do not contain all the variables ",
+                    "given by formula with NAs.", "Make sure to include them all.\n"))
+      }
+      quickpredict.mat[imp.vars, colnames(imp.predict.mat)] <- imp.predict.mat
+      quickpredict.mat[imp.vars, colnames(quickpredict.mat) %notin% colnames(imp.predict.mat)] <- 0
+    } else imp.vars <- NAvars
+
+    #Do not impute variables with missings that are not in imp.vars (also in NAvars)
+    not.imp.vars <- setdiff(attr(terms(framefull), "term.labels"), imp.vars)
+    quickpredict.mat[not.imp.vars, ] <- 0
+  }
+
   #Check model priors chosen and define the function to be used
   if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
     stop("Only priors 'ScottBerger', 'Constant' and 'User' supported.\n")
@@ -366,6 +391,7 @@ missingBtest.glm <- function (data,
       cat("Time test . . . \n")
       time.test <- mice.imputation(X = X.toimp,
                                    formula,
+                                   imp.predict.mat = quickpredict.mat,
                                    imp.mice.method = imp.mice.method,
                                    parallel = parallelmice,
                                    n.core = n.core,
@@ -391,6 +417,7 @@ missingBtest.glm <- function (data,
     imputation.array <-  mice.imputation(X = X.toimp,
                                          formula,
                                          n.imp = n.imp,
+                                         imp.predict.mat = quickpredict.mat,
                                          imp.mice.method = imp.mice.method,
                                          seed = imp.seed,
                                          parallel = parallelmice,
@@ -491,7 +518,7 @@ missingBtest.glm <- function (data,
         fit <- list()
         for (i in 1:n.imp) {
           #remove last dummy for each factor, first q0 vars are the fixed ones
-          Xi <- imputation.array[,c(1:p0, namesj[namesj %notin% indf] + p0),i]
+          Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf)  + p0),i]
           z <- glm.fit(x = Xi, y = y, family = family,
                        weights = weights, offset = offset, control = control)
           z$terms <- mt[[j]]
@@ -502,7 +529,7 @@ missingBtest.glm <- function (data,
         modelspool[[j]] <- mice::pool(fit)
       } else {
         #compute glm.fit for the unique imputation
-        Xi <- imputation.array[,c(1:p0, namesj[namesj %notin% indf] + p0)]
+        Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf)  + p0)]
         modelspool[[j]] <- glm.fit(x = Xi, y = y, family = family,
                                    weights = weights, offset = offset, control = control)
       }
@@ -530,6 +557,7 @@ missingBtest.glm <- function (data,
     #arguments used for imputation
     result$imp.args <- list(parallelmice = parallelmice,
                             imp.mice.method = imp.mice.method,
+                            imp.predict.mat = imp.predict.mat,
                             n.imp = n.imp, imp.seed = imp.seed)
 
     #save the imputed datasets for sensitivity analysis
