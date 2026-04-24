@@ -79,7 +79,7 @@
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
 #' \item{method}{\code{Full}}
 #'
-#' @author Carolina Mulet and Gonzalo Garcia-Donato
+#' @author arolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
 #' @seealso Use \code{\link[MissingBVS]{MissingGibbsGD25}} for a heuristic
@@ -144,14 +144,6 @@ missingGD25 <- function (formula,
   if (sum(isnum) < dim(aux)[2]) {
     stop("This method is only for continuous covariates.\n")
   }
-  # cat("Be careful, this method is only for normally distributed covariates.\n",
-  #     "Do you want to continue? (y/n)\n")
-  # if (tolower(readline()) != "y") {
-  #   stop("Try the missingBVS.lm function instead.\n")
-  # }
-
-  #Evaluate the null model:
-  lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
 
   #Full design matrix
   framefull <- model.frame(formula, data, na.action = NULL)
@@ -159,25 +151,14 @@ missingGD25 <- function (formula,
   namesx <- dimnames(X.full)[[2]]
   p <- length(namesx) #Number of covariates to select from
 
-  #Is there any variable to select from?
-  if (p == 0) { #only the intercept can be fixed
-    stop(paste0("The number of fixed covariates is equal to the number of\n",
-                "covariates in the full model. No model selection can be done.\n"))
-  }
+  #Check arguments and compute n.keep if needed
+  n.keep <- checkBvsarguments(p, 1, "(Intercept)", c("(Intercept)", namesx), n.keep, p)
 
-  #check if the number of regressors is too big.
-  if (p > 20) {
-    warning("Number of covariates too big. . . consider using missingGibbsBvs.lm.\n",
-            immediate. = TRUE)
-  }
+  #Check model priors chosen and define the function to be used
+  lprior.models <- checkforprior.models(prior.models, priorprobs, p)
 
-  #n.keep > 2^p, the number of models?
-  if (n.keep > 2^p) {
-    cat(paste0("The number of models to keep (", n.keep,
-               ") is larger than the total number of models (",
-               2^p, ") and it has been set to ", 2^p))
-    n.keep <- 2^p
-  }
+  #Evaluate the null model:
+  lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
 
   #The response variable
   y <- lmnull$y; obsnotNA <- names(y) #without missings
@@ -187,10 +168,7 @@ missingGD25 <- function (formula,
   #check for missings
   NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
-  #Check model priors chosen and define the function to be used
-  lprior.models <- checkforprior.models(prior.models, priorprobs, p)
-
-  #Check methods and options
+  #BF function
   BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
                                                            y = y, SS0 = SS0,
                                                            n = n, k)
@@ -276,26 +254,12 @@ missingGD25 <- function (formula,
   all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
   colnames(all.models.PM) <- c(namesx, "Post")
 
-  inclprob <- rep(0, p)
-  probdim <- rep(0, p + 1)
-  #compute inclusion probabilities (except for fixed variables) and
-  #posterior probability of the dimension of the true model
-  for (i in seq_len(2^p)) {
-    inclprob[which(all.models.PM[i, seq_len(p)] == 1)] <-
-      inclprob[which(all.models.PM[i, seq_len(p)] == 1)] + all.models.PM[i, p + 1]
-    probdim[sum(all.models.PM[i, seq_len(p)]) + 1] <-
-      probdim[sum(all.models.PM[i, seq_len(p)]) + 1] + all.models.PM[i, p + 1]
-  }
-
-  #HPM
-  nPmax <- which.max(all.models.PM[, p+1])
-  hpm <- all.models.PM[nPmax, ]
-
-  #MPM
-  mpm <- rep(0,p)
-  mpm[which(inclprob >= 0.5)] <- 1
+  #Summ up the posterior distribution
+  summ.posterior.list <- summ.posterior(0, all.models.PM, p, p, NULL)
+  list2env(summ.posterior.list, envir = environment())
 
   if (!is.null(NAvars)) {
+    #Pool results for imputed datasets
     if (n.imp > 1) {
       #Evaluate lm of full model with missings using Rubin's rule
       fit <- list()

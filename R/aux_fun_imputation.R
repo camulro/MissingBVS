@@ -1,6 +1,6 @@
 #' \pkg{MissingBVS}'s imputation for normally distributed covariates
 #'
-#' Performs the multiple imputation developed by García-Donato et al (2025) for
+#' Performs the multiple imputation used by García-Donato et al (2025) for
 #' continuous and normally distributed covariates to compute Bayesian Variable
 #' Selection in the presence of missing data.
 #'

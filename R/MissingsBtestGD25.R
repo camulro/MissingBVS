@@ -101,21 +101,14 @@ missingBtestGD25 <- function (data,
 
   if (!is.list(models)) stop("Argument models should be a list.\n")
 
+  namesm <- names(models)
   #If competing models come wihtout a name, give one by default:
-  if (is.null(names(models))){
-    names(models) <- paste("model", 1:N, sep="")
+  if (is.null(namesm)){
+    namesm <- paste("model", 1:N, sep="")
   }
 
-  # cat("Be careful, this method is only for normally distributed covariates.\n",
-  #     "Do you want to continue? (y/n)\n")
-  # if (tolower(readline()) != "y") {
-  #   stop("Try the missingBtest.lm function instead.\n")
-  # }
-
   Dim <- rep(0L, N)
-  lBFi0 <- numeric(N)
-  lPriorModels <- numeric(N)
-  PostProbi <- numeric(N)
+  lBFi0 <- lPriorModels <- PostProbi <- numeric(N)
   mt <- list() #list of terms for each model
 
   #list that contains the names of the covariates in each model
@@ -155,6 +148,16 @@ missingBtestGD25 <- function (data,
         "added to the list of competing models.\n")
   }
 
+  #Full design matrix
+  formula <- as.formula(paste0(null.model[[2]], "~ ."))
+  framefull <- model.frame(formula, data, na.action = NULL)
+  X.full <- framefull[,-1] #remove intercept
+  namesx <- dimnames(X.full)[[2]]
+  p <- length(namesx) #Number of covariates to select from
+
+  #Check arguments and define the functions to compute prior model probabilities
+  prior.models <- priormodels.btest(prior.models, NULL, N, Dim, priorprobs)
+
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
 
@@ -163,44 +166,13 @@ missingBtestGD25 <- function (data,
   n <- length(y)
   SS0 <- crossprod(lmnull$residuals) #SSE of the null model
 
-  #Full design matrix
-  formula <- as.formula(paste0(null.model[[2]], "~ ."))
-  framefull <- model.frame(formula, data, na.action = NULL)
-  X.full <- framefull[,-1] #remove intercept
-  namesx <- dimnames(X.full)[[2]]
-  p <- length(namesx) #Number of covariates to select from
-
-  #check for missings
-  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
-
-  #Check model priors chosen and define the function to be used
-  if (prior.models %notin% c("ScottBerger", "Constant", "User")) {
-    stop("Only priors 'ScottBerger', 'Constant' and 'User' supported.\n")
-  }
-  switch (prior.models, #change the string for the corresponding function
-          Constant = {prior.models <- function (modeli) 1/length(models)},
-          ScottBerger = {prior.models <- function (modeli) 1/length(unique(Dim)) /
-                                                           sum(Dim == Dim[modeli])},
-          User = {
-            if (is.null(priorprobs)) {
-              stop("User prior selected but no prior probabilities provided.\n")
-            }
-            if (length(priorprobs) != length(models)) {
-              if (nullmodel.pos == N + 1) {
-                stop(paste0("User prior selected but the length of prior probabilities is not correct (", length(models),").\n",
-                            "Make sure to provide a prior for the null model, the one with the intercept.\n"))
-              } else stop(paste0("User prior selected but the length of prior probabilities is not correct (", length(models),").\n"))
-            }
-            if (sum(priorprobs < 0) > 0) {
-              stop("Prior probabilities must be positive.\n")
-            }
-            prior.models <- function(modeli) priorprobs[modeli]}
-  )
-
   #Check methods and options
   BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
                                                            y = y, SS0 = SS0,
                                                            n = n, k)
+
+  #check for missings
+  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Imputation of missing data
   if (imp.time.test & (p*n > 10000 | n.imp > 039E1)) {
@@ -246,20 +218,20 @@ missingBtestGD25 <- function (data,
   C <- sum(exp(lBFi0 + lPriorModels))
   PostProbi <- exp(lBFi0 + lPriorModels - log(C))
 
-  if (names(models)[nullmodel.pos] == "") {
-    names(models)[nullmodel.pos] <-
+  if (namesm[nullmodel.pos] == "") {
+    namesm[nullmodel.pos] <-
       paste("(", as.formula(models[[1]])[[2]], " ~ 1)", sep="")
     names(lBFi0) <-
-      paste(names(models), ".to.(",
+      paste(namesm, ".to.(",
             paste(as.formula(models[[1]])[[2]], " ~ 1)", sep=""), sep = "")
-    names(PostProbi) <- c(names(models)[-nullmodel.pos],
+    names(PostProbi) <- c(namesm[-nullmodel.pos],
                           paste(as.formula(models[[1]])[[2]], " ~ 1", sep=""))
     names(lPriorModels) <- names(PostProbi)
   } else {
     names(lBFi0) <-
-      paste(names(models), ".to.", names(models)[nullmodel.pos], sep = "")
-    names(PostProbi) <- names(models)
-    names(lPriorModels) <- names(models)
+      paste(namesm, ".to.", namesm[nullmodel.pos], sep = "")
+    names(PostProbi) <- namesm
+    names(lPriorModels) <- namesm
   }
 
   #Evaluate lm of each model with missings using Rubin's rule
@@ -288,13 +260,13 @@ missingBtestGD25 <- function (data,
     } else modelspool[[j]] <- lm(models[[j]], data)
   }
   modelspool[[nullmodel.pos]] <- lm(null.model, data)
-  names(modelspool) <- names(models)
+  names(modelspool) <- namesm
 
   result <- list()
   result$lBFi0 <- lBFi0
   result$PostProbi <- PostProbi
   result$models <- models
-  result$nullmodel <- names(models)[nullmodel.pos]
+  result$nullmodel <- namesm[nullmodel.pos]
   result$modelspool <- modelspool
 
   #arguments used for imputation

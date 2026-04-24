@@ -219,7 +219,6 @@ missingBVS.lm <- function (formula,
                            imp.predict.mat = NULL,
                            n.imp = 039E1,
                            imp.seed = runif(1,0,09011975)) {
-
   time <- Sys.time()
 
   formula <- as.formula(formula)
@@ -230,136 +229,12 @@ missingBVS.lm <- function (formula,
     stop("The response in the full and null model does not coincide.\n")
   }
 
-  #Evaluate the null model:
-  lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
+  #Build matrices and objects needed later on
+  buildmatrices.list <- buildmatrices(formula, null.model, data)
+  list2env(buildmatrices.list, envir = environment())
 
-  #Response and fixed vars for imputation
-  framenull <- model.frame(null.model, data, na.action = NULL)
-  q0 <- dim(framenull)[2] # number of fixed covariates and/or factors,intercept always
-
-  #Rank deficient fixed model matrix to remove vars from the regressors one
-  X0rdf <- model.matrix.rankdef(framenull)
-
-  #Missing model matrix of fixed vars
-  X0 <- model.matrix(framenull, data)
-  namesnull <- dimnames(X0)[[2]]
-  p0 <- dim(X0)[2] #Number of fixed covariates or dummies of factors
-
-  #Full design matrix given by formula
-  framefull <- model.frame(formula, data, na.action = NULL)
-  #Rank deficient full model matrix data with missings
-  X.full <- model.matrix.rankdef(framefull)
-  namesx <- dimnames(X.full)[[2]]
-  #Only the non-fixed vars
-  namesxnotnull <- setdiff(namesx, dimnames(X0rdf)[[2]])
-  X.full <- X.full[, namesxnotnull]
-  p <- length(namesxnotnull) #Number of covariates and levels of factors to select from
-
-  #Is there any variable to select from?
-  if (p == 0) {
-    stop(paste0("The number of fixed variables is equal to the number of\n",
-                "regressors in the full model. No model selection can be done.\n"))
-  }
-
-  #check if the number of regressors is too big.
-  if (p > 20) {
-    warning("Number of regressors too big. . . consider using missingGibbsBvs.lm.\n",
-            immediate. = TRUE)
-  }
-
-  #check if null model is contained in the full one:
-  for (i in 1:p0){
-    if (namesnull[i] %notin% namesx) {
-      stop(paste0("Error in var: ", namesnull[i],"; null model not nested in full model.\n"))
-    }
-  }
-
-  #the order for the posterior model distribution computation step
-  ordvars <- c(namesnull, namesxnotnull) #X0, X.full
-
-  #covariates and/or factors to select from
-  depvars <- setdiff(attr(terms(framefull), "term.labels"),
-                     attr(terms(framenull), "term.labels"))
-
-  #Factors: positions has number of rows equal to the number of regressors
-  #(factors or numeric covariates) and p columns.
-  #A 1 in a row denotes the position in X of a regressor (several positions for
-  #the dummies of a factor).
-  positions <- t(sapply(depvars, function(var) {
-    if(is.factor(data[[var]])) {
-      levs <- levels(data[[var]])
-      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
-    } else ind <- which(namesxnotnull == var) #1 if the name matches
-
-    posi <- rep(0,p); posi[ind] <- 1; posi
-  }))
-  colnames(positions) <- namesxnotnull
-
-  tmp <- colSums(positions %*% t(positions))
-  positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
-
-  L <- sum(!positionsx) #Number of factors to select from
-  if (L > 0) {
-    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
-    positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
-    rownames(positionsfac) <- depvars[!positionsx]
-    colnames(positionsfac) <- namesxnotnull
-
-    l <- tmp[tmp > 1] #Number of levels for each factor
-
-    #vector of length L with the position of the last dummy for each factor to check for repeated models
-    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
-    checklast <- ifelse(L > 1, function(M) diag(M[, indf]),  function(M) M[, indf])
-  } else positionsfac <- l <- 0
-
-  q <- p - sum(l) + L #Number of factors and covariates to select from
-  #q = p if there are no factors
-
-  #n.keep > 2^q, the number of models?
-  if(is.character(n.keep)) {
-    if (n.keep == "all") {
-      # n.keep <- 2^(q - L)*prod(2^l - l)
-      n.keep <- 2^q
-    } else stop("Only n.keep='all' or type the exact number of models to keep instead.\n")
-  }
-  if (n.keep > 2^q) {
-    cat(paste0("The number of models to keep (", n.keep,
-               ") is larger than the total number of models (", 2^q,
-               ") and it has been set to ", 2^q,".\n"))
-    # n.keep <- 2^(q - L)*prod(2^l - l)
-    n.keep <- 2^q
-  }
-
-  #The response variable
-  y <- lmnull$y; obsnotNA <- names(y) #without missings
-  n <- length(y)
-  SS0 <- crossprod(lmnull$residuals) #SSE of the null model
-
-  X.full <- X.full[obsnotNA,] #remove NA obs from null model
-
-  #check for missings and define competing variables with NAs
-  NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
-
-  if (!is.null(NAvars)) {
-    #Impute just competing variables with NAs
-    fulldataframe <- model.frame(paste0(formula[[2]], "~."), data, na.action = NULL)
-    X.toimp <- fulldataframe[,-1] #full observed design matrix
-    quickpredict.mat <- mice::quickpred(X.toimp)
-    if (!is.null(imp.predict.mat)) { #if given by user
-      #check predict imputation matrix
-      imp.vars <- rownames(imp.predict.mat)
-      if (any(NAvars %notin% imp.vars)) {
-        stop(paste0("Imputation prediction matrix rows given do not contain all the variables ",
-                    "given by formula with NAs.", "Make sure to include them all.\n"))
-      }
-      quickpredict.mat[imp.vars, colnames(imp.predict.mat)] <- imp.predict.mat
-      quickpredict.mat[imp.vars, colnames(quickpredict.mat) %notin% colnames(imp.predict.mat)] <- 0
-    } else imp.vars <- NAvars
-
-    #Do not impute variables with missings that are not in imp.vars (also in NAvars)
-    not.imp.vars <- setdiff(attr(terms(fulldataframe), "term.labels"), imp.vars)
-    quickpredict.mat[not.imp.vars, ] <- 0
-  }
+  #Check arguments and compute n.keep if needed
+  n.keep <- checkBvsarguments(p, p0, namesnull, namesx, n.keep, q)
 
   #Check model priors chosen and define the functions to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, q)
@@ -368,68 +243,30 @@ missingBVS.lm <- function (formula,
     lprior.models.dummies <- checkforprior.models.dummies(prior.models.dummies, l)
   } else lprior.models.dummies <- function(delta, tau) 0
 
+  #Evaluate the null model:
+  lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
+
+  #The response variable
+  y <- lmnull$y; obsnotNA <- names(y) #without missings
+  n <- length(y)
+  SS0 <- crossprod(lmnull$residuals) #SSE of the null model
+
   #Check approx method and priors chosen and define the function to be used
   BF.approx.method <- checkforprior.betas.lm(BF.approx.method,
                                              prior.betas,
                                              n, p, p0, y, SS0)
 
+  X.full <- X.full[obsnotNA,] #remove NA obs from null model
+
+  #check for missings and define competing variables with NAs
+  NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
+
+  #Imputation step
   if (!is.null(NAvars)) {
-    #Imputation of missing data
-    if (is.null(parallelmice)) {
-      if (n.imp > 120 | (n*q > 50000 & n.imp > 5)) {
-        parallelmice <- TRUE #faster
-      } else parallelmice <- FALSE
-    }
-
-    if (imp.time.test & (n*q > 10000 | n.imp > 039E1)) {
-      #test imputation time
-      cat("Time test . . . \n")
-      time.test <- mice.imputation(X = X.toimp,
-                                   formula,
-                                   imp.predict.mat = quickpredict.mat,
-                                   imp.mice.method = imp.mice.method,
-                                   parallel = parallelmice,
-                                   n.core = n.core,
-                                   time.test = TRUE)
-
-      estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to time
-      cat("The whole imputation can take ", estim.time,
-          "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
-      if (tolower(readline()) != "y") {
-        if (!parallelmice) {
-          cat("Do you want to faster imputation running a parallel version of mice? (y/n)\n")
-          if (tolower(readline()) == "y") {
-            parallelmice <- TRUE
-          } else stop("Reduce the number of imputed datasets.\n")
-        } else stop("Reduce the number of imputed datasets.\n")
-      }
-    }
-
-    cat("Performing imputation of missing data with mice's", imp.mice.method)
-    if (parallelmice) cat(" parallel")
-    cat(" method.\n", "Please wait . . . \n")
-
-    imputation.array <-  mice.imputation(X = X.toimp,
-                                         formula,
-                                         n.imp = n.imp,
-                                         imp.predict.mat = quickpredict.mat,
-                                         imp.mice.method = imp.mice.method,
-                                         seed = imp.seed,
-                                         parallel = parallelmice,
-                                         n.core = n.core)
-
-    #remove observations with missings on the response or fixed vars,
-    #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
-    imputation.array <- imputation.array[obsnotNA, ordvars,]
-    if (n.imp > 1) {
-      #function to compute log(BFa0) for a given model as an average of BF computed
-      #by BF.approx.method over the imputed datasets
-      lBF.method <- function (model) lBF.approx(model,
-                                                imputation.array = imputation.array,
-                                                BF.approx.method = BF.approx.method,
-                                                p0 = p0, n.imp = n.imp)
-    } else lBF.method <- function (model) BF.approx.method(k = length(model),
-                                                           X = imputation.array[,c(1:p0, model+p0)])
+    buildimputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat,
+                                n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
+                                parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
+    list2env(buildimputation.list, envir = environment())
   }
 
   #Info:
@@ -447,92 +284,19 @@ missingBVS.lm <- function (formula,
   cat("The problem has a total of", 2^q, "competing models.\n")
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
-  #progress bar for loop
-  pb <- txtProgressBar(min = 0,
-                       max = 2^p,
-                       style = 3,
-                       width = 50,
-                       char = "=")
+  #Compute exact posterior distribution and normalizing constant
+  posterior.list <- exact.posterior.comput(p, positions, positionsfac, lastd, l,
+                                           namesxnotnull, NAvars, lBF.method,
+                                           lprior.models, lprior.models.dummies,
+                                           X0, X.full, BF.approx.method)
+  list2env(posterior.list, envir = environment())
 
-  #Posterior computation
-  all.models.lPM <- matrix(0, nr = 2^p, nc = p+1) #last column contains log(BF_a0*Pr(M))
-  for (i in seq_len(2^p-1)){ # null out of the loop
-    setTxtProgressBar(pb, i)
-
-    #transform the number of the model into a binary number
-    current.model <- BayesVarSel:::integer.base.b_C(i, p)
-    all.models.lPM[i, seq_len(p)] <- current.model
-
-    gamma.tau <- positions %*% current.model > 0 #covariates and/or factors active
-    deltasum <- positionsfac %*% current.model #levels active of factors
-    tau <- deltasum > 0 #active factors
-
-    #check if the model is one among the saturated and oversaturated due to the dummies
-    if (sum(tau) > 0) {
-      M <- t(apply(positionsfac, 1, function(x) x * current.model))
-      f.check <- (deltasum == l) | ((deltasum == l - 1) & checklast(M))
-      if (any(f.check)) {all.models.lPM[i, p+1] <- NA; next}
-    }
-
-    #check if there are NAs in the model considered to save computation time
-    if (any(namesxnotnull[which(current.model == 1)] %in% NAvars)) {
-      lBF.PM <- lBF.method(model = which(current.model == 1)) +
-                lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
-    } else { #if there are no missings, compute the BF by the method selected
-      X.i <- cbind(X0, X.full[, which(current.model == 1)])
-      lBF.PM <- BF.approx.method(k = sum(current.model == 1), X = X.i) +
-        lprior.models(gamma.tau) + lprior.models.dummies(deltasum, tau) #log(BF_a0*Pr(M))
-    }
-    all.models.lPM[i, p+1] <- lBF.PM
-  }
-  setTxtProgressBar(pb, 2^p)
-  cat("\n")
-  #null model
-  all.models.lPM[2^p, seq_len(p)] <- rep(0, p)
-  all.models.lPM[2^p, p+1] <- lprior.models(rep(0, p)) #BF = 1 for null model
-  all.models.lPM <- na.omit(all.models.lPM) #remove repeated models
-
-  #renormalize
-  C <- sum(exp(all.models.lPM[, p+1]))
-  all.models.PM <- all.models.lPM
-  all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
-
-  if (L > 0) {
-    #compute models matrix at the covariate-factor level
-    cf.models.PM <- all.models.PM[,seq_len(p)] %*% t(positions)
-    cf.models.PM <- cbind(cf.models.PM, all.models.PM[,p+1])
-    colnames(cf.models.PM)[q+1] <- "Post"
-
-    modelsprob <- cbind(t(sapply(seq_len(2^q)-1,
-                                 function(j) BayesVarSel:::integer.base.b_C(j, q))), numeric(2^q))
-    for (i in seq_len(nrow(cf.models.PM))) {
-      modeli <- cf.models.PM[i, seq_len(q)] > 0
-      j <- which(apply(modelsprob[, seq_len(q)], 1, function(x) all(x == modeli)))
-      modelsprob[j, q + 1] <- modelsprob[j, q + 1] + cf.models.PM[i, q + 1]
-    }
-    colnames(modelsprob) <- colnames(cf.models.PM)
-  } else modelsprob <- all.models.PM
-
-  inclprob <- rep(0, q)
-  probdim <- rep(0, q + 1)
-  #compute inclusion probabilities (except for fixed variables) and
-  #posterior probability of the dimension of the true model
-  for (i in seq_len(nrow(modelsprob))) {
-    inclprob[which(modelsprob[i, seq_len(q)] == 1)] <-
-      inclprob[which(modelsprob[i, seq_len(q)] == 1)] + modelsprob[i, q + 1]
-    probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] <-
-      probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] + modelsprob[i, q + 1]
-  }
-
-  #HPM
-  nPmax <- which.max(modelsprob[, q+1])
-  hpm <- modelsprob[nPmax, ]
-
-  #MPM
-  mpm <- rep(0,q)
-  mpm[which(inclprob >= 0.5)] <- 1
+  #Summ up the posterior distribution
+  summ.posterior.list <- summ.posterior(L, all.models.PM, p, q, positions)
+  list2env(summ.posterior.list, envir = environment())
 
   if (!is.null(NAvars)) {
+    #Pool results for imputed datasets
     if (n.imp > 1) {
       #remove last dummy for each factor, first p0 vars are the fixed ones
       if (L > 0) imputation.array <- imputation.array[,-c(indf + p0),]
@@ -602,10 +366,7 @@ missingBVS.lm <- function (formula,
 
   if (!is.null(NAvars)) {
     #arguments used for imputation
-    result$imp.args <- list(parallelmice = parallelmice,
-                            imp.mice.method = imp.mice.method,
-                            imp.predict.mat = imp.predict.mat,
-                            n.imp = n.imp, imp.seed = imp.seed)
+    result$imp.args <- imp.args
 
     #save the imputed datasets for sensitivity analysis
     # raw.imp.array <- serialize(imputation.array, NULL)
@@ -626,6 +387,314 @@ missingBVS.lm <- function (formula,
   return(result)
 }
 
+#' @keywords internal
+exact.posterior.comput <- function (p, positions, positionsfac, lastd, l,
+                                    namesxnotnull, NAvars, lBF.method,
+                                    lprior.models, lprior.models.dummies,
+                                    X0, X.full, BF.approx.method) {
+  #Compute exact posterior distribution and normalizing constant
+
+  #progress bar for loop
+  pb <- txtProgressBar(min = 0,
+                       max = 2^p,
+                       style = 3,
+                       width = 50,
+                       char = "=")
+
+  #Posterior computation
+  all.models.lPM <- matrix(0, nr = 2^p, nc = p+1) #last column contains log(BF_a0*Pr(M))
+  for (i in seq_len(2^p-1)){ # null out of the loop
+    setTxtProgressBar(pb, i)
+
+    #transform the number of the model into a binary number
+    current.model <- BayesVarSel:::integer.base.b_C(i, p)
+    all.models.lPM[i, seq_len(p)] <- current.model
+
+    gt <- positions %*% current.model > 0 #covariates and/or factors active
+    d <- positionsfac %*% current.model #levels active of factors
+    t <- d > 0 #active factors
+
+    #check if the model is one among the saturated and oversaturated due to the dummies
+    if (sum(t) > 0) {
+      M <- t(apply(positionsfac, 1, function(x) x * current.model))
+      f.check <- (d == l) | ((d == l - 1) & lastd(M))
+      if (any(f.check)) {all.models.lPM[i, p+1] <- NA; next}
+    }
+
+    #check if there are NAs in the model considered to save computation time
+    if (any(namesxnotnull[which(current.model == 1)] %in% NAvars)) {
+      lBF.PM <- lBF.method(model = which(current.model == 1)) +
+        lprior.models(gt) + lprior.models.dummies(d, t) #log(BF_a0*Pr(M))
+    } else { #if there are no missings, compute the BF by the method selected
+      X.i <- cbind(X0, X.full[, which(current.model == 1)])
+      lBF.PM <- BF.approx.method(k = sum(current.model == 1), X = X.i) +
+        lprior.models(gt) + lprior.models.dummies(d, t) #log(BF_a0*Pr(M))
+    }
+    all.models.lPM[i, p+1] <- lBF.PM
+  }
+  setTxtProgressBar(pb, 2^p)
+  cat("\n")
+  #null model
+  all.models.lPM[2^p, seq_len(p)] <- numeric(p)
+  all.models.lPM[2^p, p+1] <- lprior.models(numeric(p)) #BF = 1 for null model
+  all.models.lPM <- na.omit(all.models.lPM) #remove repeated models
+
+  #renormalize
+  C <- sum(exp(all.models.lPM[, p+1]))
+  all.models.PM <- all.models.lPM
+  all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
+
+  return(list(all.models.PM = all.models.PM, C = C))
+}
+
+#' @keywords internal
+summ.posterior <- function (L, all.models.PM, p, q, positions) {
+  #Summ up the posterior distribution
+
+  if (L > 0) {
+    #compute models matrix at the covariate-factor level
+    cf.models.PM <- all.models.PM[,seq_len(p)] %*% t(positions)
+    cf.models.PM <- cbind(cf.models.PM, all.models.PM[,p+1])
+    colnames(cf.models.PM)[q+1] <- "Post"
+
+    modelsprob <- cbind(t(sapply(seq_len(2^q)-1,
+                                 function(j) BayesVarSel:::integer.base.b_C(j, q))), numeric(2^q))
+    for (i in seq_len(nrow(cf.models.PM))) {
+      modeli <- cf.models.PM[i, seq_len(q)] > 0
+      j <- which(apply(modelsprob[, seq_len(q)], 1, function(x) all(x == modeli)))
+      modelsprob[j, q + 1] <- modelsprob[j, q + 1] + cf.models.PM[i, q + 1]
+    }
+    colnames(modelsprob) <- colnames(cf.models.PM)
+  } else modelsprob <- all.models.PM
+
+  inclprob <- rep(0, q)
+  probdim <- rep(0, q + 1)
+  #compute inclusion probabilities (except for fixed variables) and
+  #posterior probability of the dimension of the true model
+  for (i in seq_len(nrow(modelsprob))) {
+    inclprob[which(modelsprob[i, seq_len(q)] == 1)] <-
+      inclprob[which(modelsprob[i, seq_len(q)] == 1)] + modelsprob[i, q + 1]
+
+    probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] <-
+      probdim[sum(modelsprob[i, seq_len(q)] == 1) + 1] + modelsprob[i, q + 1]
+  }
+
+  #HPM
+  nPmax <- which.max(modelsprob[, q+1])
+  hpm <- modelsprob[nPmax, ]
+
+  #MPM
+  mpm <- rep(0,q)
+  mpm[which(inclprob >= 0.5)] <- 1
+
+  return(list(modelsprob = modelsprob,
+              inclprob = inclprob, probdim = probdim, hpm = hpm, mpm = mpm))
+}
+
+#' @keywords internal
+buildmatrices <- function (formula, null.model, data) {
+  #Build data matrices and objects to use later
+
+  #Response and fixed vars for imputation
+  framenull <- model.frame(null.model, data, na.action = NULL)
+  q0 <- dim(framenull)[2] # number of fixed covariates and/or factors,intercept always
+
+  #Rank deficient fixed model matrix to remove vars from the regressors one
+  X0rdf <- model.matrix.rankdef(framenull)
+
+  #Missing model matrix of fixed vars
+  X0 <- model.matrix(framenull, data)
+  namesnull <- dimnames(X0)[[2]]
+  p0 <- dim(X0)[2] #Number of fixed covariates or dummies of factors
+
+  #Full design matrix given by formula
+  framefull <- model.frame(formula, data, na.action = NULL)
+  #Rank deficient full model matrix data with missings
+  X.full <- model.matrix.rankdef(framefull)
+  namesx <- dimnames(X.full)[[2]]
+  #Only the non-fixed vars
+  namesxnotnull <- setdiff(namesx, dimnames(X0rdf)[[2]])
+  X.full <- X.full[, namesxnotnull]
+  p <- length(namesxnotnull) #Number of covariates and levels of factors to select from
+
+  #the order for the posterior model distribution computation step
+  ordvars <- c(namesnull, namesxnotnull) #X0, X.full
+
+  #For factors:
+  #covariates and/or factors to select from
+  depvars <- setdiff(attr(terms(framefull), "term.labels"),
+                      attr(terms(framenull), "term.labels"))
+
+  #positions has number of rows equal to the number of regressors and p columns.
+  #A 1 in a row denotes the position in X of a regressor (several positions for
+  #the dummies of a factor).
+  positions <- t(sapply(depvars, function(var) {
+    if(is.factor(data[[var]])) {
+      levs <- levels(data[[var]])
+      ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
+    } else ind <- which(namesxnotnull == var) #1 if the name matches
+
+    posi <- rep(0,p); posi[ind] <- 1; posi
+  }))
+  colnames(positions) <- namesxnotnull
+
+  tmp <- colSums(positions %*% t(positions))
+  positionsx <- tmp == 1 #vector of length p with TRUE if numeric variable
+
+  L <- sum(!positionsx) #Number of factors to select from
+  if (L > 0) {
+    #matrix of dim (Lxp) with 1 if dummy variable of the row factor
+    positionsfac <- matrix(positions[!positionsx,], ncol = p, nrow = L)
+    rownames(positionsfac) <- depvars[!positionsx]
+    colnames(positionsfac) <- namesxnotnull
+
+    l <- tmp[tmp > 1] #Number of levels for each factor
+
+    #vector of length L with the position of the last dummy for each factor to check for repeated models
+    indf <- apply(positionsfac, MARGIN = 1, FUN = function(x) tail(which(x == 1), n = 1))
+    lastd <- ifelse(L > 1, function(M) diag(M[, indf]),  function(M) M[, indf])
+  } else {positionsfac <- l <- 0; indf <- lastd <- NULL}
+
+  q <- p - sum(l) + L #Number of factors and covariates to select from
+  #q = p if there are no factors
+
+  r <- list(q0 = q0, p0 = p0, X0 = X0, namesnull = namesnull, framenull = framenull,
+            q = q, p = p, X.full = X.full, namesxnotnull = namesxnotnull, namesx = namesx,
+            framefull = framefull, ordvars = ordvars, depvars = depvars,
+            positions = positions, positionsx = positionsx, positionsfac = positionsfac,
+            L = L, l = l, indf = indf, lastd = lastd)
+  return(r)
+}
+
+#' @keywords internal
+buildimputation <- function(NAvars, formula, data, imp.predict.mat, n.imp,
+                            n, q, p0, imp.time.test, imp.mice.method, imp.seed,
+                            parallelmice, n.core, obsnotNA, ordvars,
+                            BF.approx.method) {
+  #Build imp.predict matrix to imputation, imputed datasets and BF function
+
+  #Impute just competing variables with NAs
+  fulldataframe <- model.frame(paste0(formula[[2]], "~."), data, na.action = NULL)
+  X.toimp <- fulldataframe[,-1] #full observed design matrix
+  quickpredict.mat <- mice::quickpred(X.toimp)
+  if (!is.null(imp.predict.mat)) { #if given by user
+    #check predict imputation matrix
+    imp.vars <- rownames(imp.predict.mat)
+    if (any(NAvars %notin% imp.vars)) {
+      stop(paste0("Imputation prediction matrix rows given do not contain all the variables ",
+                  "given by formula with NAs.", "Make sure to include them all.\n"))
+    }
+    quickpredict.mat[imp.vars, colnames(imp.predict.mat)] <- imp.predict.mat
+    quickpredict.mat[imp.vars, colnames(quickpredict.mat) %notin% colnames(imp.predict.mat)] <- 0
+  } else imp.vars <- NAvars
+
+  #Do not impute variables with missings that are not in imp.vars (also in NAvars)
+  not.imp.vars <- setdiff(attr(terms(fulldataframe), "term.labels"), imp.vars)
+  quickpredict.mat[not.imp.vars, ] <- 0
+
+  #Imputation of missing data
+  if (is.null(parallelmice)) {
+    if (n.imp > 120 | (n*q > 50000 & n.imp > 5)) {
+      parallelmice <- TRUE #faster
+    } else parallelmice <- FALSE
+  }
+
+  if (imp.time.test & (n*q > 10000 | n.imp > 039E1)) {
+    #test imputation time
+    cat("Time test . . . \n")
+    time.test <- mice.imputation(X = X.toimp, formula,
+                                 imp.predict.mat = quickpredict.mat,
+                                 imp.mice.method = imp.mice.method,
+                                 parallel = parallelmice,
+                                 n.core = n.core,
+                                 time.test = TRUE)
+
+    estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to time
+    cat("The whole imputation can take ", estim.time,
+        "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
+    if (tolower(readline()) != "y") {
+      if (!parallelmice) {
+        cat("Do you want to faster imputation running a parallel version of mice? (y/n)\n")
+        if (tolower(readline()) == "y") {
+          parallelmice <- TRUE
+        } else stop("Reduce the number of imputed datasets.\n")
+      } else stop("Reduce the number of imputed datasets.\n")
+    }
+  }
+
+  cat("Performing imputation of missing data with mice's", imp.mice.method)
+  if (parallelmice) cat(" parallel")
+  cat(" method.\n", "Please wait . . . \n")
+
+  imputation.array <-  mice.imputation(X = X.toimp, formula,
+                                       n.imp = n.imp,
+                                       imp.predict.mat = quickpredict.mat,
+                                       imp.mice.method = imp.mice.method,
+                                       seed = imp.seed,
+                                       parallel = parallelmice,
+                                       n.core = n.core)
+
+  #remove observations with missings on the response or fixed vars,
+  #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
+  imputation.array <- imputation.array[obsnotNA, ordvars,]
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model as an average of BF computed
+    #by BF.approx.method over the imputed datasets
+    lBF.method <- function (model) lBF.approx(model,
+                                              imputation.array = imputation.array,
+                                              BF.approx.method = BF.approx.method,
+                                              p0 = p0, n.imp = n.imp)
+  } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                         X = imputation.array[,c(1:p0, model+p0)])
+
+  imp.args <- list(parallelmice = parallelmice, imp.mice.method = imp.mice.method,
+                   imp.predict.mat = imp.predict.mat, n.imp = n.imp, imp.seed = imp.seed)
+
+  return(list(imputation.array = imputation.array, lBF.method = lBF.method, imp.args = imp.args))
+}
+
+"%notin%" <- function(x, table) match(x, table, nomatch = 0) == 0 #auxiliar function
+
+#' @keywords internal
+checkBvsarguments <- function (p, p0, namesnull, namesx, n.keep, q) {
+  #check arguments
+  #Is there any variable to select from?
+  if (p == 0) {
+    stop(paste0("The number of fixed variables is equal to the number of\n",
+                "regressors in the full model. No model selection can be done.\n"))
+  }
+
+  #check if the number of regressors is too big.
+  if (p > 20) {
+    warning("Number of regressors too big. . . consider using the Gibbs version.\n",
+            immediate. = TRUE)
+  }
+
+  #check if null model is contained in the full one:
+  for (i in 1:p0){
+    if (namesnull[i] %notin% namesx) {
+      stop(paste0("Error in var: ", namesnull[i],"; null model not nested in full model.\n"))
+    }
+  }
+
+  #n.keep > 2^q, the number of models?
+  if(is.character(n.keep)) {
+    if (n.keep == "all") {
+      # n.keep <- 2^(q - L)*prod(2^l - l)
+      n.keep <- 2^q
+    } else stop("Only n.keep='all' or type the exact number of models to keep instead.\n")
+  }
+  if (n.keep > 2^q) {
+    cat(paste0("The number of models to keep (", n.keep,
+               ") is larger than the total number of models (", 2^q,
+               ") and it has been set to ", 2^q,".\n"))
+    # n.keep <- 2^(q - L)*prod(2^l - l)
+    n.keep <- 2^q
+  }
+  return(n.keep)
+}
+
+#' @keywords internal
 checkformissings <- function (y, X0 = NULL, X.full) {
   #checks if there are missings on the response and regressors
   #and returns the name of non-fixed regressors with missings
@@ -649,8 +718,7 @@ checkformissings <- function (y, X0 = NULL, X.full) {
   return(NAvars)
 }
 
-"%notin%" <- function(x, table) match(x, table, nomatch = 0) == 0 #auxiliar function
-
+#' @keywords internal
 checkforprior.models <- function (prior.models, priorprobs, p) {
   #checks that the model prior given by prior.models is implemented and returns
   #the function to use for model prior computation
@@ -678,6 +746,7 @@ checkforprior.models <- function (prior.models, priorprobs, p) {
   return(prior.models.f)
 }
 
+#' @keywords internal
 checkforprior.models.dummies <- function (prior.models.dummies, l) {
   #checks that the model prior given by prior.models.dummies is implemented and
   #returns the function to use for model prior computation
@@ -693,6 +762,7 @@ checkforprior.models.dummies <- function (prior.models.dummies, l) {
   return(prior.models.f)
 }
 
+#' @keywords internal
 checkforprior.betas.lm <- function (BF.approx.method, prior.betas, n, p, p0, y, SS0) {
   #checks that the Bayes factor computation method given by BF.approx.method and prior.betas
   #is implemented and returns the function to use for Bayes factor computation on lm
