@@ -75,10 +75,9 @@
 #' data("airquality")
 #'
 #' #Default choices are: Constant prior and 390 imputed datasets.
-#' models.list = list(M0 = Solar.R ~ 1, M1 = Solar.R ~ Ozone,
-#'   M2 = Solar.R ~ Wind, M3 = Solar.R ~ Temp,
-#'   M4 = Solar.R ~ Ozone + Wind, M5 = Solar.R ~ Ozone + Temp,
-#'   M6 = Solar.R ~ Ozone + Wind + Temp)
+#' models.list = list(M0 = Ozone ~ 1, M1 = Ozone ~ Solar.R,
+#'   M2 = Ozone ~ Wind, M3 = Ozone ~ Temp, M4 = Ozone ~ Solar.R + Wind,
+#'   M5 = Ozone ~ Solar.R + Temp, M6 = Ozone ~ Solar.R + Wind + Temp)
 #'
 #' airq.mtest <- missingBtestGD25(data = airquality, models = models.list)
 #'
@@ -90,11 +89,11 @@
 missingBtestGD25 <- function (data,
                               models,
                               prior.models = "Constant",
-                              priorprobs = NULL, #needed if prior.models = "User"
+                              priorprobs = NULL,
                               imp.time.test = TRUE,
-                              initialimp.mice.method = "pmm", #mice's default
+                              initialimp.mice.method = "norm",
                               n.imp = 039E1,
-                              imp.seed = runif(1,0,09011975)) { #seed for the imputation
+                              imp.seed = runif(1,0,09011975)) {
 
   #N is the number of models:
   N <- length(models)

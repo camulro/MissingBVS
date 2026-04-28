@@ -107,7 +107,7 @@
 #' data("airquality")
 #'
 #' #Here we keep the 8 competing models:
-#' f <- Solar.R ~ 1 + Ozone + Wind + Temp
+#' f <- Ozone ~ 1 + Wind + Temp + Solar.R
 #' airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
 #'
 #' #Show the results:
@@ -124,12 +124,12 @@
 missingGD25 <- function (formula,
                          data,
                          prior.models = "ScottBerger",
-                         priorprobs = NULL, #needed if prior.models = User
+                         priorprobs = NULL,
                          n.keep = 10,
                          imp.time.test = TRUE,
-                         initialimp.mice.method = "pmm", #mice's default
-                         n.imp = 039E1, #number of imputed datasets for BF
-                         imp.seed = runif(1,0,09011975)) { #seed for the imputation
+                         initialimp.mice.method = "norm",
+                         n.imp = 039E1,
+                         imp.seed = runif(1,0,09011975)) {
 
   time <- Sys.time()
 

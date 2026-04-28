@@ -89,9 +89,8 @@
 #' if the column dummy corresponds to the row factor and 0 otherwise}
 #' \item{positionsx}{Logical vector of length p indicating whether or not the
 #' variable is a numerical covariate}
-#' \item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
-#' most probable a posteriori models and their associated Bayes factor in
-#' logaritmic scale}
+#' \item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+#' summaries the keeped models and their associated Bayes factor in logaritmic scale}
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
 #' explanatory variables}
 #' \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}

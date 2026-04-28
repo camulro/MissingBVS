@@ -47,11 +47,14 @@
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
 #' Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 #'
+#' Chang, T. and Eaves, D. (1990) Reference Priors for the Orbit in a Group Model.
+#' The Annals of Statistics. 18: 1595–1614.
+#'
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 #' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 #'
 MC.imputation <- function(X, nMC = 039E1,
-                          seed = runif(1,0,09011975), initialimp.mice.method = "pmm",
+                          seed = runif(1,0,09011975), initialimp.mice.method = "norm",
                           time.test = FALSE){
   #(Works for continuous covariates)
 

@@ -79,8 +79,8 @@
 #' \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 #' \item{MPMbin}{Binary expression of the Median Probability model using
 #' \code{inclprobRB}}
-#' \item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
-#' most probable a posteriori models and their associated probability}
+#' \item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+#' summaries the keeped models and their associated Bayes factor in logaritmic scale}
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
 #' explanatory variables.}
 #' \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
@@ -129,7 +129,7 @@
 #' data("airquality")
 #'
 #' #Here we keep the 8 competing models:
-#' f <- Solar.R ~ 1 + Ozone + Wind + Temp
+#' f <- Ozone ~ 1 + Wind + Temp + Solar.R
 #' airq.mGBVS <- missingGibbsGD25(formula = f, data = airquality)
 #'
 #' #Show the results:
@@ -146,16 +146,16 @@
 missingGibbsGD25 <- function (formula,
                               data,
                               prior.models = "ScottBerger",
-                              priorprobs = NULL, #needed if prior.models = User
+                              priorprobs = NULL,
                               init.model = "Full",
-                              n.iter = 10000, #number of iterations for Gibbs Sampling algorithm
+                              n.iter = 10000,
                               n.burnin = 500,
                               n.thin = 1,
                               imp.time.test = TRUE,
-                              initialimp.mice.method = "pmm", #mice's default
-                              n.imp = 039E1, #number of imputed datasets for BF
-                              Gibbs.seed = runif(1,0,26061970), #seed for the Gibbs sampling
-                              imp.seed = runif(1,0,09011975)) { #seed for the imputation
+                              initialimp.mice.method = "norm",
+                              n.imp = 039E1,
+                              Gibbs.seed = runif(1,0,26061970),
+                              imp.seed = runif(1,0,09011975)) {
 
   time <- Sys.time()
 
