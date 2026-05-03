@@ -8,7 +8,7 @@ MC.imputation(
   X,
   nMC = 390,
   seed = runif(1, 0, 9011975),
-  initialimp.mice.method = "pmm",
+  initialimp.mice.method = "norm",
   time.test = FALSE
 )
 }
@@ -36,7 +36,7 @@ covariance matrices}
 \item{rmu}{Vector of dimension px\code{nMC} containing the corresponding means}
 }
 \description{
-Performs the multiple imputation developed by García-Donato et al (2025) for
+Performs the multiple imputation used by García-Donato et al (2025) for
 continuous and normally distributed covariates to compute Bayesian Variable
 Selection in the presence of missing data.
 }
@@ -58,6 +58,9 @@ plot.MissingBVS.imputation(X = airquality, imputation = imp.air,
 García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
 Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
+
+Chang, T. and Eaves, D. (1990) Reference Priors for the Orbit in a Group Model.
+The Annals of Statistics. 18: 1595–1614.
 
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.

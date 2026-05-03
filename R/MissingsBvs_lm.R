@@ -264,8 +264,8 @@ missingBVS.lm <- function (formula,
   #Imputation step
   if (!is.null(NAvars)) {
     buildimputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat,
-                                n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
-                                parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
+                                            n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
+                                            parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
     list2env(buildimputation.list, envir = environment())
   }
 
@@ -292,7 +292,7 @@ missingBVS.lm <- function (formula,
   list2env(posterior.list, envir = environment())
 
   #Summ up the posterior distribution
-  summ.posterior.list <- summ.posterior(L, all.models.PM, p, q, positions)
+  summ.posterior.list <- summ.posterior(all.models.PM, p, q, L, positions)
   list2env(summ.posterior.list, envir = environment())
 
   if (!is.null(NAvars)) {
@@ -340,9 +340,10 @@ missingBVS.lm <- function (formula,
     result$positionsx <- positionsx
   }
 
+  #The binary code for the n.keep best models and the correspondent post
   result$modelsprob <- modelsprob[order(modelsprob[,q+1],
                                         decreasing = TRUE)[seq_len(n.keep)],]
-  #The binary code for the n.keep best models and the correspondent post
+
   result$inclprob <- inclprob #inclusion probability for each variable
   names(result$inclprob) <- depvars
 
@@ -352,8 +353,8 @@ missingBVS.lm <- function (formula,
   result$call <- match.call()
 
   if(!identical(lprior.models, logUser)){
-    priorprobs <- rep(0, q + 1)
-    priorprobs[1] <- exp(lprior.models(rep(0, q))) #prior inclusion prob for dimension 0
+    priorprobs <- numeric(q+1)
+    priorprobs[1] <- exp(lprior.models(numeric(q))) #prior inclusion prob for dimension 0
     for (i in seq_len(q)) {
       priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, q - i))) + lchoose(q, i))
       #prior inclusion probability for each dimension
@@ -443,12 +444,13 @@ exact.posterior.comput <- function (p, positions, positionsfac, lastd, l,
   C <- sum(exp(all.models.lPM[, p+1]))
   all.models.PM <- all.models.lPM
   all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
+  colnames(all.models.PM) <- c(namesxnotnull, "Post")
 
   return(list(all.models.PM = all.models.PM, C = C))
 }
 
 #' @keywords internal
-summ.posterior <- function (L, all.models.PM, p, q, positions) {
+summ.posterior <- function (all.models.PM, p, q, L, positions) {
   #Summ up the posterior distribution
 
   if (L > 0) {
@@ -467,8 +469,8 @@ summ.posterior <- function (L, all.models.PM, p, q, positions) {
     colnames(modelsprob) <- colnames(cf.models.PM)
   } else modelsprob <- all.models.PM
 
-  inclprob <- rep(0, q)
-  probdim <- rep(0, q + 1)
+  inclprob <- numeric(q)
+  probdim <- numeric(q+1)
   #compute inclusion probabilities (except for fixed variables) and
   #posterior probability of the dimension of the true model
   for (i in seq_len(nrow(modelsprob))) {

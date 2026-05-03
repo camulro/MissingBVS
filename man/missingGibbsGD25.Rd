@@ -14,7 +14,7 @@ missingGibbsGD25(
   n.burnin = 500,
   n.thin = 1,
   imp.time.test = TRUE,
-  initialimp.mice.method = "pmm",
+  initialimp.mice.method = "norm",
   n.imp = 390,
   Gibbs.seed = runif(1, 0, 26061970),
   imp.seed = runif(1, 0, 9011975)
@@ -78,8 +78,8 @@ the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model using
 \code{inclprobRB}}
-\item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
-most probable a posteriori models and their associated probability}
+\item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+summaries the keeped models and their associated Bayes factor in logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables.}
 \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
@@ -133,18 +133,18 @@ of the possible model dimensions.
 data("airquality")
 
 #Here we keep the 8 competing models:
-f <- Solar.R ~ 1 + Ozone + Wind + Temp
-airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+f <- Ozone ~ 1 + Wind + Temp + Solar.R
+airq.mGBVS <- missingGibbsGD25(formula = f, data = airquality)
 
 #Show the results:
-airq.mBVS
+airq.mGBVS
 
 #Summ up the results:
-summary(airq.mBVS)
+summary(airq.mGBVS)
 
 #A plot with the posterior inclusion probabilities for each competing variable
 #and the dimension probability of the true model:
-plot(airq.mBVS)
+plot(airq.mGBVS)
 }
 
 }

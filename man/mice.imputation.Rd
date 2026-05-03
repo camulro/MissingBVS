@@ -8,6 +8,7 @@ mice.imputation(
   X,
   formula,
   n.imp = 390,
+  imp.predict.mat = mice::quickpred(X),
   imp.mice.method = "pmm",
   seed = runif(1, 0, 9011975),
   parallel = n.imp > 120,
@@ -22,19 +23,26 @@ mice.imputation(
 
 \item{n.imp}{Number of imputed datasets to compute the average Bayes factor.}
 
+\item{imp.predict.mat}{\code{matrix} with p1 rows and \code{ncol(X)} columns,
+where p1 is the number of independent variables given by \code{formula} with
+\code{NAs}. Each entry equals 1 if the column variable is used as a predictor
+for the corresponding row variable in the \code{\link[mice]{mice}} imputation.
+By default, the \code{\link[mice]{quickpred}} function is used.}
+
 \item{imp.mice.method}{Method used by \code{\link[mice]{mice}} to impute the
-values. See \code{\link[mice]{mice}} for possible choices.}
+values. It can be a string or a vector of strings of length p1, where p1 is the number of independent
+variables given by \code{formula} with \code{NAs}.}
 
 \item{seed}{Seed chosen for the imputations.}
+
+\item{parallel}{Logical to indicate whether or not to use parallel
+\code{\link[mice]{mice}} imputation. By default performs parallel mice
+imputation if the number of imputations is big enough (\code{n.imp > 120}).}
 
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
 \item{time.test}{Logical to indicate whether to check time of performance with
 \code{n.imp = 30} or not.}
-
-\item{parallelmice}{Logical to indicate whether or not to use parallel
-\code{\link[mice]{mice}} imputation. By default performs parallel mice
-imputation if the number of imputations is big enough (\code{n.imp > 120}).}
 }
 \value{
 An object of class \code{MissingBVS.imputation}, an array of dimension

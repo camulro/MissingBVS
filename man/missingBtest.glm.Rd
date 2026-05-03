@@ -16,6 +16,7 @@ missingBtest.glm(
   prior.models.dummies = "ScottBerger",
   priorprobs = NULL,
   imp.mice.method = "pmm",
+  imp.predict.mat = NULL,
   parallelmice = NULL,
   n.core = NULL,
   imp.time.test = TRUE,
@@ -66,7 +67,15 @@ factor levels (to be literally specified). Possible choices are "Constant" and
 dimensional vector defining the prior model probabilities (used for chosen
 \code{prior.models}= "User"; see details).}
 
-\item{imp.mice.method}{Method for mice's imputation.}
+\item{imp.mice.method}{Method for mice's imputation. Can be a string or a
+vector of strings of length p1, where p1 is the number of independent
+variables given by \code{formula} with \code{NAs}.}
+
+\item{imp.predict.mat}{\code{matrix} with p1 rows and p2 columns, where p2
+is the number of variables used to impute. Each entry equals 1 if the
+column variable is used as a predictor for the corresponding row variable in the
+imputation step. By default, the \code{\link[mice]{quickpred}} function
+is used for the variables with NAs in formula and 0s for the rest of them.}
 
 \item{parallelmice}{Logital to indicate whether or not to use parallel
 \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
@@ -78,8 +87,6 @@ big enough.}
 \item{imp.time.test}{Logical to indicate whether to check or not time of performance
 of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
-
-\item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 
 \item{imp.seed}{Seed for imputation.}
 
@@ -114,6 +121,10 @@ if the column dummy corresponds to the row factor and 0 otherwise}
 \item{positionsx}{Logical vector of length p indicating whether or not the
 variable is a numerical covariate}
 \item{imp.args}{List of arguments used for the imputation step}
+\item{family}{Family function among \code{\link[stats]{family}} used to specify
+the error distribution and link function to be used in the model}
+\item{weights}{Weights vector used in the glm fitting process}
+\item{offset}{Offset vector used in the glm fitting process}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{prior.models}{Function used to compute the prior over the model space}
@@ -144,7 +155,7 @@ of the possible model dimensions.
 \examples{
 \dontrun{
 #Indian Prime Diabetes Data from VIM's package
-data.diabetes <- VIM::diabetes; data.diabetes$Outcome
+data.diabetes <- VIM::diabetes
 
 #Default choices are: BIC approximation, Constant prior and 390 imputed
 #datasets with mice's pmm method.

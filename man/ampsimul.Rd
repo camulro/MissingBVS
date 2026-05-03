@@ -44,6 +44,6 @@ van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 }
 \seealso{
-\code{\link[MissingBVS]{simul}} for the completed dataset.
+\code{\link[MissingBVS]{simul}} for the complete dataset.
 }
 \keyword{datasets}

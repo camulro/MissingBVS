@@ -155,23 +155,9 @@ missingBtest.lm <- function (data,
   #N is the number of models:
   N <- length(models)
 
-  if (!is.list(models)) stop("Argument models should be a list.\n")
-
-  #If competing models come wihtout a name, give one by default:
-  if (is.null(names(models))){
-    if (!is.null(null.model)) stop(paste0("Please provide a name for the competing models.\n",
-                                          "The null model must be in that list.\n"))
-    names(models) <- paste("model", seq_len(N), sep="")
-  }
-
-  #Check if the given null model is one of the competing models:
-  if (!is.null(null.model)){
-    relax.nest = TRUE
-    pos.user.null.model <- which(null.model == names(models))
-    if (length(pos.user.null.model) == 0) {
-      stop("The null model provided is not in the list of competing models.\n")
-    }
-  } else relax.nest = FALSE
+  #Check Btest given arguments
+  Btestarg.list <- checkBtestarguments(models, null.model)
+  list2env(Btestarg.list, envir = environment())
 
   SSE <- numeric(N) #SSEs for each model
   Dim <- rep(0L,N)
@@ -435,6 +421,33 @@ priormodels.btest <- function (prior.models, prior.models.dummies,
   }
 
   return(prior.models = prior.models)
+}
+
+#' @keywords internal
+checkBtestarguments <- function (models, null.model) {
+  #check arguments
+  if (!is.list(models)) stop("Argument models should be a list.\n")
+
+  #If competing models come wihtout a name, give one by default:
+  if (is.null(names(models))){
+    if (!is.null(null.model)) stop(paste0("Please provide a name for the competing models.\n",
+                                          "The null model must be in that list.\n"))
+    names(models) <- paste("model", seq_len(N), sep="")
+  }
+
+  #Check if the given null model is one of the competing models:
+  if (!is.null(null.model)){
+    relax.nest = TRUE
+    pos.user.null.model <- which(null.model == names(models))
+    if (length(pos.user.null.model) == 0) {
+      stop("The null model provided is not in the list of competing models.\n")
+    }
+
+    return(list(models = models, relax.nest = relax.nest,
+                pos.user.null.model = pos.user.null.model))
+  } else relax.nest = FALSE
+
+  return(list(models = models, relax.nest = relax.nest))
 }
 
 #' Print an object of class \code{MissingBtest}

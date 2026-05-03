@@ -116,6 +116,10 @@
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 #' model space)}
 #' \item{imp.args}{List of arguments used for the imputation step}
+#' \item{family}{Family function among \code{\link[stats]{family}} used to specify
+#' the error distribution and link function to be used in the model}
+#' \item{weights}{Weights vector used in the glm fitting process}
+#' \item{offset}{Offset vector used in the glm fitting process}
 #' \item{BF.approx.method}{Function used to compute Bayes factors}
 #' \item{prior.betas}{\code{prior.betas}}
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
@@ -225,8 +229,8 @@ missingGibbsBVS.glm <- function (formula,
   environment(null.model) <- environment()
 
   #for the C code
-  weights <- as.numeric(weights)
-  offset <- as.numeric(offset)
+  ws <- weights <- as.numeric(weights)
+  os <- offset <- as.numeric(offset)
   laplace <- as.integer(laplace)
 
   #Build matrices and objects needed later on
@@ -258,10 +262,13 @@ missingGibbsBVS.glm <- function (formula,
   n <- length(y) #observations without missings on the response
   devnull <- glmnull$deviance #deviance of the null model
 
+  weights <- weights[as.numeric(obsnotNA)]
+  offset <- offset[as.numeric(obsnotNA)]
+
   #Check approx method and priors chosen and define the function to be used
   BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
                                               n, p, p0, y, null.model,
-                                              data, family, devnull,
+                                              data[obsnotNA,], family, devnull,
                                               weights, offset, control, laplace)
 
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
@@ -331,8 +338,8 @@ missingGibbsBVS.glm <- function (formula,
   } else glmfull <- glm(formula,
                         data,
                         family = family,
-                        weights = weights,
-                        offset = offset,
+                        weights = ws,
+                        offset = os,
                         control = control)
 
   #result
@@ -357,21 +364,21 @@ missingGibbsBVS.glm <- function (formula,
     result$positionsx <- positionsx
   }
 
+  #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$modelsprob <- cf.models.lBF
 
-  #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
 
-  result$postprobdim <- probdim/sum(probdim) #vector with the estimated posterior dimension probability
+  result$postprobdim <- probdim #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:q + q0 #dimension of the true model
 
   result$call <- match.call()
   result$C <- C #estimated normilizing constant
 
   if(!identical(lprior.models, logUser)){
-    priorprobs <- rep(0, q + 1)
-    priorprobs[1] <- exp(lprior.models(rep(0, q))) #prior inclusion prob for dimension 0
+    priorprobs <- numeric(q+1)
+    priorprobs[1] <- exp(lprior.models(numeric(q))) #prior inclusion prob for dimension 0
     for (i in seq_len(q)) {
       priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, q - i))) + lchoose(q, i))
       #prior inclusion probability for each dimension
@@ -391,6 +398,11 @@ missingGibbsBVS.glm <- function (formula,
     # raw.imp.array <- serialize(imputation.array, NULL)
     # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
   }
+
+  #glm arguments
+  result$family <- family
+  result$weights <- weights
+  result$offset <- offset
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas

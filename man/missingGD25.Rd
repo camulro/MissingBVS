@@ -11,7 +11,7 @@ missingGD25(
   priorprobs = NULL,
   n.keep = 10,
   imp.time.test = TRUE,
-  initialimp.mice.method = "pmm",
+  initialimp.mice.method = "norm",
   n.imp = 390,
   imp.seed = runif(1, 0, 9011975)
 )
@@ -111,7 +111,7 @@ of the possible model dimensions.
 data("airquality")
 
 #Here we keep the 8 competing models:
-f <- Solar.R ~ 1 + Ozone + Wind + Temp
+f <- Ozone ~ 1 + Wind + Temp + Solar.R
 airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
 
 #Show the results:
@@ -146,7 +146,7 @@ Use \code{\link[MissingBVS]{MissingGibbsGD25}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
 }
 \author{
-Carolina Mulet and Gonzalo Garcia-Donato
+arolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
 \keyword{package}

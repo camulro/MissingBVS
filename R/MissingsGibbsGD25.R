@@ -168,7 +168,7 @@ missingGibbsGD25 <- function (formula,
   # isint <- sapply(aux, is.integer)
   # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
   if (sum(isnum) < dim(aux)[2]) {
-    stop("This method is only for continuous covariates.\n")
+    stop("This method is only for continuous covariates.\nTry missingGibbsBVS.lm instead.\n")
   }
 
   #Full design matrix
@@ -352,21 +352,21 @@ missingGibbsGD25 <- function (formula,
   result$MPMbin <- mpm #The binary code for the MPM model
   names(result$MPMbin) <- namesx
 
+  #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$modelsprob <- cf.models.lBF
 
-  #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
 
-  result$postprobdim <- probdim/sum(probdim) #vector with the estimated posterior dimension probability
+  result$postprobdim <- probdim #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:p + 1 #dimension of the true model
 
   result$call <- match.call()
   result$C <- C #estimated normilizing constant
 
   if(!identical(lprior.models, logUser)){
-    priorprobs <- rep(0, p + 1)
-    priorprobs[1] <- exp(lprior.models(rep(0, p))) #prior inclusion prob for dimension 0
+    priorprobs <- numeric(p+1)
+    priorprobs[1] <- exp(lprior.models(numeric(p))) #prior inclusion prob for dimension 0
     for (i in seq_len(p)) {
       priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, p - i))) + lchoose(p, i))
       #prior inclusion probability for each dimension

@@ -18,6 +18,7 @@ missingBtest.lm(
   n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
+  imp.predict.mat = NULL,
   n.imp = 390,
   imp.seed = runif(1, 0, 9011975)
 )
@@ -65,7 +66,15 @@ big enough.}
 of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
-\item{imp.mice.method}{Method for mice's imputation.}
+\item{imp.mice.method}{Method for mice's imputation. Can be a string or a
+vector of strings of length p1, where p1 is the number of independent
+variables given by \code{formula} with \code{NAs}.}
+
+\item{imp.predict.mat}{\code{matrix} with p1 rows and p2 columns, where p2
+is the number of variables used to impute. Each entry equals 1 if the
+column variable is used as a predictor for the corresponding row variable in the
+imputation step. By default, the \code{\link[mice]{quickpred}} function
+is used for the variables with NAs in formula and 0s for the rest of them.}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 

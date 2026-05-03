@@ -321,21 +321,21 @@ missingGibbsBVS.lm <- function (formula,
     result$positionsx <- positionsx
   }
 
+  #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$modelsprob <- cf.models.lBF
 
-  #The binary code for all the visited models (after n.thin is applied) and the correspondent post
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
 
-  result$postprobdim <- probdim/sum(probdim) #vector with the estimated posterior dimension probability
+  result$postprobdim <- probdim #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:q + q0 #dimension of the true model
 
   result$call <- match.call()
   result$C <- C #estimated normilizing constant
 
   if(!identical(lprior.models, logUser)){
-    priorprobs <- rep(0, q + 1)
-    priorprobs[1] <- exp(lprior.models(rep(0, q))) #prior inclusion prob for dimension 0
+    priorprobs <- numeric(q+1)
+    priorprobs[1] <- exp(lprior.models(numeric(q))) #prior inclusion prob for dimension 0
     for (i in seq_len(q)) {
       priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, q - i))) + lchoose(q, i))
       #prior inclusion probability for each dimension
@@ -500,6 +500,9 @@ summ.Gibbs <- function (cf.models.lPM, inclprobRB, q, n.iter, n.thin,
 
   inclprob <- colMeans(cf.models.lPM[,-(q+1)]) #inclusion probabilities except for fixed variables
 
+  dim.tab <- table(c(rowSums(cf.models.lPM[,-(q+1)]), 0:q))
+  probdim <- (dim.tab - 1) / dim(cf.models.lPM)[1] #posterior probability of the dimension of the true model
+
   cf.models.PM <- cf.models.lPM[,seq_len(q)]
   cf.models.PM <- cbind(cf.models.PM, exp(cf.models.lPM[, q + 1]))
   colnames(cf.models.PM)[q+1] <- "BF.PM"
@@ -522,14 +525,9 @@ summ.Gibbs <- function (cf.models.lPM, inclprobRB, q, n.iter, n.thin,
   cf.models.PM[, q + 1] <- exp(cf.models.lPM[, q + 1] - log(C))
   post <- cf.models.PM[, q + 1]
 
-  probdim <- rep(0, q + 1)
   cf.models.lBF <- cf.models.lPM
-  #compute posterior probability of the dimension of the true model and
   #save logBF for each model
   for (i in seq_len(floor(n.iter / n.thin))) {
-    probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] <-
-      probdim[sum(cf.models.PM[i, seq_len(q)] > 0) + 1] + cf.models.PM[i, q + 1]
-
     gt <- cf.models.lPM[i, seq_len(q)] > 0
     d <- cf.models.lPM[i, !positionsx]; t <- d > 0
     cf.models.lBF[i, q + 1] <- cf.models.lPM[i, q + 1] -

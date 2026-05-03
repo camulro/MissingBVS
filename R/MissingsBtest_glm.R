@@ -93,6 +93,10 @@
 #' \item{positionsx}{Logical vector of length p indicating whether or not the
 #' variable is a numerical covariate}
 #' \item{imp.args}{List of arguments used for the imputation step}
+#' \item{family}{Family function among \code{\link[stats]{family}} used to specify
+#' the error distribution and link function to be used in the model}
+#' \item{weights}{Weights vector used in the glm fitting process}
+#' \item{offset}{Offset vector used in the glm fitting process}
 #' \item{BF.approx.method}{Function used to compute Bayes factors}
 #' \item{prior.betas}{\code{prior.betas}}
 #' \item{prior.models}{Function used to compute the prior over the model space}
@@ -173,30 +177,16 @@ missingBtest.glm <- function (data,
   #N is the number of models:
   N <- length(models)
 
-  if (!is.list(models)) stop("Argument models should be a list.\n")
-
-  #If competing models come wihtout a name, give one by default:
-  if (is.null(names(models))){
-    if (!is.null(null.model)) stop(paste0("Please provide a name for the competing models.\n",
-                                          "The null model must be in that list.\n"))
-    names(models) <- paste("model", seq_len(N), sep="")
-  }
-
-  #Check if the given null model is one of the competing models:
-  if (!is.null(null.model)){
-    relax.nest = TRUE
-    pos.user.null.model <- which(null.model == names(models))
-    if (length(pos.user.null.model) == 0) {
-      stop("The null model provided is not in the list of competing models.\n")
-    }
-  } else relax.nest = FALSE
+  #Check Btest given arguments
+  Btestarg.list <- checkBtestarguments(models, null.model)
+  list2env(Btestarg.list, envir = environment())
 
   #check whether the family chosen is among the options provided by BAS
   inBAS <- checkforfamily(family, BF.approx.method)
 
   #for the C code
-  weights <- as.numeric(weights)
-  offset <- as.numeric(offset)
+  ws <- weights <- as.numeric(weights)
+  os <- offset <- as.numeric(offset)
   laplace <- as.integer(laplace)
 
   Dev <- numeric(N) #deviances for each model
@@ -257,18 +247,24 @@ missingBtest.glm <- function (data,
 
   #The response variable
   obsnotNA <- rownames(X0)
-  y <- model.response(framenull) #response variable without missings
+  y <- na.omit(model.response(framenull)) #response variable without missings
   n <- length(y)
   devnull <- Dev[nullmodel.pos]
 
   #is the response a factor?
   if (is.factor(y)) y <- y != levels(y)[1L]
+
+  weights <- weights[as.numeric(obsnotNA)]
+  offset <- offset[as.numeric(obsnotNA)]
   y[weights == 0] <- 0
+  print(y)
+  print(weights)
+  print(obsnotNA)
 
   #Check approx method and priors chosen and define the function to be used
   BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
                                               n, p = max(Dim), p0, y, null.model,
-                                              data, family, devnull,
+                                              data[obsnotNA,], family, devnull,
                                               weights, offset, control, laplace)
 
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
@@ -316,10 +312,10 @@ missingBtest.glm <- function (data,
                                    weights = weights, offset = offset, control = control)
       }
     } else modelspool[[j]] <- glm(models[[j]], data, family = family,
-                                  weights = weights, offset = offset, control = control)
+                                  weights = ws, offset = os, control = control)
   }
   modelspool[[nullmodel.pos]] <- glm(null.model, data, family = family,
-                                     weights = weights, offset = offset, control = control)
+                                     weights = ws, offset = os, control = control)
   names(modelspool) <- names(models)
 
   result <- list()
@@ -343,6 +339,11 @@ missingBtest.glm <- function (data,
     # raw.imp.array <- serialize(imputation.array, NULL)
     # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
   }
+
+  #glm arguments
+  result$family <- family
+  result$weights <- weights
+  result$offset <- offset
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas

@@ -98,13 +98,11 @@ missingBtestGD25 <- function (data,
   #N is the number of models:
   N <- length(models)
 
-  if (!is.list(models)) stop("Argument models should be a list.\n")
+  #Check Btest given arguments
+  Btestarg.list <- checkBtestarguments(models, NULL)
+  list2env(Btestarg.list, envir = environment())
 
   namesm <- names(models)
-  #If competing models come wihtout a name, give one by default:
-  if (is.null(namesm)){
-    namesm <- paste("model", 1:N, sep="")
-  }
 
   Dim <- rep(0L, N)
   lBFi0 <- lPriorModels <- PostProbi <- numeric(N)
@@ -120,7 +118,7 @@ missingBtestGD25 <- function (data,
     # isint <- sapply(aux, is.integer)
     # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
     if (sum(isnum) < dim(aux)[2]) {
-      stop("This method is only for continuous covariates.\n")
+      stop("This method is only for continuous covariates.\nTry missingBtest.lm instead.\n")
     }
     temp <- lm(formula = formula,
                data = data,

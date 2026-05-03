@@ -20,6 +20,7 @@ missingBVS.glm(
   n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
+  imp.predict.mat = NULL,
   n.imp = 390,
   imp.seed = runif(1, 0, 9011975),
   weights = rep.int(1, dim(data)[1]),
@@ -81,7 +82,15 @@ big enough.}
 of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
-\item{imp.mice.method}{Method for mice's imputation.}
+\item{imp.mice.method}{Method for mice's imputation. Can be a string or a
+vector of strings of length p1, where p1 is the number of independent
+variables given by \code{formula} with \code{NAs}.}
+
+\item{imp.predict.mat}{\code{matrix} with p1 rows and p2 columns, where p2
+is the number of variables used to impute. Each entry equals 1 if the
+column variable is used as a predictor for the corresponding row variable in the
+imputation step. By default, the \code{\link[mice]{quickpred}} function
+is used for the variables with NAs in formula and 0s for the rest of them.}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 
@@ -122,8 +131,8 @@ resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
 \item{positionsx}{Logical vector of length p indicating whether or not the
 variable is a numerical covariate}
-\item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
-most probable a posteriori models and their associated probability}
+\item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+summaries the keeped models and their associated Bayes factor in logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables}
 \item{postprobdim}{Posterior probabilities over the true model dimension}
@@ -132,6 +141,10 @@ explanatory variables}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 model space)}
 \item{imp.args}{List of arguments used for the imputation step}
+\item{family}{Family function among \code{\link[stats]{family}} used to specify
+the error distribution and link function to be used in the model}
+\item{weights}{Weights vector used in the glm fitting process}
+\item{offset}{Offset vector used in the glm fitting process}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
@@ -187,7 +200,7 @@ of the possible model dimensions.
 \dontrun{
 #Indian Prime Diabetes Data from VIM's package
 
-#Here we keep the 56 competing models:
+#Here we keep the 32 competing models:
 f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
 diabetes.mBVS <- missingBVS.glm(formula = f, data = VIM::diabetes,
   family = binomial(), n.keep = 32, n.imp = 100)
@@ -232,7 +245,7 @@ Use \code{\link[MissingBVS]{MissingGibbsBvs.glm}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
 }
 \author{
-Carolina Mulet and Gonzalo Garcia-Donato
+Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
 \keyword{package}

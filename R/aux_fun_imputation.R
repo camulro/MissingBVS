@@ -179,23 +179,36 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
   formula <- paste(formula)
 
   if (time.test) {time <- Sys.time(); n.imp <- 30} # to estimate imputation time
-  if (!parallel) {
-    imput <- mice::mice(X,
-                        meth = imp.mice.method,
-                        m = n.imp,
-                        predictorMatrix = imp.predict.mat,
-                        visitSequence = "monotone",
-                        printFlag = FALSE,
-                        seed = seed)
-   } else imput <- mice::futuremice(X,
-                                    meth = imp.mice.method,
-                                    m = n.imp,
-                                    predictorMatrix = imp.predict.mat,
-                                    visitSequence = "monotone",
-                                    parallelseed = seed,
-                                    n.core = n.core)
 
-  imps <- mice::complete(imput, action = "all") #extracts all at once
+  imp.warnings <- list()
+  imps <- withCallingHandlers({
+    if (!parallel) {
+      imput <- mice::mice(X,
+                          meth = imp.mice.method,
+                          m = n.imp,
+                          predictorMatrix = imp.predict.mat,
+                          visitSequence = "monotone",
+                          printFlag = FALSE,
+                          seed = seed)
+     } else imput <- mice::futuremice(X,
+                                      meth = imp.mice.method,
+                                      m = n.imp,
+                                      predictorMatrix = imp.predict.mat,
+                                      visitSequence = "monotone",
+                                      parallelseed = seed,
+                                      n.core = n.core)
+
+    mice::complete(imput, action = "all") #extracts all at once
+  },
+    warning = function(w) {imp.warnings <<- c(imp.warnings, list(w)); invokeRestart("muffleWarning")}
+  )
+
+  #Show unique warnings
+  imp.warnings.mess <- vapply(imp.warnings, function(w) w$message, character(1))
+  imp.warnings.mess <- unique(imp.warnings.mess)
+  for (w in imp.warnings.mess) {
+    warning(sprintf("[FROM MICE] %s", w), call. = FALSE)
+  }
 
   #Get final dim of full imputed datasets
   n <- nrow(X)

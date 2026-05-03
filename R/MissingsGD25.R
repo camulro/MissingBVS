@@ -142,7 +142,7 @@ missingGD25 <- function (formula,
   # isint <- sapply(aux, is.integer)
   # if (sum(isnum) < dim(aux)[2] | sum(isint) > 0) {
   if (sum(isnum) < dim(aux)[2]) {
-    stop("This method is only for continuous covariates.\n")
+    stop("This method is only for continuous covariates.\nTry missingBvs.lm instead.\n")
   }
 
   #Full design matrix
@@ -245,8 +245,8 @@ missingGD25 <- function (formula,
   }
   setTxtProgressBar(pb, 2^p)
   #null model
-  all.models.lPM[2^p, seq_len(p)] <- rep(0, p)
-  all.models.lPM[2^p, p+1] <- lprior.models(rep(0, p)) #BF = 1 for null model
+  all.models.lPM[2^p, seq_len(p)] <- numeric(p)
+  all.models.lPM[2^p, p+1] <- lprior.models(numeric(p)) #BF = 1 for null model
 
   #renormalize
   C <- sum(exp(all.models.lPM[, p+1]))
@@ -255,7 +255,7 @@ missingGD25 <- function (formula,
   colnames(all.models.PM) <- c(namesx, "Post")
 
   #Summ up the posterior distribution
-  summ.posterior.list <- summ.posterior(0, all.models.PM, p, p, NULL)
+  summ.posterior.list <- summ.posterior(all.models.PM, p, p, 0, NULL)
   list2env(summ.posterior.list, envir = environment())
 
   if (!is.null(NAvars)) {
@@ -294,9 +294,10 @@ missingGD25 <- function (formula,
   result$MPMbin <- mpm #The binary code for the MPM model
   names(result$MPMbin) <- namesx
 
+  #The binary code for the n.keep best models (after n.thin is applied) and the correspondent post
   result$modelsprob <- all.models.PM[order(all.models.PM[,p+1],
                                            decreasing = TRUE)[seq_len(n.keep)],]
-  #The binary code for the n.keep best models (after n.thin is applied) and the correspondent post
+
   result$inclprob <- inclprob #inclusion probability for each variable
   names(result$inclprob) <- namesx
 
@@ -306,8 +307,8 @@ missingGD25 <- function (formula,
   result$call <- match.call()
 
   if(!identical(lprior.models, logUser)){
-    priorprobs <- rep(0, p + 1)
-    priorprobs[1] <- exp(lprior.models(rep(0, p))) #prior inclusion prob for dimension 0
+    priorprobs <- numeric(p+1)
+    priorprobs[1] <- exp(lprior.models(numeric(p))) #prior inclusion prob for dimension 0
     for (i in seq_len(p)) {
       priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, p - i))) + lchoose(p, i))
       #prior inclusion probability for each dimension

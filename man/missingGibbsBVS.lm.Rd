@@ -22,6 +22,7 @@ missingGibbsBVS.lm(
   n.core = NULL,
   imp.time.test = TRUE,
   imp.mice.method = "pmm",
+  imp.predict.mat = NULL,
   n.imp = 390,
   Gibbs.seed = runif(1, 0, 26061970),
   imp.seed = runif(1, 0, 9011975)
@@ -85,7 +86,15 @@ big enough.}
 of the imputation process with \code{n.imp = 30} if the number of variables or
 the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
 
-\item{imp.mice.method}{Method for mice's imputation.}
+\item{imp.mice.method}{Method for mice's imputation. Can be a string or a
+vector of strings of length p1, where p1 is the number of independent
+variables given by \code{formula} with \code{NAs}.}
+
+\item{imp.predict.mat}{\code{matrix} with p1 rows and p2 columns, where p2
+is the number of variables used to impute. Each entry equals 1 if the
+column variable is used as a predictor for the corresponding row variable in the
+imputation step. By default, the \code{\link[mice]{quickpred}} function
+is used for the variables with NAs in formula and 0s for the rest of them.}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 
@@ -116,9 +125,8 @@ resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
 \item{positionsx}{Logical vector of length p indicating whether or not the
 variable is a numerical covariate}
-\item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
-most probable a posteriori models and their associated Bayes factor in
-logaritmic scale}
+\item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+summaries the keeped models and their associated Bayes factor in logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables}
 \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
