@@ -76,6 +76,8 @@
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 #' model space)}
 #' \item{imp.args}{List of arguments used for the imputation step}
+#' \item{compress.imp.list}{Compressed list of imputed datasets and covariance
+#' matrices}
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
 #' \item{method}{\code{Full}}
 #'
@@ -195,7 +197,7 @@ missingGD25 <- function (formula,
                                    initialimp.mice.method = initialimp.mice.method)
 
   #remove observations with missings on the response
-  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA,,]
+  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA, , , drop = FALSE]
   #function to compute log(BFa0) for a given model with García-Donato's 2025 method
   lBF.method <- function (model) lBF.miss(model,
                                           imputation.list = imputation.list,
@@ -208,7 +210,7 @@ missingGD25 <- function (formula,
                                             imputation.list = imputation.list,
                                             BF.miss.aux = BF.miss.aux,
                                             n = n, nMC = n.imp)
-  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model],
+  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model,],
                                                     Sigma11 = imputation.list$rSigma[model, model,],
                                                     k = length(model))
 
@@ -258,9 +260,7 @@ missingGD25 <- function (formula,
   summ.posterior.list <- summ.posterior(all.models.PM, p, p, 0, NULL)
   list2env(summ.posterior.list, envir = environment())
 
-  if (!is.null(NAvars)) {
-    #Pool results for imputed datasets
-    if (n.imp > 1) {
+  if (!is.null(NAvars)) {#Pool results for imputed datasets
       #Evaluate lm of full model with missings using Rubin's rule
       fit <- list()
       mt <- attr(framefull, "terms")
@@ -272,11 +272,7 @@ missingGD25 <- function (formula,
         fit[[i]] <- z
       }
       lmfull <- mice::pool(fit)
-    } else {
-      #compute lm.fit for the unique imputation
-      lmfull <- lm.fit(x = cbind(1, imputation.list$rX.imput), y = y)
-    }
-  } else lmfull <- lm(formula, data)
+  } else lmfull <- lm(formula, data, x = TRUE, y = TRUE)
 
   ##result
   result <- list()
@@ -323,9 +319,9 @@ missingGD25 <- function (formula,
   result$imp.args <- list(initialimp.mice.method = initialimp.mice.method,
                           n.imp = n.imp, imp.seed = imp.seed)
 
-  #save the imputed datasets for sensitivity analysis
-  # raw.imp.array <- serialize(imputation.array, NULL)
-  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+  #save the imputed datasets for BMA or sensitivity analysis
+  raw.imp.list <- serialize(imputation.list, NULL)
+  result$compress.imp.list <- memCompress(raw.imp.list, type = "xz")
 
   result$logprior.models <- lprior.models #function used for model prior
 

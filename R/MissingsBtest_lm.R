@@ -60,6 +60,8 @@
 #' imputation step. By default, the \code{\link[mice]{quickpred}} function
 #' is used for the variables with NAs in formula and 0s for the rest of them.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
+#' @param imp.datasets Array or list for imputed datasets if given by user. By
+#' default \code{NULL} and imputation is performed following the other parameters.
 #' @param imp.seed Seed for imputation.
 
 #' @return \code{\link[MissingBVS]{MissingBtest.lm}} returns an object of type
@@ -150,6 +152,7 @@ missingBtest.lm <- function (data,
                              imp.mice.method = "pmm",
                              imp.predict.mat = NULL,
                              n.imp = 039E1,
+                             imp.datasets = NULL,
                              imp.seed = runif(1,0,09011975)) {
 
   #N is the number of models:
@@ -163,10 +166,12 @@ missingBtest.lm <- function (data,
   Dim <- rep(0L,N)
   mt <- list() #list of terms for each model
 
-  #list that contains the names of the variables or factors in each model
-  covar.list <- list()
+  covar.list <- list() #list that contains the names of the variables in each model
+  compvars <- c() #name of original competing vars
   for (i in seq_len(N)) {
-    temp <- lm(formula = as.formula(models[[i]]),
+    f <- as.formula(models[[i]])
+    compvars <- c(compvars, attr(terms(f), "term.labels"))
+    temp <- lm(formula = f,
                data = data,
                y = TRUE, x = TRUE)
 
@@ -178,9 +183,10 @@ missingBtest.lm <- function (data,
     mt[[i]] <- temp$terms
   }
   ordered.SSE <- sort(SSE, index.return = TRUE, decreasing = TRUE)
-  #Which acts as null model:
+  #Which one acts as null model:
   nullmodel.pos <- ordered.SSE$ix[1]
 
+  #Check null model
   if (!is.null(null.model)){
     if (nullmodel.pos != pos.user.null.model){
       stop(paste0("The given null model does not coincide with the one with the\n",
@@ -191,9 +197,9 @@ missingBtest.lm <- function (data,
   null.model <- as.formula(models[[nullmodel.pos]])
   competing.models <- seq_len(N)[-nullmodel.pos]
 
-  #Competing vars
-  compvars <- unique(unlist(covar.list))[-1] #remove intercept
-  full.formula <- as.formula(paste0(null.model[[2]], " ~ ", paste(compvars, collapse = " + ")))
+  #Competing vars full formula:
+  full.formula <- as.formula(paste0(null.model[[2]], " ~ ",
+                                    paste(unique(compvars), collapse = " + ")))
 
   #Build matrices and objects needed later on
   buildmatrices.list <- buildmatrices(full.formula, null.model, data)
@@ -223,10 +229,16 @@ missingBtest.lm <- function (data,
 
   #Imputation step
   if (!is.null(NAvars)) {
-    buildimputation.list <- buildimputation(NAvars, full.formula, data, imp.predict.mat,
-                                            n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
-                                            parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    list2env(buildimputation.list, envir = environment())
+    if (is.null(imp.datasets)) { #if not given imputed array
+      buildimputation.list <- buildimputation(NAvars, full.formula, data, imp.predict.mat,
+                                              n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
+                                              parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
+      list2env(buildimputation.list, envir = environment())
+    } else {
+      extimputation.list <- extimputation(full.formula, imp.datasets, n0 = dim(data)[1], framefull,
+                                          ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      list2env(extimputation.list, envir = environment())
+    }
   }
 
   #Posterior computation of model space defined by models list
@@ -241,23 +253,17 @@ missingBtest.lm <- function (data,
   for(j in competing.models){
     namesj <- which(namesxnotnull %in% covar.list[[j]])
     if (any(namesxnotnull[namesj] %in% NAvars)) {
-      if (n.imp > 1) {
-        fit <- list()
-        for (i in 1:n.imp) {
-          #remove last dummy for each factor, first q0 vars are the fixed ones
-          Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf) + p0),i]
-          z <- lm.fit(x = Xi, y = y)
-          z$terms <- mt[[j]]
-          class(z) <- "lm"
+      fit <- list()
+      for (i in 1:n.imp) {
+        #remove last dummy for each factor, first q0 vars are the fixed ones
+        Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf) + p0),i]
+        z <- lm.fit(x = Xi, y = y)
+        z$terms <- mt[[j]]
+        class(z) <- "lm"
 
-          fit[[i]] <- z
-        }
-        modelspool[[j]] <- mice::pool(fit)
-      } else {
-        #compute lm.fit for the unique imputation
-        Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf)  + p0)]
-        modelspool[[j]] <- lm.fit(x = Xi, y = y)
+        fit[[i]] <- z
       }
+      modelspool[[j]] <- mice::pool(fit)
     } else modelspool[[j]] <- lm(models[[j]], data)
   }
   modelspool[[nullmodel.pos]] <- lm(null.model, data)
@@ -313,43 +319,31 @@ posterior.btest <- function (competing.models, namesxnotnull, namesnull, covar.l
                   "Please define explicitly the null model if it is the case.\n"))
     }
 
-    tau <- (positionsfac %*% modeli) > 0; ltau <- (positionsfac %*% modeli)[tau]
+    pm <- positionsfac %*% modeli
+    tau <- pm > 0; ltau <- pm[tau]
     m2 <- sum(tau) #number of factors active
     if (m2 > 0) {
-      colsi <- which(colSums(matrix(positionsfac[which(tau),], nrow = m2)) > 0)
-      ind <- t(sapply(2:(2^ltau[1])-1, FUN =
-                        function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[1])))
-      rep <- which((rowSums(ind) == ltau[1]) |
-                     ((rowSums(ind) == (ltau[1] - 1)) &  ind[,ltau[1]]))
-      mat.ind <- matrix(ind[-rep,], ncol = ltau[1])
-      if (m2 > 1) {
-        for(j in 2:m2){
-          ind <- t(sapply(2:(2^ltau[j])-1, FUN =
-                            function(j2) BayesVarSel:::integer.base.b_C(j2, ltau[j])))
-          rep <- which((rowSums(ind) == ltau[j]) |
-                         ((rowSums(ind) == (ltau[j] - 1)) &  ind[,ltau[j]]))
-          ind <- matrix(ind[-rep,], ncol = ltau[j])
-          mat.ind <- merge(mat.ind, ind, by = NULL)
-        }
-      }
-      colnames(mat.ind) <- colsi
+      mats <- lapply(ltau, build_ind)
+      mat.ind <- Reduce(function(x, y) merge(x, y, by = NULL), mats)
+
+      cn <- which(colSums(positionsfac[which(tau), , drop = FALSE]) > 0)
+      colnames(mat.ind) <- cn
 
       lBF <- lpriorM <- numeric(nrow(mat.ind))
       for (j in 1:nrow(mat.ind)) {
-        deltaj <- mat.ind[j,]
-        deltasumj <- positionsfac[which(tau), colsi] %*% as.integer(deltaj)
+        dj <- as.integer(mat.ind[j,]); djsum <- positionsfac[which(tau), cn] %*% dj
 
         current.model <- as.integer(modeli)
-        current.model[colsi] <- as.integer(deltaj)
+        current.model[cn] <- dj
 
         #check if there are NAs in the model considered to save computation time
         if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
           lBF[j] <- lBF.method(model = which(current.model == 1)) #log(BF_a0)
-          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
+          lpriorM[j] <- lprior.models.dummies(djsum, ltau) #log(Pr(M_delta))
         } else { #if there are no missings, compute the BF by the method selected
           X.i <- cbind(X0, X.full[, which(current.model == 1)])
           lBF[j] <- BF.approx.method(k = sum(current.model == 1), X = X.i) #log(BF_a0)
-          lpriorM[j] <- lprior.models.dummies(deltasumj, ltau) #log(Pr(M_delta))
+          lpriorM[j] <- lprior.models.dummies(djsum, ltau) #log(Pr(M_delta))
         }
       }
       lBFi0[i] <- log(sum(exp(lBF + lpriorM)))
@@ -448,6 +442,15 @@ checkBtestarguments <- function (models, null.model) {
   } else relax.nest = FALSE
 
   return(list(models = models, relax.nest = relax.nest))
+}
+
+#' @keywords internal
+build_ind <- function(k) {
+  ind <- t(sapply(2:2^k - 1,
+                  FUN = function(j2) BayesVarSel:::integer.base.b_C(j2,k)))
+
+  rs <- rowSums(ind)
+  ind[!(rs == k | (rs == (k - 1) & ind[, k])), , drop = FALSE]
 }
 
 #' Print an object of class \code{MissingBtest}

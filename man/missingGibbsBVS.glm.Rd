@@ -150,9 +150,11 @@ resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
 \item{positionsx}{Logical vector of length p indicating whether or not the
 variable is a numerical covariate}
-\item{modelsprob}{\code{data.frame} which summaries the \code{n.keep}
-most probable a posteriori models and their associated Bayes factor in
-logaritmic scale}
+\item{modelsrankdeflogBF.PM}{A \code{floor(n.iter/n.thin)}xx(p+number of dummies+1)
+\code{matrix} which summaries the keeped models and their associated Bayes
+factor plus model prob in logaritmic scale}
+\item{modelslogBF}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+summaries the keeped models and their associated Bayes factor in logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables}
 \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
@@ -162,6 +164,7 @@ explanatory variables}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 model space)}
 \item{imp.args}{List of arguments used for the imputation step}
+\item{compress.imp.array}{Compressed array of imputed datasets}
 \item{family}{Family function among \code{\link[stats]{family}} used to specify
 the error distribution and link function to be used in the model}
 \item{weights}{Weights vector used in the glm fitting process}

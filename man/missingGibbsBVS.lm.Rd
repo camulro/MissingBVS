@@ -125,7 +125,10 @@ resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
 \item{positionsx}{Logical vector of length p indicating whether or not the
 variable is a numerical covariate}
-\item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+\item{modelsrankdeflogBF.PM}{A \code{floor(n.iter/n.thin)}xx(p+number of dummies+1)
+\code{matrix} which summaries the keeped models and their associated Bayes
+factor plus model prob in logaritmic scale}
+\item{modelslogBF}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
 summaries the keeped models and their associated Bayes factor in logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables}
@@ -135,6 +138,7 @@ explanatory variables}
 \item{call}{The \code{call} to the function}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
 \item{imp.args}{List of arguments used for the imputation step}
+\item{compress.imp.array}{Compressed array of imputed datasets}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}

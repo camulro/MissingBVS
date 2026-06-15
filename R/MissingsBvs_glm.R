@@ -92,6 +92,8 @@
 #' imputation step. By default, the \code{\link[mice]{quickpred}} function
 #' is used for the variables with NAs in formula and 0s for the rest of them.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
+#' @param imp.datasets Array or list for imputed datasets if given by user. By
+#' default \code{NULL} and imputation is performed following the other parameters.
 #' @param imp.seed Seed for imputation.
 #' @param weights NULL or numeric vector of the same length as \code{y} to
 #' specify the weights to be used in the glm fitting process.
@@ -124,6 +126,8 @@
 #' if the column dummy corresponds to the row factor and 0 otherwise}
 #' \item{positionsx}{Logical vector of length p indicating whether or not the
 #' variable is a numerical covariate}
+#' \item{modelsrankdefprob}{A (n.keep)x(p+number of dummies+1) \code{matrix} which
+#' summaries the \code{n.keep} most probable a posteriori models and their probabilities}
 #' \item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
 #' summaries the keeped models and their associated Bayes factor in logaritmic scale}
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
@@ -134,6 +138,7 @@
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 #' model space)}
 #' \item{imp.args}{List of arguments used for the imputation step}
+#' \item{compress.imp.array}{Compressed array of imputed datasets}
 #' \item{family}{Family function among \code{\link[stats]{family}} used to specify
 #' the error distribution and link function to be used in the model}
 #' \item{weights}{Weights vector used in the glm fitting process}
@@ -212,6 +217,7 @@ missingBVS.glm <- function (formula,
                             imp.mice.method = "pmm",
                             imp.predict.mat = NULL,
                             n.imp = 039E1,
+                            imp.datasets = NULL,
                             imp.seed = runif(1,0,09011975),
                             weights = rep.int(1, dim(data)[1]),
                             offset = rep.int(0, dim(data)[1]),
@@ -285,10 +291,16 @@ missingBVS.glm <- function (formula,
 
   #Imputation step
   if (!is.null(NAvars)) {
-    buildimputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat,
-                                            n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
-                                            parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    list2env(buildimputation.list, envir = environment())
+    if (is.null(imp.datasets)) { #if not given imputed array
+      buildimputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat,
+                                              n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
+                                              parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
+      list2env(buildimputation.list, envir = environment())
+    } else {
+      extimputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
+                                          ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      list2env(extimputation.list, envir = environment())
+    }
   }
 
   #Info:
@@ -307,7 +319,7 @@ missingBVS.glm <- function (formula,
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
   #Compute exact posterior distribution and normalizing constant
-  posterior.list <- exact.posterior.comput(p, positions, positionsfac, lastd, l,
+  posterior.list <- exact.posterior.comput(p, positions, positionsfac, firstd, l,
                                            namesxnotnull, NAvars, lBF.method,
                                            lprior.models, lprior.models.dummies,
                                            X0, X.full, BF.approx.method)
@@ -317,34 +329,28 @@ missingBVS.glm <- function (formula,
   summ.posterior.list <- summ.posterior(all.models.PM, p, q, L, positions)
   list2env(summ.posterior.list, envir = environment())
 
-  if (!is.null(NAvars)) {
-    #Pool results for imputed datasets
-    if (n.imp > 1) {
-      #remove last dummy for each factor, first p0 vars are the fixed ones
-      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0),]
-      #Evaluate glm of full model with missings using Rubin's rule
-      fit <- list()
-      mt <- attr(framefull, "terms")
-      for (i in 1:n.imp) {
-        z <- glm.fit(x = imputation.array[,,i], y = y, family = family,
-                     weights = weights, offset = offset, control = control)
-        z$terms <- mt
-        class(z) <- "glm"
+  if (!is.null(NAvars)) {#Pool results for imputed datasets
+    imp.array <- imputation.array
+    #remove first dummy on each factor, first p0 vars are the fixed ones
+    if (L > 0) imp.array <- imp.array[,-c(indf + p0), , drop = FALSE]
+    #Evaluate glm of full model with missings using Rubin's rule
+    fit <- list()
+    mt <- attr(framefull, "terms")
+    for (i in 1:n.imp) {
+      z <- glm.fit(x = imp.array[,,i], y = y, family = family,
+                   weights = weights, offset = offset, control = control)
+      z$terms <- mt
+      class(z) <- "glm"
 
-        fit[[i]] <- z
-      }
-      glmfull <- mice::pool(fit)
-    } else {
-      #compute glm.fit for the unique imputation
-      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0)]
-        glmfull <- glm.fit(x = imputation.array, y = y, family = family,
-                           weights = weights, offset = offset, control = control)
+      fit[[i]] <- z
     }
+    glmfull <- mice::pool(fit)
   } else glmfull <- glm(formula,
                         data,
+                        x = TRUE, y = TRUE,
                         family = family,
-                        weights = ws,
-                        offset = os,
+                        weights = weights,
+                        offset = offset,
                         control = control)
 
   #result
@@ -367,6 +373,7 @@ missingBVS.glm <- function (formula,
     #matrix for the factors index
     result$positions <- positionsfac
     result$positionsx <- positionsx
+    result$modelsrankdefprob <- all.models.PM # rank deficient models and probs
   }
 
   #The binary code for the n.keep best models and the correspondent post
@@ -398,9 +405,9 @@ missingBVS.glm <- function (formula,
     #arguments used for imputation
     result$imp.args <- imp.args
 
-    #save the imputed datasets for sensitivity analysis
-    # raw.imp.array <- serialize(imputation.array, NULL)
-    # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+    #save the imputed datasets for BMA or sensitivity analysis
+    raw.imp.array <- serialize(imputation.array, NULL)
+    result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
   }
 
   #glm arguments

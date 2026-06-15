@@ -65,7 +65,7 @@ MC.imputation <- function(X, nMC = 039E1,
                     dimnames = list(seq_len(n), colnames(X), seq_len(nMC)))
   rSigma <- array(0, dim=c(p, p, nMC),
                   dimnames = list(colnames(X), colnames(X), seq_len(nMC)))
-  rmu <- matrix(0, nr=p, nc=nMC)
+  rmu <- matrix(0, nr=p, nc=nMC, dimnames = list(colnames(X), seq_len(nMC)))
 
   if (p < 2) stop("It does not work with p<2")
 
@@ -98,7 +98,8 @@ MC.imputation <- function(X, nMC = 039E1,
       X.full[i,b] <- LaplacesDemon::rmvn(1, as.vector(thetab.mid.a), Sigmab.mid.a)
     }
 
-    rX.imput[,,s] <- scale(X.full[, drop = FALSE], center = TRUE, scale = FALSE) # already centered
+    rX.imput[,,s] <- scale(X.full[, drop = FALSE], center = TRUE, scale = FALSE) #center
+    # rX.imput[,,s] <- sweep(X.full[, drop = FALSE], 2, mu, FUN = "-") #center
     rSigma[,,s] <- Sigma
     rmu[,s] <- mu
   }
@@ -252,48 +253,48 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
 #'
 #' missing.model(airquality)
 #'
-missing.model <- function (data, formula = NULL, show = TRUE) {
-  #data is a matrix or dataframe
-  #formula can either be null or a model formula
-  data <- data.frame(data)
-
-  #if formula not provided, all variables from data are shown
-  if (is.null(formula)) {
-    data.model <- data
-  } else {
-    formula <- as.formula(formula)
-    data.model <- model.frame(formula, data, na.action = NULL)
-    data.model <- data.model[,which(colnames(data.model) != formula[[2]])] #remove response
-  }
-
-  #observations missed
-  O <- 1*(!is.na(data.model)) #1=observed, 0=missed
-  #the following units have at least one NA
-  these <- which(rowSums(O) < ncol(data.model))
-
-  if (length(these) == 0) {
-    stop("No missing values for the given model.\n")
-  }
-
-  mO <- O[these,]
-  rownames(mO) <- these
-
-  Total <- dim(data)[1] - colSums(O) #number of missings per variable
-  ord <- order(Total)
-
-  if (show) {
-    cat("\nVariables ordered by the number of missings:\n")
-    print(mO[,ord])
-    cat("---\n")
-    cat("Code: 0 = missed, 1 = observed\n")
-    cat("  Rows correspond to observations with missings.\n")
-    cat("---\nThe total number of missings per variable is:\n")
-    print(Total[ord])
-    cat("\n")
-  }
-  mO <- rbind(mO, Total)[,ord]
-  return(mO)
-}
+# missing.model <- function (data, formula = NULL, show = TRUE) {
+#   #data is a matrix or dataframe
+#   #formula can either be null or a model formula
+#   data <- data.frame(data)
+#
+#   #if formula not provided, all variables from data are shown
+#   if (is.null(formula)) {
+#     data.model <- data
+#   } else {
+#     formula <- as.formula(formula)
+#     data.model <- model.frame(formula, data, na.action = NULL)
+#     data.model <- data.model[,which(colnames(data.model) != formula[[2]])] #remove response
+#   }
+#
+#   #observations missed
+#   O <- 1*(!is.na(data.model)) #1=observed, 0=missed
+#   #the following units have at least one NA
+#   these <- which(rowSums(O) < ncol(data.model))
+#
+#   if (length(these) == 0) {
+#     stop("No missing values for the given model.\n")
+#   }
+#
+#   mO <- O[these,]
+#   rownames(mO) <- these
+#
+#   Total <- dim(data)[1] - colSums(O) #number of missings per variable
+#   ord <- order(Total)
+#
+#   if (show) {
+#     cat("\nVariables ordered by the number of missings:\n")
+#     print(mO[,ord])
+#     cat("---\n")
+#     cat("Code: 0 = missed, 1 = observed\n")
+#     cat("  Rows correspond to observations with missings.\n")
+#     cat("---\nThe total number of missings per variable is:\n")
+#     print(Total[ord])
+#     cat("\n")
+#   }
+#   mO <- rbind(mO, Total)[,ord]
+#   return(mO)
+# }
 
 #' Box-and-whisker plot for numerical observed and imputed data
 #'
@@ -409,7 +410,7 @@ plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
 
 #' @keywords internal
 ME <- function (n.imp, imp.seed) {
-  if (n.imp == 039 & imp.seed == 09011975) { #check for huge fans
+  if (n.imp == 039 & imp.seed == 09011975) { #check for Huge fans
     cat("\n--------------------------------------------------------------\n")
     cat(" In the loving memory of María Eugenia Castellanos (ME) . . . \n",
         " our dearest *missing* <3                                       \n\n")

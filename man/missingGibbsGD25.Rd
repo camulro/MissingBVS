@@ -78,7 +78,7 @@ the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model using
 \code{inclprobRB}}
-\item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+\item{modelslogBF}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
 summaries the keeped models and their associated Bayes factor in logaritmic scale}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
 explanatory variables.}
@@ -89,6 +89,8 @@ explanatory variables.}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 model space)}
 \item{imp.args}{List of arguments used for the imputation step}
+\item{compress.imp.list}{Compressed list of imputed datasets and covariance
+matrices}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
 \item{method}{\code{Gibbs}}
 }

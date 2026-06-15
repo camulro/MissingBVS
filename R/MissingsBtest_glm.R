@@ -65,6 +65,9 @@
 #' column variable is used as a predictor for the corresponding row variable in the
 #' imputation step. By default, the \code{\link[mice]{quickpred}} function
 #' is used for the variables with NAs in formula and 0s for the rest of them.
+#' @param n.imp Number of imputed data sets used for Bayes factor computation.
+#' @param imp.datasets Array or list for imputed datasets if given by user. By
+#' default \code{NULL} and imputation is performed following the other parameters.
 #' @param imp.seed Seed for imputation.
 #' @param weights NULL or numeric vector of the same length as \code{y} to
 #' specify the weights to be used in the glm fitting process.
@@ -168,6 +171,7 @@ missingBtest.glm <- function (data,
                               n.core = NULL,
                               imp.time.test = TRUE,
                               n.imp = 039E1,
+                              imp.datasets = NULL,
                               imp.seed = runif(1,0,09011975),
                               weights = rep.int(1, nrow(data)),
                               offset = rep.int(0, nrow(data)),
@@ -185,21 +189,21 @@ missingBtest.glm <- function (data,
   inBAS <- checkforfamily(family, BF.approx.method)
 
   #for the C code
-  ws <- weights <- as.numeric(weights)
-  os <- offset <- as.numeric(offset)
+  weights <- as.numeric(weights)
+  offset <- as.numeric(offset)
   laplace <- as.integer(laplace)
 
   Dev <- numeric(N) #deviances for each model
   Dim <- rep(0L,N)
   mt <- list() #list of terms for each model
 
-  #list that contains the names of the variables in each model
-  covar.list <- list()
+  covar.list <- list() #list that contains the names of the variables in each model
+  compvars <- c() #name of original competing vars
   for (i in seq_len(N)) {
-    #select environment to get glm arguments
-    formulai <- as.formula(models[[i]])
-    environment(formulai) <- environment()
-    temp <- glm(formula = formulai,
+    f <- as.formula(models[[i]])
+    compvars <- c(compvars, attr(terms(f), "term.labels"))
+    environment(f) <- environment() #select environment to get glm arguments
+    temp <- glm(formula = f,
                 data = data,
                 y = TRUE, x = TRUE,
                 family = family,
@@ -209,16 +213,17 @@ missingBtest.glm <- function (data,
 
     Dev[i] <- temp$deviance
 
-    framei <- model.frame(formulai, data, na.action = NULL)
+    framei <- model.frame(f, data, na.action = NULL)
     Xi <- model.matrix.rankdef(framei)
     covar.list[[i]] <- dimnames(Xi)[[2]]
     Dim[i] <- length(covar.list[[i]])
     mt[[i]] <- temp$terms
   }
   ordered.Dev <- sort(Dev, index.return = TRUE, decreasing = TRUE)
-  #Which acts as null model:
+  #Which one acts as null model:
   nullmodel.pos <- ordered.Dev$ix[1]
 
+  #Check null model
   if (!is.null(null.model)){
     if (nullmodel.pos != pos.user.null.model){
       stop(paste0("The given null model does not coincide with the one with\n",
@@ -230,9 +235,9 @@ missingBtest.glm <- function (data,
   environment(null.model) <- environment()
   competing.models <- seq_len(N)[-nullmodel.pos]
 
-  #Competing vars
-  compvars <- unique(unlist(covar.list))[-1] #remove intercept
-  full.formula <- as.formula(paste0(null.model[[2]], " ~ ", paste(compvars, collapse = " + ")))
+  #Competing vars full formula:
+  full.formula <- as.formula(paste0(null.model[[2]], " ~ ",
+                                    paste(unique(compvars), collapse = " + ")))
 
   #Build matrices and objects needed later on
   buildmatrices.list <- buildmatrices(full.formula, null.model, data)
@@ -256,10 +261,6 @@ missingBtest.glm <- function (data,
 
   weights <- weights[as.numeric(obsnotNA)]
   offset <- offset[as.numeric(obsnotNA)]
-  y[weights == 0] <- 0
-  print(y)
-  print(weights)
-  print(obsnotNA)
 
   #Check approx method and priors chosen and define the function to be used
   BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
@@ -274,10 +275,16 @@ missingBtest.glm <- function (data,
 
   #Imputation step
   if (!is.null(NAvars)) {
-    buildimputation.list <- buildimputation(NAvars, full.formula, data, imp.predict.mat,
-                                            n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
-                                            parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    list2env(buildimputation.list, envir = environment())
+    if (is.null(imp.datasets)) { #if not given imputed array
+      buildimputation.list <- buildimputation(NAvars, full.formula, data, imp.predict.mat,
+                                              n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
+                                              parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
+      list2env(buildimputation.list, envir = environment())
+    } else {
+      extimputation.list <- extimputation(full.formula, imp.datasets, n0 = dim(data)[1], framefull,
+                                          ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      list2env(extimputation.list, envir = environment())
+    }
   }
 
   #Posterior computation of model space defined by models list
@@ -292,30 +299,23 @@ missingBtest.glm <- function (data,
   for(j in competing.models){
     namesj <- which(namesxnotnull %in% covar.list[[j]])
     if (any(namesxnotnull[namesj] %in% NAvars)) {
-      if (n.imp > 1) {
-        fit <- list()
-        for (i in 1:n.imp) {
-          #remove last dummy for each factor, first q0 vars are the fixed ones
-          Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf)  + p0),i]
-          z <- glm.fit(x = Xi, y = y, family = family,
-                       weights = weights, offset = offset, control = control)
-          z$terms <- mt[[j]]
-          class(z) <- "glm"
+      fit <- list()
+      for (i in 1:n.imp) {
+        #remove last dummy for each factor, first q0 vars are the fixed ones
+        Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf)  + p0),i]
+        z <- glm.fit(x = Xi, y = y, family = family,
+                     weights = weights, offset = offset, control = control)
+        z$terms <- mt[[j]]
+        class(z) <- "glm"
 
-          fit[[i]] <- z
-        }
-        modelspool[[j]] <- mice::pool(fit)
-      } else {
-        #compute glm.fit for the unique imputation
-        Xi <- imputation.array[,c(1:p0, setdiff(namesj, indf)  + p0)]
-        modelspool[[j]] <- glm.fit(x = Xi, y = y, family = family,
-                                   weights = weights, offset = offset, control = control)
+        fit[[i]] <- z
       }
+      modelspool[[j]] <- mice::pool(fit)
     } else modelspool[[j]] <- glm(models[[j]], data, family = family,
-                                  weights = ws, offset = os, control = control)
+                                  weights = weights, offset = offset, control = control)
   }
   modelspool[[nullmodel.pos]] <- glm(null.model, data, family = family,
-                                     weights = ws, offset = os, control = control)
+                                     weights = weights, offset = offset, control = control)
   names(modelspool) <- names(models)
 
   result <- list()

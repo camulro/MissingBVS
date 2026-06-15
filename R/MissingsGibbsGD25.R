@@ -79,7 +79,7 @@
 #' \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 #' \item{MPMbin}{Binary expression of the Median Probability model using
 #' \code{inclprobRB}}
-#' \item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+#' \item{modelslogBF}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
 #' summaries the keeped models and their associated Bayes factor in logaritmic scale}
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
 #' explanatory variables.}
@@ -90,6 +90,8 @@
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 #' model space)}
 #' \item{imp.args}{List of arguments used for the imputation step}
+#' \item{compress.imp.list}{Compressed list of imputed datasets and covariance
+#' matrices}
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
 #' \item{method}{\code{Gibbs}}
 #'
@@ -221,14 +223,14 @@ missingGibbsGD25 <- function (formula,
                                    initialimp.mice.method = initialimp.mice.method)
 
   #remove observations with missings on the response
-  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA,,]
+  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA, , , drop = FALSE]
   if (n.imp > 1) {
     #function to compute log(BFa0) for a given model with García-Donato's 2025 method
     lBF.method <- function (model) lBF.miss(model,
                                             imputation.list = imputation.list,
                                             BF.miss.aux = BF.miss.aux,
                                             n = n, nMC = n.imp)
-  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model],
+  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model,],
                                                     Sigma11 = imputation.list$rSigma[model, model,],
                                                     k = length(model))
 
@@ -316,25 +318,19 @@ missingGibbsGD25 <- function (formula,
                                 lprior.models, function(d,t) 0, rep(1,p))
   list2env(summ.Gibbs.list, envir = environment())
 
-  if (!is.null(NAvars)) {
-    #Pool results for imputed datasets
-    if (n.imp > 1) {
-      #Evaluate lm of full model with missings using Rubin's rule
-      fit <- list()
-      mt <- attr(framefull, "terms")
-      for (i in 1:n.imp) {
-        z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
-        z$terms <- mt
-        class(z) <- "lm"
+  if (!is.null(NAvars)) {#Pool results for imputed datasets
+    #Evaluate lm of full model with missings using Rubin's rule
+    fit <- list()
+    mt <- attr(framefull, "terms")
+    for (i in 1:n.imp) {
+      z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
+      z$terms <- mt
+      class(z) <- "lm"
 
-        fit[[i]] <- z
-      }
-      lmfull <- mice::pool(fit)
-    } else {
-      #compute lm.fit for the unique imputation
-      lmfull <- lm.fit(x = cbind(1, imputation.list$rX.imput), y = y)
+      fit[[i]] <- z
     }
-  } else lmfull <- lm(formula, data)
+    lmfull <- mice::pool(fit)
+  } else lmfull <- lm(formula, data, x = TRUE, y = TRUE)
 
   #result
   result <- list()
@@ -353,7 +349,7 @@ missingGibbsGD25 <- function (formula,
   names(result$MPMbin) <- namesx
 
   #The binary code for all the visited models (after n.thin is applied) and the correspondent post
-  result$modelsprob <- cf.models.lBF
+  result$modelslogBF <- cf.models.lBF
 
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
@@ -383,8 +379,8 @@ missingGibbsGD25 <- function (formula,
                           n.imp = n.imp, imp.seed = imp.seed)
 
   #save the imputed datasets for sensitivity analysis
-  # raw.imp.array <- serialize(imputation.array, NULL)
-  # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+  raw.imp.list <- serialize(imputation.list, NULL)
+  result$compress.imp.list <- memCompress(raw.imp.list, type = "xz")
 
   result$logprior.models <- lprior.models #function used for model prior
 

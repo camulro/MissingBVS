@@ -64,6 +64,8 @@
 #' imputation step. By default, the \code{\link[mice]{quickpred}} function
 #' is used for the variables with NAs in formula and 0s for the rest of them.
 #' @param n.imp Number of imputed data sets used for Bayes factor computation.
+#' @param imp.datasets Array or list for imputed datasets if given by user. By
+#' default \code{NULL} and imputation is performed following the other parameters.
 #' @param Gibbs.seed Seed for the Gibbs sampler algorithm.
 #' @param imp.seed Seed for imputation.
 #'
@@ -89,7 +91,10 @@
 #' if the column dummy corresponds to the row factor and 0 otherwise}
 #' \item{positionsx}{Logical vector of length p indicating whether or not the
 #' variable is a numerical covariate}
-#' \item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
+#' \item{modelsrankdeflogBF.PM}{A \code{floor(n.iter/n.thin)}xx(p+number of dummies+1)
+#' \code{matrix} which summaries the keeped models and their associated Bayes
+#' factor plus model prob in logaritmic scale}
+#' \item{modelslogBF}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
 #' summaries the keeped models and their associated Bayes factor in logaritmic scale}
 #' \item{inclprob}{Named vector with the inclusion probabilities of the potential
 #' explanatory variables}
@@ -99,6 +104,7 @@
 #' \item{call}{The \code{call} to the function}
 #' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the model space)}
 #' \item{imp.args}{List of arguments used for the imputation step}
+#' \item{compress.imp.array}{Compressed array of imputed datasets}
 #' \item{BF.approx.method}{Function used to compute Bayes factors}
 #' \item{prior.betas}{\code{prior.betas}}
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
@@ -195,6 +201,7 @@ missingGibbsBVS.lm <- function (formula,
                                 imp.mice.method = "pmm",
                                 imp.predict.mat = NULL,
                                 n.imp = 039E1,
+                                imp.datasets = NULL,
                                 Gibbs.seed = runif(1,0,26061970),
                                 imp.seed = runif(1,0,09011975)) {
 
@@ -242,10 +249,16 @@ missingGibbsBVS.lm <- function (formula,
 
   #Imputation step
   if (!is.null(NAvars)) {
-    buildimputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat,
-                                            n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
-                                            parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    list2env(buildimputation.list, envir = environment())
+    if (is.null(imp.datasets)) { #if not given imputed array
+      buildimputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat,
+                                              n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
+                                              parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
+      list2env(buildimputation.list, envir = environment())
+    } else {
+      extimputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
+                                          ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      list2env(extimputation.list, envir = environment())
+    }
   }
 
   #Info:
@@ -267,7 +280,7 @@ missingGibbsBVS.lm <- function (formula,
   #George and McCulloch's Gibbs exploration
   gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
                            lprior.models, lprior.models.dummies, lBF.method, BF.approx.method,
-                           positions, positionsfac, l, L, lastd,
+                           positions, positionsfac, l, L, firstd,
                            init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
   list2env(gibbs.list, envir = environment())
 
@@ -276,28 +289,22 @@ missingGibbsBVS.lm <- function (formula,
                                 lprior.models, lprior.models.dummies, positionsx)
   list2env(summ.Gibbs.list, envir = environment())
 
-  if (!is.null(NAvars)) {
-    #Pool results for imputed datasets
-    if (n.imp > 1) {
-      #remove last dummy for each factor, first p0 vars are the fixed ones
-      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0),]
-      #Evaluate lm of full model with missings using Rubin's rule
-      fit <- list()
-      mt <- attr(framefull, "terms")
-      for (i in 1:n.imp) {
-        z <- lm.fit(x = imputation.array[,,i], y = y)
-        z$terms <- mt
-        class(z) <- "lm"
+  if (!is.null(NAvars)) {#Pool results for imputed datasets
+    imp.array <- imputation.array
+    #remove first dummy on each factor, first p0 vars are the fixed ones
+    if (L > 0) imp.array <- imp.array[,-c(indf + p0), , drop = FALSE]
+    #Evaluate lm of full model with missings using Rubin's rule
+    fit <- list()
+    mt <- attr(framefull, "terms")
+    for (i in 1:n.imp) {
+      z <- lm.fit(x = imp.array[,,i], y = y)
+      z$terms <- mt
+      class(z) <- "lm"
 
-        fit[[i]] <- z
-      }
-      lmfull <- mice::pool(fit)
-    } else {
-      #compute lm.fit for the unique imputation
-      if (L > 0) imputation.array <- imputation.array[,-c(indf + p0)]
-      lmfull <- lm.fit(x = imputation.array, y = y)
+      fit[[i]] <- z
     }
-  } else lmfull <- lm(formula, data)
+    lmfull <- mice::pool(fit)
+  } else lmfull <- lm(formula, data, x = TRUE, y = TRUE)
 
   #result
   result <- list()
@@ -319,10 +326,11 @@ missingGibbsBVS.lm <- function (formula,
     #matrix for the factors index
     result$positions <- positionsfac
     result$positionsx <- positionsx
+    result$modelsrankdeflogBF.PM <- all.models.lPM # rank deficient models and probs
   }
 
-  #The binary code for all the visited models (after n.thin is applied) and the correspondent post
-  result$modelsprob <- cf.models.lBF
+  #The binary code for all the visited models (after n.thin is applied) and the logBF
+  result$modelslogBF <- cf.models.lBF
 
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
@@ -351,9 +359,9 @@ missingGibbsBVS.lm <- function (formula,
     #arguments used for imputation
     result$imp.args <- imp.args
 
-    #save the imputed datasets for sensitivity analysis
-    # raw.imp.array <- serialize(imputation.array, NULL)
-    # result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
+    #save the imputed datasets for BMA or sensitivity analysis
+    raw.imp.array <- serialize(imputation.array, NULL)
+    result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
   }
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
@@ -370,7 +378,7 @@ missingGibbsBVS.lm <- function (formula,
 #' @keywords internal
 GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
                         lprior.models, lprior.models.dummies, lBF.method, BF.approx.method,
-                        positions, positionsfac, l, L, lastd,
+                        positions, positionsfac, l, L, firstd,
                         init.model, n.iter, n.burnin, n.thin, Gibbs.seed) {
   #Gibbs sampling algorithm, originally proposed by George and McCulloch (1997)
   #and further studied by Garcia-Donato and Martinez-Beneito (2013), to explore
@@ -392,10 +400,10 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
   d <- positionsfac %*% current.model #levels of factors
   t <- d > 0 #active factors
 
-  #change saturated or oversaturated model for c(1,...,1,0)
+  #change saturated or oversaturated model for c(0,1,...,1)
   if (sum(t) > 0) {
     M <- t(apply(positionsfac, 1, function(x) x * current.model))
-    f.check <- (d == l) | ((d == l - 1) & lastd(M))
+    f.check <- (d == l) | ((d == l - 1) & firstd(M))
     if(any(f.check)) {
       for (f in which(f.check)) {
         current.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1), 0)
@@ -433,10 +441,10 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
       #change saturated or oversaturated model for c(1,...,1,0)
       if (sum(t) > 0) {
         M <- t(apply(positionsfac, 1, function(x) x * proposal.model))
-        f.check <- (d == l) | ((d == l - 1) & lastd(M))
+        f.check <- (d == l) | ((d == l - 1) & firstd(M))
         if(any(f.check)) {
           for (f in which(f.check)) {
-            proposal.model[as.logical(positionsfac[f,])] <- c(rep(1,l[f]-1), 0)
+            proposal.model[as.logical(positionsfac[f,])] <- c(0, rep(1,l[f]-1))
           }
         }
       }
@@ -483,14 +491,16 @@ GM97.Gibbs <- function (y, X0, X.full, p, namesxnotnull, NAvars,
 
   if (n.burnin > 0) all.models.lPM <- all.models.lPM[-seq_len(n.burnin),] #remove burnin
   all.models.lPM <- all.models.lPM[seq(1, n.iter, by = n.thin), ] #keep 1 each n.thin iterations
+  colnames(all.models.lPM) <- c(namesxnotnull, "logBF.PM")
 
   #models matrix at the covariate-factor level
   cf.models.lPM <- all.models.lPM[,seq_len(p)] %*% t(positions)
   cf.models.lPM <- cbind(cf.models.lPM, all.models.lPM[, p+1])
   colnames(cf.models.lPM)[ncol(cf.models.lPM)] <- "logBF.PM"
-  #cf.models.lPM is exactly all.models.lPM if there are no factors
+  #cf.models.lPM is exactly all.models.lPM if there are no factor
 
-  return(list(cf.models.lPM = cf.models.lPM, inclprobRB = inclprobRB %*% t(positions)))
+  return(list(cf.models.lPM = cf.models.lPM, all.models.lPM = all.models.lPM,
+              inclprobRB = inclprobRB %*% t(positions)))
 }
 
 #' @keywords internal

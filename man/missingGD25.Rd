@@ -67,6 +67,8 @@ explanatory variables.}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
 model space)}
 \item{imp.args}{List of arguments used for the imputation step}
+\item{compress.imp.list}{Compressed list of imputed datasets and covariance
+matrices}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
 \item{method}{\code{Full}}
 }

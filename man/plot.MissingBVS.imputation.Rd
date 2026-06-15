@@ -2,7 +2,7 @@
 % Please edit documentation in R/aux_fun_imputation.R
 \name{plot.MissingBVS.imputation}
 \alias{plot.MissingBVS.imputation}
-\title{Box-and-whisker plot for numerical observed and imputed data}
+\title{Binary matrix for missing data pattern}
 \usage{
 \method{plot}{MissingBVS.imputation}(X, imputation, formula, mfrow = NULL)
 }
@@ -17,13 +17,27 @@ imputed datasets.}
 \item{mfrow}{Vector of the form \code{c(nr, nc)} for the number of rows and
 columns respectively. It selects the layout of the figures as an nr-by-nc array.
 If \code{NULL}, it will be automatically calculated.}
+
+\item{data}{Data frame containing the data with possible missing values.}
+
+\item{show}{Logical that indicates whether or not to print que matrix pattern.}
 }
 \description{
+Generates a matrix with 0 if the original entry was missing and 1 otherwise
+for observations with missing data and summarizes by variable.
+}
+\examples{
+#Daily air quality measurements in New York
+data("airquality")
+
+missing.model(airquality)
+
+Box-and-whisker plot for numerical observed and imputed data
+
 Produce box-and-whisker plots to represent the observed, given by \code{X},
 vs the imputed, given by \code{imputation}, values for each numerical regressor
 given by \code{formula}.
-}
-\examples{
+
 \dontrun{
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 data("dataS97")
@@ -38,6 +52,11 @@ plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
 
 }
 \seealso{
+Use \code{\link[MissingBVS]{MC.imputation}},
+\code{\link[MissingBVS]{mice.imputation}} and
+\code{\link[MissingBVS]{futuremice.imputation}} for performing multiple
+imputed dataset for \pkg{MissingBVS}.
+
 Use \code{\link[MissingBVS]{MC.imputation}},
 \code{\link[MissingBVS]{mice.imputation}} and
 \code{\link[MissingBVS]{futuremice.imputation}} for generating objects of

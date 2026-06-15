@@ -30,5 +30,9 @@ check()
 #comprobar si una función está registrada en un paquete:
 # getDLLRegisteredRoutines("BAS")
 
-build()
+devtools::build()
+
+#to load from github
+library(devtools)
+install_github('camulro/MissingBVS', dependencies = TRUE)
 

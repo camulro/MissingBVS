@@ -20,6 +20,7 @@ missingBVS.lm(
   imp.mice.method = "pmm",
   imp.predict.mat = NULL,
   n.imp = 390,
+  imp.datasets = NULL,
   imp.seed = runif(1, 0, 9011975)
 )
 }
@@ -81,6 +82,9 @@ is used for the variables with NAs in formula and 0s for the rest of them.}
 
 \item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
 
+\item{imp.datasets}{Array or list for imputed datasets if given by user. By
+default \code{NULL} and imputation is performed following the other parameters.}
+
 \item{imp.seed}{Seed for imputation.}
 }
 \value{
@@ -105,6 +109,8 @@ resulting from factors columns - L, where L is the number of factors, with 1
 if the column dummy corresponds to the row factor and 0 otherwise}
 \item{positionsx}{Logical vector of length p indicating whether or not the
 variable is a numerical covariate}
+\item{modelsrankdefprob}{A (n.keep)x(p+number of dummies+1) \code{matrix} which
+summaries the \code{n.keep} most probable a posteriori models and their probabilities}
 \item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
 most probable a posteriori models and their associated probability}
 \item{inclprob}{Named vector with the inclusion probabilities of the potential
@@ -115,6 +121,7 @@ explanatory variables}
 \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in
 the model space)}
 \item{imp.args}{List of arguments used for the imputation step}
+\item{compress.imp.array}{Compressed array of imputed datasets}
 \item{BF.approx.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
 \item{logprior.models}{Function used to compute the log-prior over the model space}

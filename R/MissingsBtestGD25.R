@@ -108,8 +108,7 @@ missingBtestGD25 <- function (data,
   lBFi0 <- lPriorModels <- PostProbi <- numeric(N)
   mt <- list() #list of terms for each model
 
-  #list that contains the names of the covariates in each model
-  covar.list <- list()
+  covar.list <- list() #list that contains the names of the covariates in each model
   for (i in seq_len(N)) {
     formula <- as.formula(models[[i]])
     #Check for numeric covariates
@@ -129,20 +128,22 @@ missingBtestGD25 <- function (data,
     mt[[i]] <- temp$terms
   }
   nullmodel.pos <- which(covar.list == "(Intercept)")
+  response <- as.character(as.formula(models[[1]])[[2]])
+
   #Check if null model is one of the competing models:
   if (length(nullmodel.pos) > 0) {
-    competing.models <- (seq_len(N))[-nullmodel.pos]
-    null.model <- as.formula(models[[nullmodel.pos]])
+    competing.models <- setdiff(seq_len(N), nullmodel.pos)
     #the null model has to be the one with the intercept
+    null.model <- as.formula(models[[nullmodel.pos]])
   } else {
     competing.models <- seq_len(N) #null.model is not provided by user
-    null.model <- as.formula(paste(as.formula(models[[1]])[[2]], " ~ 1", sep=""))
     #the null model has to be the one with the intercept
+    null.model <- as.formula(paste(response, "~ 1"))
+
     nullmodel.pos <- N + 1
     Dim[nullmodel.pos] <- 1
     models[[nullmodel.pos]] <- null.model
-    cat("Null model", paste(as.formula(models[[1]])[[2]], " ~ 1", sep=""),
-        "added to the list of competing models.\n")
+    cat("Null model", paste(response, "~ 1"), "added to the list of competing models.\n")
   }
 
   #Full design matrix
@@ -193,14 +194,14 @@ missingBtestGD25 <- function (data,
                                    initialimp.mice.method = initialimp.mice.method)
 
   #remove observations with missings on the response
-  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA,,]
+  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA,,, drop = FALSE]
   if (n.imp > 1) {
     #function to compute log(BFa0) for a given model with García-Donato's 2025 method
     lBF.method <- function (model) lBF.miss(model,
                                             imputation.list = imputation.list,
                                             BF.miss.aux = BF.miss.aux,
                                             n = n, nMC = n.imp)
-  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model],
+  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model,],
                                                     Sigma11 = imputation.list$rSigma[model, model,],
                                                     k = length(model))
 
@@ -215,20 +216,15 @@ missingBtestGD25 <- function (data,
   C <- sum(exp(lBFi0 + lPriorModels))
   PostProbi <- exp(lBFi0 + lPriorModels - log(C))
 
+  #Names to save
+  null.name <- paste0("(", response, " ~ 1)")
   if (namesm[nullmodel.pos] == "") {
-    namesm[nullmodel.pos] <-
-      paste("(", as.formula(models[[1]])[[2]], " ~ 1)", sep="")
-    names(lBFi0) <-
-      paste(namesm, ".to.(",
-            paste(as.formula(models[[1]])[[2]], " ~ 1)", sep=""), sep = "")
-    names(PostProbi) <- c(namesm[-nullmodel.pos],
-                          paste(as.formula(models[[1]])[[2]], " ~ 1", sep=""))
-    names(lPriorModels) <- names(PostProbi)
+    namesm[nullmodel.pos] <- null.name
+    names(lBFi0) <- paste0(namesm, ".to.(", null.name, ")")
+    names(PostProbi) <- names(lPriorModels) <- c(namesm[-nullmodel.pos], null.name)
   } else {
-    names(lBFi0) <-
-      paste(namesm, ".to.", namesm[nullmodel.pos], sep = "")
-    names(PostProbi) <- namesm
-    names(lPriorModels) <- namesm
+    names(lBFi0) <- paste0(namesm, ".to.", namesm[nullmodel.pos])
+    names(PostProbi) <- names(lPriorModels) <- namesm
   }
 
   #Evaluate lm of each model with missings using Rubin's rule
@@ -236,24 +232,17 @@ missingBtestGD25 <- function (data,
   for(j in competing.models){
     namesj <- which(namesx %in% covar.list[[j]])
     if (any(namesx[namesj] %in% NAvars)) {
-      if (n.imp > 1) {
-        fit <- list()
-        for (i in 1:n.imp) {
-          Xi <- cbind(1, imputation.list$rX.imput[,namesj,i])
-          colnames(Xi) <- c("(Intercept)", namesx[namesj])
-          z <- lm.fit(x = Xi, y = y)
-          z$terms <- mt[[j]]
-          class(z) <- "lm"
-
-          fit[[i]] <- z
-        }
-        modelspool[[j]] <- mice::pool(fit)
-      } else {
-        #compute lm.fit for the unique imputation
-        Xi <- cbind(1, imputation.list$rX.imput[,namesj])
+      fit <- list()
+      for (i in 1:n.imp) {
+        Xi <- cbind(1, imputation.list$rX.imput[,namesj,i])
         colnames(Xi) <- c("(Intercept)", namesx[namesj])
-        modelspool[[j]] <- lm.fit(x = Xi, y = y)
+        z <- lm.fit(x = Xi, y = y)
+        z$terms <- mt[[j]]
+        class(z) <- "lm"
+
+        fit[[i]] <- z
       }
+      modelspool[[j]] <- mice::pool(fit)
     } else modelspool[[j]] <- lm(models[[j]], data)
   }
   modelspool[[nullmodel.pos]] <- lm(null.model, data)
