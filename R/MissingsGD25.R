@@ -1,87 +1,84 @@
 #' Bayesian Variable Selection with Missing data for linear regression models
 #'
 #' Computation and summaries of posterior distribution over the model space
-#' in problems of small to moderate size when missingness occurs in linear
-#' models with normally distributed covariates.
+#' in problems of small to moderate size, when missingness occurs in linear
+#' models with normally distributed covariates under the g'-imputation prior of
+#' García-Donato et al. (2025).
 #'
-#' The set of competing models is made up by all the possible subsets of
-#' regressors specified by \code{formula}: Mi for i in 1,...,2^p, being p the number
-#' of potential (non-fixed) covariates in the variable selection problem. The simplest,
-#' nested in all of them, contains only the intercept. \code{MissingGD25} performs
-#' \code{n.imp} imputations given by the result of \code{\link[MissingBVS]{MC.imputation}}
-#' and computes the posterior distribution over this model space through Bayes' theorem:
+#' The set of competing models is made up by all the possible subsets of regressors
+#' specified by \code{formula}: Mi for i in 1,...,2^p, being p the number of potential
+#' regressors in the variable selection problem. It is assumed that the intercept term
+#' is present in all models, and the simplest one, the null, contains only this term.
+#' \code{\link[MissingBVS]{missingGD25}} performs for the regressors \code{n.imp}
+#' imputations from an objective Bayesian multivariate normal model (Sun and Berger, 2006),
+#' along with their variance-covariance matrices. Hence, the posterior distribution
+#' over the model space is given through Bayes' theorem:
 #'
-#' Pr(Mi | \code{data})=Pr(Mi)*Bi/C,
+#' Pr(Mi | \code{data}) = Pr(Mi) * Bi / C,
 #'
-#' where Bi is the Bayes factor(BF) of Mi to M0 under missing data proposed by
-#' García-Donato et al (2025), Pr(Mi) is the prior probability of Mi and C is
-#' the normalizing constant.
+#' where Bi is the Bayes factor (BF) of Mi to M0 derived a the expected value of g'BF of
+#' García-Donato et al. (2025) for normal random regressors, Pr(Mi) is the prior
+#' probability of Mi and C is the normalizing constant. The g'BFs are computed
+#' with \code{\link[MissingBVS]{BF.miss.X}}, which resemble g-prior BFs (Zellner, 1986)
+#' for random covariates, for each pair of imputed dataset and  variance-covariance
+#' matrix simulated. The integral of g'BF is approximated with a Monte Carlo scheme.
 #'
-#' Bi is computed as the MonteCarlo approximation of the integral defining the
-#' BF, for Mi to M0 calculated for the jth imputed data set.
-#'
-#' The prior over the model space Pr(Mi) offers three possibilities:
-#' "Constant" assigns the same prior probability to every model.
-#' "ScottBerger" is the default choice. It assigns the same prior probability to
-#' every possible model dimension and, therefore, accounts for multiplicity issues
-#' (Scott and Berger 2010).
-#' "User" (see below).
-#'
-#' If \code{prior.models}="User" is chosen, user has to provide a p+1 dimensional
-#' parameter vector with the model dimension prior probabilities through \code{priorprobs}.
-#' The first component of \code{priorprobs} must contain the probability of the
-#' model with fixed covariates; next p components correspond to the p prior probabilities
-#' of the possible model dimensions.
-#'
+#' The prior over the model space Pr(Mi) offers three options throuh \code{prior.models}:
+#' -"Constant" assigns the same prior probability to every model.
+#' -"ScottBerger" is the default choice. It assigns the same prior probability to
+#' every possible model size and, therefore, accounts for multiplicity issues
+#' (Scott and Berger, 2010).
+#' -"User": if chosen, user has to provide a p+1 dimensional vector with the model size
+#' prior probabilities through \code{priorprobs}. The first component must contain the
+#' probability of the null model M0 and next p components correspond to the p prior
+#' probabilities of model sizes 1,...,p.
 #'
 #' @export
 #' @param formula Formula defining the most complex (full) regression model in the
 #' analysis. See details.
 #' @param data Data frame containing the data.
-#' @param prior.models Prior distribution over the model space (to be literally specified).
-#' Possible choices are "Constant", "ScottBerger" and "User" (see details).
-#' @param priorprobs A p+1 (being p the number of non-fixed covariates)
-#' dimensional vector defining the prior model probabilities (used for chosen
-#' \code{prior.models}= "User"; see details).
-#' @param n.keep Number of the most probable models kept. By default it is set to
-#' 10 and automatically adjusted if 10 is greater than the total number of models.
-#' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 30} if the number of variables or
-#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
-#' @param initialimp.mice.method Method for mice's imputation.
-#' @param n.imp Number of imputed data sets used for Bayes factor computation.
+#' @param prior.models Model prior distribution over the covariates and/or factors
+#' model space (to be literally specified). Possible choices are "Constant",
+#' "ScottBerger" and "User" (see details).
+#' @param priorprobs A p+1 (being p the number of competing variables) dimensional
+#' vector defining the prior model size probabilities (if \code{prior.models}= "User";
+#' see details).
+#' @param n.keep It can be either the character "all" to return the whole model
+#' space or a numeric for the exact number of the most probable models to keep.
+#' By default it is set to 10 and automatically adjusted if 10 is greater than
+#' the total number of models.
+#' @param n.imp Number of imputed datasets for model posterior computation.
 #' @param imp.seed Seed for imputation.
 #'
 #' @return \code{missingGD25} returns an object of class \code{missingBVS}
 #' with the following elements:
-#' \item{time}{The internal time consumed in solving the problem}
-#' \item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
-#' for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
-#' the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
-#' \item{lmnull}{The \code{lm} class object that results when the null model,
-#' the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
-#' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
+#' \item{time}{Time lasted solving the problem}
+#' \item{lmfull}{If missings on the \code{formula} competing variables, combination
+#' of the estimates of fitted full model over the \code{n.imp} imputed datasets.
+#' Otherwise, it is the \code{\link[stats]{lm}} object}
+#' \item{lmnull}{The \code{lm} class object that results when \code{null.model}
+#' is fitted by \code{\link[stats]{lm}}}
+#' \item{variables}{Names of all the competing variables given by \code{formula}}
 #' \item{n}{Number of observations}
-#' \item{p}{Number of explanatory variables to select from}
-#' \item{k}{Number of fixed variables}
+#' \item{p}{Number of explanatory covariates to select from}
+#' \item{k}{Number of fixed variables, which is fixed to 1}
 #' \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 #' \item{MPMbin}{Binary expression of the Median Probability model}
-#' \item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
+#' \item{modelsprob}{A \code{n.keep} x (p+1) matrix which summarizes the \code{n.keep}
 #' most probable a posteriori models and their associated probability}
-#' \item{inclprob}{Named vector with the inclusion probabilities of the potential
-#' explanatory variables.}
-#' \item{postprobdim}{Posterior probabilities over the true model dimension}
-#' \item{priorprobs}{Prior probabilities over the true model dimension}
+#' \item{inclprob}{Named vector with the inclusion probabilities of p competing variables}
+#' \item{postprobdim}{Posterior probabilities over the true model size}
+#' \item{C}{The value of the normalizing constant C=sum_i AvBi * Pr(Mi)}
 #' \item{call}{The \code{call} to the function}
-#' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
-#' model space)}
-#' \item{imp.args}{List of arguments used for the imputation step}
+#' \item{priorprobs}{Prior probabilities over the true model size}
+#' \item{imp.info}{List of arguments used for the imputation step and other information}
 #' \item{compress.imp.list}{Compressed list of imputed datasets and covariance
 #' matrices}
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
-#' \item{method}{\code{Full}}
+#' \item{prior.models}{Argument chosen for \code{prior.models}}
+#' \item{method}{String "Full" denoting exhaustive model search}
 #'
-#' @author arolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
+#' @author Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
 #' @seealso Use \code{\link[MissingBVS]{MissingGibbsGD25}} for a heuristic
@@ -98,10 +95,15 @@
 #' Barbieri, M and Berger, J (2004)<DOI:10.1214/009053604000000238> Optimal
 #' Predictive Model Selection. The Annals of Statistics, 32, 870-897.
 #'
-#' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-#' by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
+#' Zellner, A. (1986)<DOI:10.2307/2233941> On Assessing Prior Distributions and
+#' Bayesian Regression Analysis with g-prior Distributions. In Bayesian
+#' Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
+#' Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
 #'
-#' @keywords package
+#' Sun, D. and Berger, J. O. (2006) Objective Bayesian analysis for the multivariate
+#' normal model. In Bernardo, J. M., Bayarri, M. J., Berger, J. O., Dawid, A. P.,
+#' Heckerman, D., Smith, A. F. M., and West, M. (eds.), Proc. Valencia / ISBA 8th
+#' World Meeting on Bayesian statistics. Oxford university Press. MR2433206. 16
 #'
 #' @examples
 #' \dontrun{
@@ -128,8 +130,6 @@ missingGD25 <- function (formula,
                          prior.models = "ScottBerger",
                          priorprobs = NULL,
                          n.keep = 10,
-                         imp.time.test = TRUE,
-                         initialimp.mice.method = "norm",
                          n.imp = 039E1,
                          imp.seed = runif(1,0,09011975)) {
 
@@ -172,29 +172,14 @@ missingGD25 <- function (formula,
 
   #BF function
   BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
-                                                           y = y, SS0 = SS0,
-                                                           n = n, k)
-
+                                                           y = y, SS0 = SS0, n = n, k)
   #Imputation of missing data
-  if (imp.time.test & (p*n > 10000 | n.imp > 039E1)) {
-    #test imputation time
-    cat("Time test . . . \n")
-    time.test <- MC.imputation(X = X.full,
-                               time.test = TRUE)
+  if (p*n > 10000 | n.imp > 039E1) cat("Imputation step could take a while.\n",
+    "Consider reducing the number of imputed datasets if that is the case.\n")
 
-    estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to test
-    cat("The whole imputation would take ", estim.time,
-        "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
-    if (tolower(readline()) != "y") {
-       stop("Reduce the number of imputed datasets.\n")
-    }
-  }
   cat("Performing imputation of missing data with Garcia-Donato's 2025 method.\n",
       "Please wait . . . \n")
-  imputation.list <- MC.imputation(X = X.full,
-                                   nMC = n.imp,
-                                   seed = imp.seed,
-                                   initialimp.mice.method = initialimp.mice.method)
+  imputation.list <- MC.imputation(X = X.full, nMC = n.imp, seed = imp.seed)
 
   #remove observations with missings on the response
   imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA, , , drop = FALSE]
@@ -216,20 +201,16 @@ missingGD25 <- function (formula,
 
   #Info:
   cat("Info. . .\n")
-  cat("Most complex model has a total of", p + 1, "single covariates.\n")
-  cat(paste0("From those 1 is fixed (the intercept) and we should select from the remaining ",
-             p, ":\n"))
-  cat(paste(paste(namesx, collapse = ", ", sep = ""), "\n", sep = ""))
+  cat("Most complex model has a total of", p + 1, "covariates.\n")
+  cat("From those 1 is fixed (the intercept) and we should select from the remaining",
+      p, ":\n")
+  cat(paste(namesx, collapse = ", ", sep = ""))
 
-  cat("The problem has a total of", 2^p, "competing models.\n")
+  cat("\nThe problem has a total of", 2^p, "competing models.\n")
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
   #progress bar for loop
-  pb <- txtProgressBar(min = 0,
-                       max = 2^p,
-                       style = 3,
-                       width = 50,
-                       char = "=")
+  pb <- txtProgressBar(min = 0, max = 2^p, style = 3, width = 50, char = "=")
 
   #Posterior computation
   all.models.lPM <- matrix(0, nr = 2^p, nc = p+1) #last column contains log(BF_a0*Pr(M))
@@ -240,10 +221,8 @@ missingGD25 <- function (formula,
     current.model <- BayesVarSel:::integer.base.b_C(i, p)
     all.models.lPM[i, seq_len(p)] <- current.model
 
-    lBF.PM <- lBF.method(model = which(current.model == 1)) +
+    all.models.lPM[i, p+1] <- lBF.method(model = which(current.model == 1)) +
       lprior.models(current.model) #log(BF_a0*Pr(M))
-
-    all.models.lPM[i, p+1] <- lBF.PM
   }
   setTxtProgressBar(pb, 2^p)
   #null model
@@ -257,21 +236,18 @@ missingGD25 <- function (formula,
   colnames(all.models.PM) <- c(namesx, "Post")
 
   #Summ up the posterior distribution
-  summ.posterior.list <- summ.posterior(all.models.PM, p, p, 0, NULL)
+  summ.posterior.list <- summ.posterior(all.models.PM, p, p, FALSE, NULL)
   list2env(summ.posterior.list, envir = environment())
 
   if (!is.null(NAvars)) {#Pool results for imputed datasets
-      #Evaluate lm of full model with missings using Rubin's rule
-      fit <- list()
-      mt <- attr(framefull, "terms")
-      for (i in 1:n.imp) {
-        z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
-        z$terms <- mt
-        class(z) <- "lm"
-
-        fit[[i]] <- z
-      }
-      lmfull <- mice::pool(fit)
+    #Evaluate lm of full model with missings using Rubin's rule
+    fit <- list(); mt <- attr(framefull, "terms")
+    for (i in 1:n.imp) {
+      z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
+      z$terms <- mt; class(z) <- "lm"; fit[[i]] <- z
+    }
+    lmfull <- mice::pool(fit)
+    lmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read lmfull$call
   } else lmfull <- lm(formula, data, x = TRUE, y = TRUE)
 
   ##result
@@ -299,6 +275,7 @@ missingGD25 <- function (formula,
 
   result$postprobdim <- probdim #vector with the dimension probabilities.
   names(result$postprobdim) <- 0:p + 1 #dimension of the true model
+  result$C <- C #normalizing constant
 
   result$call <- match.call()
 
@@ -306,24 +283,21 @@ missingGD25 <- function (formula,
     priorprobs <- numeric(p+1)
     priorprobs[1] <- exp(lprior.models(numeric(p))) #prior inclusion prob for dimension 0
     for (i in seq_len(p)) {
-      priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, p - i))) + lchoose(p, i))
+      priorprobs[i+1] <- exp(lprior.models(c(rep.int(1, i), rep.int(0, p - i))) + lchoose(p, i))
       #prior inclusion probability for each dimension
     }
   }
   result$priorprobs <- priorprobs
   names(result$priorprobs) <- 0:p + 1 #prior dimension probability
 
-  result$C <- C #normilizing constant
-
   #arguments used for imputation
-  result$imp.args <- list(initialimp.mice.method = initialimp.mice.method,
-                          n.imp = n.imp, imp.seed = imp.seed)
-
+  result$imp.info <- list(n.imp = n.imp, imp.seed = imp.seed)
   #save the imputed datasets for BMA or sensitivity analysis
   raw.imp.list <- serialize(imputation.list, NULL)
   result$compress.imp.list <- memCompress(raw.imp.list, type = "xz")
 
   result$logprior.models <- lprior.models #function used for model prior
+  result$prior.models <- prior.models
 
   result$method <- "Full"
   class(result) <- "MissingBvs"

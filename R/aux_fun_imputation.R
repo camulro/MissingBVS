@@ -1,16 +1,16 @@
-#' \pkg{MissingBVS}'s imputation for normally distributed covariates
+#' \pkg{MissingBVS}'s objective Bayesian imputation for multivariate normal covariates
 #'
 #' Performs the multiple imputation used by García-Donato et al (2025) for
-#' continuous and normally distributed covariates to compute Bayesian Variable
-#' Selection in the presence of missing data.
+#' continuous and normally distributed covariates to perform objective Bayesian
+#' Variable Selection in the presence of missing data.
 #'
 #' @export
 #' @param X Matrix with missing values to impute.
 #' @param nMC Number of samples used to approximate, by MonteCarlo, the integral
 #' defining the Bayes factor.
-#' @param seed Seed chosen for the gibbs sampler on the imputation step.
+#' @param seed Seed chosen for the Gibbs sampler on the imputation step.
 #' @param initialimp.mice.method Method used by \code{\link[mice]{mice}} to impute the
-#' initial values. See \code{\link[mice]{mice}} for possible choices.
+#' initial values. By default, it is set to "norm" since \code{X} has to be normal.
 #' @param time.test Logical to indicate whether to check time of performance with
 #' \code{nMC = 30} or not.
 #'
@@ -18,9 +18,8 @@
 #' with the following elements:
 #' \item{rX.imput}{Array of dimension nxpx\code{nMC}, where n is the number of
 #' observations and p the number of competing covariates, containing the imputed datasets}
-#' \item{rSigma}{Array of dimension pxpx\code{nMC} containing the corresponding
-#' covariance matrices}
-#' \item{rmu}{Vector of dimension px\code{nMC} containing the corresponding means}
+#' \item{rSigma}{Array of dimension pxpx\code{nMC} containing the covariance matrices}
+#' \item{rmu}{Vector of dimension px\code{nMC} containing the simulated means}
 #'
 #' @author María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
@@ -109,40 +108,51 @@ MC.imputation <- function(X, nMC = 039E1,
   class(imputation.list) <- "MissingBVS.imputation"
   return(imputation.list)
 }
-#' \pkg{mice}'s imputation for Missing Bayesian Variable Selection (\pkg{MissingBVS})
+#' \pkg{mice}'s imputation for Bayesian Imputation Averaging in variable selection
 #'
 #' Performs the Multiple Imputation by Chained Equations of \pkg{mice} and makes
-#' an array with the proper form to compute Bayesian Variable Selection in the
-#' presence of missing data. It can be applied to any kind of data with the correct
-#' imputation method.
+#' an array with the proper form to compute Bayesian Imputation Averaging for Variable
+#' Selection in the presence of missing data.
 #'
-#' A parallel version of \pkg{mice} can be performed through the \code{parallelmice}
-#' argument, which makes the imputation a lot faster for a big number of imputations
-#' or huge datasets.
+#' Performs flexible imputation for most kind of data with the correct arguments.
+#' The imputation model of each incomplete variable in \code{formula} can be explicitly
+#' specified with the matrix \code{imp.predict.mat}. If entry ij equals 1, the jth
+#' column variable is used as a predictor for the ith row variable, where the imputation
+#' model is given by the string or vector \code{imp.mice.method}. See \code{\link[mice]{mice}}
+#' for more details of the imputation method. Moreover, the order of imputed variables
+#' on each iteration of the method can be specified with \code{visit.seq} and the maximum
+#' number of iterations for convergence of each imputed dataset can be set with \code{maxit}.
+#'
+#' A parallel computation version of \pkg{mice} can be performed through the
+#' \code{parallelmice} argument, which makes the imputation procedure a lot faster
+#' for a big number \code{n.imp} of imputations or huge datasets \code´{X}.
 #'
 #' @export
 #' @param X Matrix with missing values to impute.
 #' @param formula Formula defining the most complex (full) regression model.
-#' @param n.imp Number of imputed datasets to compute the average Bayes factor.
-#' @param imp.predict.mat \code{matrix} with p1 rows and \code{ncol(X)} columns,
-#' where p1 is the number of independent variables given by \code{formula} with
-#' \code{NAs}. Each entry equals 1 if the column variable is used as a predictor
-#' for the corresponding row variable in the \code{\link[mice]{mice}} imputation.
-#' By default, the \code{\link[mice]{quickpred}} function is used.
+#' @param n.imp Number of imputed datasets to compute the Average Bayes factor.
+#' @param imp.predict.mat \code{matrix} with ncol(\code{X}) rows and columns,
+#' where the order is defined by \code{X}. Each entry equals 1 if the column variable
+#' is used as a predictor of the corresponding row variable in the
+#' \code{\link[mice]{mice}} imputation. By default, the \code{\link[mice]{quickpred}}
+#' is used to specify each imputation model.
 #' @param imp.mice.method Method used by \code{\link[mice]{mice}} to impute the
-#' values. It can be a string or a vector of strings of length p1, where p1 is the number of independent
-#' variables given by \code{formula} with \code{NAs}.
+#' values. It can be a string or a vector of strings of length ncol(\code{X}).
+#' @param visit.seq Vector of strings containing the names of the variables in \code{X}.
+#' The order given is the one that iterations of each imputation will follow.
 #' @param seed Seed chosen for the imputations.
+#' @param maxit Number of iterations of each imputation for convergence. By default,
+#' it is set to 5.
 #' @param parallel Logical to indicate whether or not to use parallel
-#' \code{\link[mice]{mice}} imputation. By default performs parallel mice
-#' imputation if the number of imputations is big enough (\code{n.imp > 120}).
+#' \code{\link[mice]{mice}} imputation. By default, performs parallelization if the
+#' number of imputations is big enough (\code{n.imp} > 120).
 #' @param n.core See \code{\link[mice]{futuremice}} for details.
 #' @param time.test Logical to indicate whether to check time of performance with
 #' \code{n.imp = 30} or not.
 #'
 #' @return An object of class \code{MissingBVS.imputation}, an array of dimension
 #' nxpx\code{n.imp}, where n is the number of observations and p the number of
-#' competing covariates, containing the imputed datasets.
+#' competing covariates given by \code{formula}, containing the imputed datasets.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
@@ -175,8 +185,8 @@ MC.imputation <- function(X, nMC = 039E1,
 #' \link{https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html}
 #'
 mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::quickpred(X),
-                            imp.mice.method = "pmm", seed = runif(1,0,09011975),
-                            parallel = n.imp > 120, n.core = NULL, time.test = FALSE) {
+                            imp.mice.method = "pmm", visit.seq = NULL, seed = runif(1,0,09011975),
+                            maxit = 5, parallel = n.imp > 120, n.core = NULL, time.test = FALSE) {
   formula <- paste(formula)
 
   if (time.test) {time <- Sys.time(); n.imp <- 30} # to estimate imputation time
@@ -188,18 +198,20 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
                           meth = imp.mice.method,
                           m = n.imp,
                           predictorMatrix = imp.predict.mat,
-                          visitSequence = "monotone",
+                          visitSequence = visit.seq,
                           printFlag = FALSE,
+                          maxit = maxit,
                           seed = seed)
      } else imput <- mice::futuremice(X,
                                       meth = imp.mice.method,
                                       m = n.imp,
                                       predictorMatrix = imp.predict.mat,
-                                      visitSequence = "monotone",
+                                      visitSequence = visit.seq,
+                                      maxit = maxit,
                                       parallelseed = seed,
                                       n.core = n.core)
 
-    mice::complete(imput, action = "all") #extracts all at once
+    imps <- mice::complete(imput, action = "all") #extracts all at once
   },
     warning = function(w) {imp.warnings <<- c(imp.warnings, list(w)); invokeRestart("muffleWarning")}
   )
@@ -226,14 +238,13 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
   if (time.test) return(time <- Sys.time() - time)
 
   class(imputation.array) <- "MissingBVS.imputation"
-  return(imputation.array)
+  return(list(imputation.array = imputation.array, logEvents = imput$loggedEvents))
 }
 #' Binary matrix for missing data pattern
 #'
 #' Generates a matrix with 0 if the original entry was missing and 1 otherwise
 #' for observations with missing data and summarizes by variable.
 #'
-#' @export
 #' @param data Data frame containing the data with possible missing values.
 #' @param formula Formula defining the most complex (full) regression model.
 #' If \code{NULL}, the full data missing entries are chosen.
@@ -302,7 +313,6 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
 #' vs the imputed, given by \code{imputation}, values for each numerical regressor
 #' given by \code{formula}.
 #'
-#' @export
 #' @param X Matrix with missing values to impute.
 #' @param imputation Object of class \code{MissingBVS.imputation} containing the
 #' imputed datasets.
@@ -332,81 +342,81 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
 #' plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
 #' }
 #'
-plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
-  #X is a matrix or dataframe with missing data
-  #imputation.array is the array with the whole imputed data
-  #formula can either be null or a model formula
-  formula <- as.formula(formula)
-
-  if (inherits(imputation, "MissingBVS.imputation")) {
-    if (is.list(imputation)) {
-      imputation.array <- imputation$rX.imput
-    } else imputation.array <- imputation
-  } else stop("Only imputation plot available for class MissingBVS.imputation.\n")
-
-  aux <- model.frame(formula, X, na.action = NULL)[,-1]
-  #which variables are numerical
-  isnum <- sapply(aux, is.numeric)
-  X.full <- as.matrix(aux[,isnum])
-
-  missing.matrix <- missing.model(X.full, show = FALSE)
-  NAvars <- names(which(missing.matrix["Total",] > 0)) #original vars with missings
-  pm <- length(NAvars)
-  missings <- missing.matrix[-nrow(missing.matrix), NAvars]
-
-  n.imp <- dim(imputation.array)[3]
-  if (pm == 0) stop("There are no missings in the data provided.\n")
-  #keep imputed vars
-  if (pm == 1) {
-    n <- length(missings)
-    p <- 1
-    imputation.array.model <- array(imputation.array[names(missings),NAvars,],
-                                    dim = c(n, p, n.imp),
-                                    dimnames = list(names(missings),
-                                                 NAvars, 1:n.imp)) #intercept removed
-  } else {
-    n <- dim(missings)[1]
-    p <- dim(missings)[2]
-
-    imputation.array.model <- array(imputation.array[rownames(missings),NAvars,],
-                                    dim = c(n, p, n.imp),
-                                    dimnames = list(rownames(missings),
-                                                    NAvars, 1:n.imp))
-  }
-
-  #calculate how to grid the composed plot
-  if (is.null(mfrow)) {
-    nr <- ceiling(sqrt(p))
-    nc <- ceiling(p/nr)
-
-    par(mfrow = c(nr, nc), mar = c(2.5,2,0.5,0.5), mgp = c(1.5, 0.5, 0))
-  } else if (length(mfrow) != 2) {
-    stop("Please provide a vector of the form c(nrow, ncol) to grid the plot.\n")
-  } else par(mfrow = mfrow, mar = c(2.5,2,0.5,0.5), mgp = c(1.5, 0.5, 0))
-
-  for (i in NAvars) {
-    if (pm == 1) {
-      x.mi <- as.vector(imputation.array.model[which(missings == 0),i,]) #imputed
-    } else x.mi <- as.vector(imputation.array.model[which(missings[,i] == 0),i,]) #imputed
-
-    x.oi <- X.full[!is.na(X.full[,i]), i] #observed
-    x.i <- c(x.mi, x.oi)
-
-    gr <- c(rep("Imp", length(x.mi)), rep("Obs", length(x.oi)))
-
-    boxplot(x.i ~ gr,
-            col = c(rgb(1, 0.3, 0.3, 0.5), rgb(0,0,0,0.5)),
-            horizontal = TRUE,
-            xlab = paste0(i, ", NA's: ", length(x.mi)/n.imp), ylab = "",)
-    stripchart(x.i ~ gr,
-               method = "jitter",
-               vertical = FALSE,
-               pch = 16,
-               col = c(rgb(1, 0.3, 0.3, 0.5), rgb(0,0,0,0.5)),
-               add = TRUE)
-  }
-  par(mfrow = c(1,1), mar = c(5.1, 4.1, 4.1, 2.1), mgp = c(3, 1, 0)) #R default values
-}
+# plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
+#   #X is a matrix or dataframe with missing data
+#   #imputation.array is the array with the whole imputed data
+#   #formula can either be null or a model formula
+#   formula <- as.formula(formula)
+#
+#   if (inherits(imputation, "MissingBVS.imputation")) {
+#     if (is.list(imputation)) {
+#       imputation.array <- imputation$rX.imput
+#     } else imputation.array <- imputation
+#   } else stop("Only imputation plot available for class MissingBVS.imputation.\n")
+#
+#   aux <- model.frame(formula, X, na.action = NULL)[,-1]
+#   #which variables are numerical
+#   isnum <- sapply(aux, is.numeric)
+#   X.full <- as.matrix(aux[,isnum])
+#
+#   missing.matrix <- missing.model(X.full, show = FALSE)
+#   NAvars <- names(which(missing.matrix["Total",] > 0)) #original vars with missings
+#   pm <- length(NAvars)
+#   missings <- missing.matrix[-nrow(missing.matrix), NAvars]
+#
+#   n.imp <- dim(imputation.array)[3]
+#   if (pm == 0) stop("There are no missings in the data provided.\n")
+#   #keep imputed vars
+#   if (pm == 1) {
+#     n <- length(missings)
+#     p <- 1
+#     imputation.array.model <- array(imputation.array[names(missings),NAvars,],
+#                                     dim = c(n, p, n.imp),
+#                                     dimnames = list(names(missings),
+#                                                  NAvars, 1:n.imp)) #intercept removed
+#   } else {
+#     n <- dim(missings)[1]
+#     p <- dim(missings)[2]
+#
+#     imputation.array.model <- array(imputation.array[rownames(missings),NAvars,],
+#                                     dim = c(n, p, n.imp),
+#                                     dimnames = list(rownames(missings),
+#                                                     NAvars, 1:n.imp))
+#   }
+#
+#   #calculate how to grid the composed plot
+#   if (is.null(mfrow)) {
+#     nr <- ceiling(sqrt(p))
+#     nc <- ceiling(p/nr)
+#
+#     par(mfrow = c(nr, nc), mar = c(2.5,2,0.5,0.5), mgp = c(1.5, 0.5, 0))
+#   } else if (length(mfrow) != 2) {
+#     stop("Please provide a vector of the form c(nrow, ncol) to grid the plot.\n")
+#   } else par(mfrow = mfrow, mar = c(2.5,2,0.5,0.5), mgp = c(1.5, 0.5, 0))
+#
+#   for (i in NAvars) {
+#     if (pm == 1) {
+#       x.mi <- as.vector(imputation.array.model[which(missings == 0),i,]) #imputed
+#     } else x.mi <- as.vector(imputation.array.model[which(missings[,i] == 0),i,]) #imputed
+#
+#     x.oi <- X.full[!is.na(X.full[,i]), i] #observed
+#     x.i <- c(x.mi, x.oi)
+#
+#     gr <- c(rep("Imp", length(x.mi)), rep("Obs", length(x.oi)))
+#
+#     boxplot(x.i ~ gr,
+#             col = c(rgb(1, 0.3, 0.3, 0.5), rgb(0,0,0,0.5)),
+#             horizontal = TRUE,
+#             xlab = paste0(i, ", NA's: ", length(x.mi)/n.imp), ylab = "",)
+#     stripchart(x.i ~ gr,
+#                method = "jitter",
+#                vertical = FALSE,
+#                pch = 16,
+#                col = c(rgb(1, 0.3, 0.3, 0.5), rgb(0,0,0,0.5)),
+#                add = TRUE)
+#   }
+#   par(mfrow = c(1,1), mar = c(5.1, 4.1, 4.1, 2.1), mgp = c(3, 1, 0)) #R default values
+# }
 
 #' @keywords internal
 ME <- function (n.imp, imp.seed) {

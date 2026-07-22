@@ -13,7 +13,25 @@ Hypothesis testing, model selection and model averaging
 \tab 0.1.0\cr Date: \tab 2026-03-20\cr License: \tab GPL (>= 3)\cr }
 }
 \examples{
-# To be completed
+
+\dontrun{
+#Cross-Country Growth, from Fernández, Ley and Steel (2001)
+data("dataS97")
+
+#Here we keep the 8 competing models:
+f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+
+#Show the results:
+dataS97.mBVS
+
+#Summ up the results:
+summary(dataS97.mBVS)
+
+#A plot with the posterior inclusion probabilities for each competing variable
+#and the dimension probability of the true model:
+plot(dataS97.mBVS)
+}
 
 }
 \references{

@@ -13,8 +13,8 @@
 }
 \description{
 Summary of an object of class \code{MissingBvs}, providing inclusion
-probabilities and a representation of the Median Probability Model and the
-Highest Posterior probability Model.
+probabilities and a representation of the Median Probability Model (MPM) and the
+Highest Posterior probability Model (HPM).
 }
 \examples{
 \dontrun{

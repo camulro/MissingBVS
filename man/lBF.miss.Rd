@@ -2,7 +2,7 @@
 % Please edit documentation in R/aux_fun_BF.R
 \name{lBF.miss}
 \alias{lBF.miss}
-\title{Logarithm of the MC approximation of the Bayes factor in linear models}
+\title{Logarithm of the MC approximation of the GD25 Bayes factor in linear models}
 \usage{
 lBF.miss(
   model,
@@ -18,11 +18,11 @@ for a given model with p competing covariates.}
 
 \item{imputation.list}{Object of class \code{MC.imputation} with the
 following elements: \code{rX.imput}Array of dimension \code{n}xpx\code{nMC}
-containing the imputed datasets \code{rSigma}Array of dimension
+containing the imputed datasets; \code{rSigma}Array of dimension
 pxpx\code{nMC} containing the corresponding covariance matrices}
 
-\item{BF.miss.aux}{Auxiliary function to compute the Bayes factor for each
-entry in \code{imputation.list}.}
+\item{BF.miss.aux}{Auxiliary function with needed fixed parameters to compute
+the g'-Bayes factor for each entry in \code{imputation.list}.}
 
 \item{n}{Number of observations.}
 
@@ -35,11 +35,13 @@ approximation of the integral defining the Bayes factor for a given \code{model}
 following García-Donato et al (2025).
 }
 \description{
-Computes the logarithm of the Bayes factor in the linear regression model
-when missingness occurs, assuming normally distributed covariates. It does so
-by approximating the integral via a MonteCarlo scheme with an
-\code{MC.imputation} object and using the BF computation auxiliary function
-given by \code{BF.miss.aux}.
+Computes the logarithm of the Bayes factor in linear regression models when
+covariates are random and normally distributed (García-Donato et al., 2025).
+}
+\details{
+The Bayes factor approximation is via a MonteCarlo scheme given the imputed datasets
+and variance-covariance matrices simuled in a \code{MissingBVS.imputation} object.
+The g'BF is computed with the auxiliary function \code{BF.miss.aux}.
 }
 \examples{
 #Daily air quality measurements in New York

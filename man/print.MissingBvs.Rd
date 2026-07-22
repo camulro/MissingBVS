@@ -12,9 +12,9 @@
 \item{...}{Additional parameters to be passed.}
 }
 \description{
-Print an object of class \code{MissingBvs}. The ten ones with the higher
-probability are shown jointly with their Bayes factors (in logaritmic scale)
-and their posterior probability (or an estimation if the object was created
+Print an object of class \code{MissingBvs}. Top ten models with the highest
+probabilitis are shown jointly with corresponding log-Bayes factors and
+posterior probabilities (or an estimation if the object was created
 by a Gibbs function).
 }
 \examples{

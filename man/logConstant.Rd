@@ -18,9 +18,8 @@ Computes the logarithm of the prior that assigns an uniform distribution to
 the model space
 }
 \details{
-It is derived by assigning an independent Bernouilli distribution with fixed
-probability 0.5 to the a priori inclusion probability of each
-competing variable.
+This prior is derived by assigning an independent Bernouilli distribution with fixed
+probability 0.5 to the a priori inclusion probability of each competing variable.
 }
 \examples{
 logConstant(7) # log(1 / (2^p))

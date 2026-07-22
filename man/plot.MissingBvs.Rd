@@ -20,6 +20,8 @@ probabilities.}
 \description{
 Plots to summarize graphically the results in an object of class
 \code{MissingBvs}, including prior and posterior probabilities obtained.
+}
+\details{
 Two summaries are available: the model size probability if \code{plotdim}=TRUE
 and the inclusion probabilities if  \code{plotpip}=TRUE. By default,
 both plots are shown.

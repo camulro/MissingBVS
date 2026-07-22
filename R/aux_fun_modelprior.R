@@ -3,9 +3,8 @@
 #' Computes the logarithm of the prior that assigns an uniform distribution to
 #' model size (Scott and Berger, 2010)
 #'
-#' It is derived by assigning an independent Bernouilli distribution with
-#' probability Beta(1,1) to the a priori inclusion probability of each
-#' competing variable.
+#' This prior is derived by assigning an independent Bernouilli distribution with
+#' probability Beta(1,1) to the a priori inclusion probability of each competing variable.
 #'
 #' @export
 #' @param p Number of covariates to select from.
@@ -24,11 +23,11 @@
 #' Statistics. 38: 2587–2619.
 #'
 #' @examples
-#' logScottBerger(7, c(rep(1,4),rep(0,3))) # log((p + 1)^(-1) / choose(p, sum(model)))
+#' logScottBerger(model = c(rep(1,4),rep(0,3))) # log((p + 1)^(-1) / choose(p, sum(model)))
 #'
-logScottBerger <- function(p, model) {
+logScottBerger <- function(p = length(model), model) {
   # log((p + 1)^(-1) / choose(p, sum(model)))
-  -log(p + 1) - lchoose(p, sum(model)) #logaritmic scale
+  -log(p + 1) - lchoose(p, sum(model)) #logarithmic scale
 }
 
 #' Logarithm of the Constant model prior
@@ -36,9 +35,8 @@ logScottBerger <- function(p, model) {
 #' Computes the logarithm of the prior that assigns an uniform distribution to
 #' the model space
 #'
-#' It is derived by assigning an independent Bernouilli distribution with fixed
-#' probability 0.5 to the a priori inclusion probability of each
-#' competing variable.
+#' This prior is derived by assigning an independent Bernouilli distribution with fixed
+#' probability 0.5 to the a priori inclusion probability of each competing variable.
 #'
 #' @export
 #' @param p Number of covariates to select from.
@@ -64,11 +62,11 @@ logConstant <- function(p) {
 #' Computes the logarithm of the prior that assigns a user given prior for model
 #' size
 #'
-#' It is derived by assigning a fixed prior for model sizes given by user
+#' This prior is derived by assigning a fixed prior for model sizes given by user
 #' through the numeric vector \code{priorprobs}. Its first entry correspond to
 #' the null model, the second to the ones with exactly one active variable, and
 #' so on. Models of a given size receive the same amount of probability, such
-#' as Scott and Berger (2010).
+#' as Scott and Berger (2010)'s prior.
 #'
 #' @export
 #' @param p Number of covariates to select from.
@@ -91,39 +89,36 @@ logConstant <- function(p) {
 #'
 #' @examples
 #' logUser(7, c(rep(1,4),rep(0,3)), c(0.3,rep(0.2,3),rep(0.1,4)))
-#' # log(priorprobs[sum(model)]/sum(priorprobs) / choose(p, sum(model)))
+#' # log(priorprobs[sum(model) + 1]/sum(priorprobs) / choose(p, sum(model)))
 #'
-logUser <- function(p, model, priorprobs) {
+logUser <- function(p = length(model), model, priorprobs) {
   # priorprobs[sum(model)]/sum(priorprobs) / choose(p, sum(model))
   log(priorprobs[sum(model) + 1]) - log(sum(priorprobs)) - lchoose(p, sum(model)) #logaritmic scale
   #prior prob for each model size divided by the number of models with that size
 }
 
-#auxiliar function for lprior.model.dummies computation
-#returns the number of different models given an active factor
-#i.e., lchoose(n, k) if k < n -1 and 1 otherwise (k <= n)
+#' @keywords internal
+# auxiliar function for lprior.model.dummies computation returns the number of different
+# models given an active factor i.e., lchoose(n, k) if k < n -1 and 1 otherwise (k <= n)
 mylchoose <- function(n, k) {
   ifelse(k < (n - 1), lchoose(n, k), 0)
 }
 
-#' Logarithm of the Scott and Berger model prior for the dummy level
+#' Logarithm of the Scott and Berger model prior for the dummy level, if factors
 #'
 #' If there are factors present, computes the logarithm of the prior that assigns
 #' an uniform distribution to model size (Scott and Berger, 2010) on the level
-#' of the dummies that make up each different factor. It assumes independence
-#' among the dummy variables corresponding to different factors.
+#' of the dummies that make up each different factor.
 #'
-#' It is derived by assigning an independent Bernouilli distribution with
-#' probability Beta(1,1) to the a priori inclusion probability of each
-#' competing dummy variable.
+#' This prior is derived by assigning an independent Bernouilli distribution with
+#' probability Beta(1,1) to the a priori inclusion probability of each competing
+#' dummy variable and assumming independence between different factors.
 #'
 #' @export
-#' @param delta Integer vector of length \code{L} specifying the number of
-#' active levels for each factor, where \code{L} is the number of factors.
-#' @param tau Logical vector of length \code{L} denoting whether or not a factor
-#' is active.
-#' @param l Integer vector of length \code{L} specifying the number of levels
-#' making up each factor.
+#' @param delta Integer vector of length L specifying the number of active levels
+#' for each factor, where L is the number of factors.
+#' @param tau Logical vector of length L denoting whether or not a factor is active.
+#' @param l Integer vector of length L specifying the number of levels making up each factor.
 #'
 #' @return \code{logScottBerger.d} returns the logarithm of the Scott and Berger
 #' prior at the dummies level, assuming independence between factors.
@@ -145,7 +140,7 @@ mylchoose <- function(n, k) {
 #' logScottBerger.d(0:3, c(F,rep(T,3)), c(3,2,4,3))
 #'
 logScottBerger.d <- function(delta, tau, l) {
-  if (sum(tau) == 0) {
+  if (sum(tau) == 0) { #no active factor (and hence, dummy)
     return(0)
   } else {
     ltau <- l[tau] #levels of active factors
@@ -153,22 +148,20 @@ logScottBerger.d <- function(delta, tau, l) {
   }
 }
 
-#' Logarithm of the Constant model prior for the dummy level
+#' Logarithm of the Constant model prior for the dummy level, if factors
 #'
 #' Computes the logarithm of the prior that assigns an uniform distribution to
 #' the model space on the level of the dummies that make up each different
-#' factor. It assumes independence among the dummy variables corresponding to
-#' different factors.
+#' factor.
 #'
-#' It is derived by assigning an independent Bernouilli distribution with fixed
+#' This prior is derived by assigning an independent Bernouilli distribution with fixed
 #' probability 0.5 to the a priori inclusion probability of each competing
-#' dummy variable.
+#' dummy variable and assumming independence between different factors.
 #'
 #' @export
-#' @param tau Logical vector of length \code{L} denoting whether or not a factor
-#' is active, where \code{L} is the number of factors.
-#' @param l Integer vector of length \code{L} specifying the number of levels
-#' making up each factor.
+#' @param tau Logical vector of length L denoting whether or not a factor is active,
+#' where L is the number of factors.
+#' @param l Integer vector of length L specifying the number of levels making up each factor.
 #'
 #' @return \code{logConstant.d} returns the logarithm of the Constant prior
 #' at the dummies level, assuming independence between factors.
@@ -182,7 +175,7 @@ logScottBerger.d <- function(delta, tau, l) {
 #' logConstant.d(c(F,rep(T,3)), c(3,2,4,3))
 #'
 logConstant.d <- function(tau, l) {
-  if (sum(tau) == 0) {
+  if (sum(tau) == 0) { #no active factor (and hence, dummy)
     return(0)
   } else {
     ltau <- l[tau] #levels of active factors

@@ -2,8 +2,7 @@
 % Please edit documentation in R/MissingsBvs_glm.R
 \name{missingBVS.glm}
 \alias{missingBVS.glm}
-\title{Bayesian Variable Selection with Missing data for generalized linear
-regression models}
+\title{Bayesian Imputation Averaging for Variable Selection with Missing data in generalized linear models}
 \usage{
 missingBVS.glm(
   formula,
@@ -14,14 +13,16 @@ missingBVS.glm(
   prior.betas = "Robust",
   prior.models = "ScottBerger",
   prior.models.dummies = "ScottBerger",
+  marginal.factors = TRUE,
   priorprobs = NULL,
   n.keep = 10,
-  parallelmice = NULL,
-  n.core = NULL,
-  imp.time.test = TRUE,
   imp.mice.method = "pmm",
   imp.predict.mat = NULL,
   n.imp = 390,
+  maxit = 5,
+  parallelmice = NULL,
+  n.core = NULL,
+  imp.datasets = NULL,
   imp.seed = runif(1, 0, 9011975),
   weights = rep.int(1, dim(data)[1]),
   offset = rep.int(0, dim(data)[1]),
@@ -36,63 +37,64 @@ analysis. See details.}
 \item{data}{Data frame containing the data.}
 
 \item{family}{String, function or the call to a family function among
-\code{\link[stats]{family}} to specify the error distribution and link
-function to be used in the model. If it is one of the implemented families in
-\pkg{BAS}: \code{binomial(link = "logit")},
-\code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
-using BAS logmarginal computation is performed.}
+\code{\link[stats]{family}} to specify the error distribution and link function to be
+used in the model. If it is one of the implemented families in \pkg{BAS}:
+\code{binomial(link = "logit")}, \code{poisson(link = "log")} and \code{Gamma(link = "log")};
+a faster version using \pkg{BAS} log-marginal computation is performed.}
 
-\item{null.model}{Formula defining which is the simplest (null) model, which.
-should be nested in the full one. By default, it is defined to be the one
+\item{null.model}{Formula defining which is the simplest (null) model, nested in
+the full one with possible fixed variables. By default, it is defined to be the one
 with just the intercept.}
 
-\item{BF.approx.method}{Method used to approximate Bayes factors with missing
-data (to be literally specified). Possible choices include "BIC", "TBF" and
-"gprior" (see details).}
+\item{BF.approx.method}{Method used to compute or approximate data-driven Bayes factors
+(to be literally specified). Possible choices include "BIC", "TBF" and "gprior"
+(see details).}
 
-\item{prior.betas}{Prior distribution for regression parameters within each
-model (to be literally specified). Possible choices are the ones implemented
-in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
-"FLS", "intrinsic.MGC" and "IHG" (see details).}
+\item{prior.betas}{Prior distribution for model coefficients if "gprior" method is
+chosen (to be literally specified). Possible choices are: "Robust", "Liangetal",
+"gZellner", "FLS" and "intrinsic.WNC" (see details).}
 
-\item{prior.models}{Prior distribution over the model space (to be literally specified). Possible
-choices are "Constant", "ScottBerger" and "User" (see details).}
+\item{prior.models}{Model prior distribution over the covariates and/or factors
+model space (to be literally specified). Possible choices are "Constant",
+"ScottBerger" and "User" (see details).}
 
-\item{prior.models.dummies}{Prior distribution over the model space of the
-factor levels (to be literally specified). Possible choices are "Constant" and
-"ScottBerger" (see details).}
+\item{prior.models.dummies}{Prior distribution over the dummies submodel space
+given by the active factors (to be literally specified). Possible choices are
+"Constant" and "ScottBerger" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed variables)
-dimensional vector defining the prior model probabilities (used for chosen
-\code{prior.models}= "User"; see details.)}
+\item{marginal.factors}{Logical to indicate whether or not to marginalize factors'
+probabilities such as García-Donato and Paulo (2022). By default, it is set to TRUE.}
+
+\item{priorprobs}{A p+1 (being p the number of non-fixed variables) dimensional
+vector defining the prior model size probabilities (if \code{prior.models}= "User";
+see details).}
 
 \item{n.keep}{It can be either the character "all" to return the whole model
 space or a numeric for the exact number of the most probable models to keep.
 By default it is set to 10 and automatically adjusted if 10 is greater than
 the total number of models.}
 
-\item{parallelmice}{Logital to indicate whether or not to use parallel
-\code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
-the parallel mice imputation if the number of imputations or the dataset are
-big enough.}
+\item{imp.mice.method}{Method for \pck{mice}'s imputation. Can be either a string
+or a vector of strings of length the number of variables in data, except the response.}
 
-\item{n.core}{See \code{\link[mice]{futuremice}} for details.}
+\item{imp.predict.mat}{Matrix with \code{formula}'s competing variables in rows
+and some \code{data}'s variables in columns. Each entry equals 1 if the column variable
+is used as a predictor for the corresponding row variable in the imputation step. Order
+in columns defines the imputation visit sequence. By default, a shortcut is used to
+define the most important predictors for each variable based on correlations.}
 
-\item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 30} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
+\item{n.imp}{Number of imputed datasets for model posterior computation.}
 
-\item{imp.mice.method}{Method for mice's imputation. Can be a string or a
-vector of strings of length p1, where p1 is the number of independent
-variables given by \code{formula} with \code{NAs}.}
+\item{maxit}{Number of iterations for \pck{mice}'s imputation. By default, it is 5.}
 
-\item{imp.predict.mat}{\code{matrix} with p1 rows and p2 columns, where p2
-is the number of variables used to impute. Each entry equals 1 if the
-column variable is used as a predictor for the corresponding row variable in the
-imputation step. By default, the \code{\link[mice]{quickpred}} function
-is used for the variables with NAs in formula and 0s for the rest of them.}
+\item{parallelmice}{Logical to indicate whether or not to use parallelization on
+\code{\link[mice]{mice}}'s imputation. By default, automatically performs it if the
+number of imputations or competing variables given by \code{formula} are big enough.}
 
-\item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
+\item{n.core}{Number of cores for parallel imputation.}
+
+\item{imp.datasets}{Array or list for imputed datasets if given by user. By default
+it is set to NULL and imputation is performed following other imputation arguments.}
 
 \item{imp.seed}{Seed for imputation.}
 
@@ -106,98 +108,128 @@ specify an a priori known component included in the glm fitting process.}
 It is set to \code{[stats]{glm.control()}} by default.}
 
 \item{laplace}{Logical variable to access the Laplace approximation to the
-marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
-for more details.}
+marginal likelihood of \pkg{BAS}.}
 }
 \value{
 \code{missingBVS.glm} returns an object of class \code{missingBVS}
 with the following elements:
-\item{time}{The internal time consumed in solving the problem}
-\item{glmfull}{If missings on the competing variables, object of class
-\code{\link[mice]{mipo}} that combines the estimates for the model defined by
-\code{formula} fitted by \code{\link[stats]{glm}} over
-the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
-for details. Otherwise, it is the \code{glm} object for the \code{formula} model}
-\item{glmnull}{The \code{glm} class object that results when the null model,
-the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
-\item{variables}{Names of all the potential (non-fixed) explanatory variables}
+\item{time}{Time lasted solving the problem}
+\item{glmfull}{If missings on the \code{formula} competing variables, combination
+of the estimates of glm fitted full model over the \code{n.imp} imputed datasets.
+Otherwise, it is the \code{\link[stats]{glm}} object}
+\item{glmnull}{The \code{glm} class object that results when \code{null.model}
+is fitted by \code{\link[stats]{glm}}}
+\item{variables}{Names of all the competing variables given by \code{formula}}
 \item{n}{Number of observations}
-\item{p}{Number of explanatory variables to select from}
-\item{k}{Number of fixed variables}
+\item{p}{Number of explanatory variables (covariates and/or factors) to select from}
+\item{k}{Number of fixed variables given by \code{null.model}}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model}
-\item{positions}{\code{matrix} with L rows and p plus the number of dummies
-resulting from factors columns - L, where L is the number of factors, with 1
-if the column dummy corresponds to the row factor and 0 otherwise}
+\item{positions}{Matrix with L rows and p1 * (sum_j l_j - L), where p1 is the number
+of covariates, L the number of factors and l_j the number of levels of the jth factor,
+with 1 if the column dummy makes up the row factor and 0 otherwise (when relevant)}
 \item{positionsx}{Logical vector of length p indicating whether or not the
-variable is a numerical covariate}
-\item{modelsrankdefprob}{A (n.keep)x(p+number of dummies+1) \code{matrix} which
-summaries the \code{n.keep} most probable a posteriori models and their probabilities}
-\item{modelsprob}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
-summaries the keeped models and their associated Bayes factor in logaritmic scale}
-\item{inclprob}{Named vector with the inclusion probabilities of the potential
-explanatory variables}
-\item{postprobdim}{Posterior probabilities over the true model dimension}
-\item{priorprobs}{Prior probabilities over the true model dimension}
+variable is a numerical covariate (when relevant)}
+\item{modelsrankdefprob}{A \code{n.keep} x (p1 * (sum_j l_j - L)+1) matrix which
+summarizes the \code{n.keep} most probable a posteriori submodels and their
+probabilities (when relevant)}
+\item{modelsprob}{A \code{n.keep} x (p+1) matrix which summarizes the \code{n.keep}
+most probable a posteriori models and their associated probability}
+\item{inclprob}{Named vector with the inclusion probabilities of p competing variables}
+\item{postprobdim}{Posterior probabilities over the true model size}
+\item{C}{The value of the normalizing constant C=sum_i AvBi * Pr(Mi)}
 \item{call}{The \code{call} to the function}
-\item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
-model space)}
-\item{imp.args}{List of arguments used for the imputation step}
-\item{compress.imp.array}{Compressed array of imputed datasets}
+\item{priorprobs}{Prior probabilities over the true model size}
+\item{imp.info}{List of arguments used for the imputation step and other
+information (when relevant)}
+\item{compress.imp.array}{Compressed array of imputed datasets (when relevant)}
 \item{family}{Family function among \code{\link[stats]{family}} used to specify
 the error distribution and link function to be used in the model}
 \item{weights}{Weights vector used in the glm fitting process}
 \item{offset}{Offset vector used in the glm fitting process}
-\item{BF.approx.method}{Function used to compute Bayes factors}
-\item{prior.betas}{\code{prior.betas}}
-\item{logprior.models}{Function used to compute the log-prior over the model space}
-\item{logprior.models.dumm}{Function used to compute the log-prior over the
-model space of the factor levels}
-\item{method}{\code{Full}}
+\item{BF.approx.method}{Function used to compute data-driven Bayes factors}
+\item{prior.betas}{Chosen \code{prior.betas} argument}
+\item{logprior.models}{Function used to compute the log-prior over the model space
+defined by covariates and/or factors}
+\item{prior.models}{Two-dimensional vector with \code{prior.models} and
+\code{prior.models.dummies} chosen. If there are no factors or \code{marginal.factors}
+is set to FALSE, it saves the only argument used, \code{prior.models}}
+\item{marginal.factors}{Logical to indicate whether or not are marginalized factors'
+model space probabilities such as García-Donato and Paulo (2022)}
+\item{method}{String "Full" denoting exhaustive model search}
 }
 \description{
-Computation and summaries of posterior distribution over the model space
-in problems of small to moderate size when missingness occurs in generalized
-linear models.
+Computation and summaries of posterior distribution over the model space in problems
+of small to moderate size in the presence of (possible) missing data and/or categorical
+variables in generalized linear models. Each posterior model probability is computed
+following the Bayesian Imputation Averaging (BIA) framework, using standard priors
+for model coefficients and the hierarchical approach of García-Donato and Paulo (2022)
+with factors.
 }
 \details{
-The set of competing models is made up by all the possible subsets of
-regressors specified by \code{formula}: Mi for i in 1,...,2^p, being p the number
-of potential (non-fixed) regressors in the variable selection problem. The simplest,
-nested in all of them, contains only the intercept. \code{MissingBvs} performs
-\code{n.imp} imputations given by \code{imp.mice.method} with the mice package and
-computes the posterior distribution over this model space through Bayes' theorem:
+The set of competing models is made up by all the possible subsets of regressors
+specified by \code{formula}: Mi for i in 1,...,2^p, being p the number of potential
+(non-fixed) regressors in the variable selection problem. It is assumed that the
+intercept term is present in all models. The simplest one M0, the \code{null.model}
+nested in the rest, contains the fixed variables, if given, and only the intercept by default.
+In order to implement BIA, \code{\link[MissingBVS]{missingBVS.glm}} can, either perform
+\code{n.imp} imputations designed by \code{imp.predict.mat} and \code{imp.mice.method}
+with the \pck{mice} package, or use user-given imputated datasets by the
+\code{imp.datasets} argument. Hence, the posterior distribution over the model space
+is given through Bayes' theorem:
 
-Pr(Mi | \code{data})=Pr(Mi)*Bi/C,
+Pr(Mi | \code{data}) = Pr(Mi) * AvBi / C,
 
-where Bi is an approximation of the Bayes factor of Mi to M0 under missing data,
+where AvBi is the Average Bayes factor (AvBF) of Mi to M0 under missing data,
 Pr(Mi) is the prior probability of Mi and C is the normalizing constant.
+AvBi is an actual Bayes factor (BF) and it is defined as the average of the
+\code{n.imp} data-driven BFs:
 
-Bi is computed as the average of the \code{n.imp} standard Bayes factors, B_i(j)
-for j in 1,...,\code{n.imp}, for Mi to M0 calculated for the jth imputed data set.
-If the BF computation method chosen is \code{"gprior"}, BF B_i(j) depends on
+AvBi = 1/\code{n.imp} * (Bi(1) + ... + Bi(\code{n.imp})),
+
+where Bi(j) corresponds to the BF for model Mi to M0 under the jth imputed dataset.
+Data-driven BF can be either computed using popular g-prior choices or approximated
+with the BIC (Schwarz, 1978) or the test-based BF (Held, Gravestock and Sabanés, 2015)
+with the \code{BF.approx.method} argument. Approximations can be done through the
+\pkg{BAS} faster computation if the \code{family} is one of the implemented there:
+\code{binomial(link = "logit")}, \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
+
+If the BF computation method chosen is \code{"gprior"}, data-driven BFs depend on
 the prior assigned for the model-specific parameters given by \code{prior.betas}
-and \code{MissingBvs.glm} uses the same choices as
-\code{[MissingBVS]{missingBVS.lm}} for generalized linear models developed by
-Li and Clyde (2018). It does so using the \pkg{BAS} logmarginal computation
-(Clyde, 2025) if the \code{family} chosen is one of the implemented in the package.
+and developed for generalized linear models by Li and Clyde (2018). It proceeds
+using the \pkg{BAS} log-marginal computation (Clyde, 2025) if the \code{family}
+chosen is ones of the available. Otherwise, method \code{"gprior"} is not provided.
+The choices currently available are:
+-"Robust" is the default option and denotes the criteria-based prior of Bayarri,
+Berger, Forte and Garcia-Donato (2012).
+-"gZellner" corresponds to the prior in Zellner (1986) with g=n fixed.
+-"Liangetal" prior is the hyper-g/n of Liang et al (2008) with a=3.
+-"FLS" corresponds to the prior in Zellner (1986) with g=max(n, p*p) fixed, the
+(benchmark) prior recommended by Fernandez, Ley and Steel (2001).
+-"intrinsic.WNC" is the intrinsic prior derived by Womack, Novelo and Casella (2014).
 
-The BF can also be approximated with the BIC (Schwarz, 1978) or the test-based
-BF (Held, Gravestock and Sabanés, 2015). It can be done through the \pkg{BAS}
-faster computation if the \code{family} is one of the implemented in the package.
+The prior over the model space Pr(Mi) offers three options throuh \code{prior.models}:
+-"Constant" assigns the same prior probability to every model.
+-"ScottBerger" is the default choice. It assigns the same prior probability to
+every possible model size and, therefore, accounts for multiplicity issues
+(Scott and Berger, 2010).
+-"User": if chosen, user has to provide a p+1 dimensional vector with the model size
+prior probabilities through \code{priorprobs}. The first component must contain the
+probability of the null model M0 and next p components correspond to the p prior
+probabilities of model sizes 1,...,p.
 
-The prior over the model space Pr(Mi) offers three possibilities:
-"Constant" assigns the same prior probability to every model.
-"ScottBerger" is the default choice. It assigns the same prior probability to
-every possible model dimension and, therefore, accounts for multiplicity issues
-(Scott and Berger 2010).
-"User" (see below).
-
-If \code{prior.models}="User" is chosen, user has to provide a p+1 dimensional
-parameter vector with the model dimension prior probabilities through \code{priorprobs}.
-The first component of \code{priorprobs} must contain the probability of the
-model with fixed variables; next p components correspond to the p prior probabilities
-of the possible model dimensions.
+In the presence of factors, in order to make results do not dependent on codification
+of factors Pr(Mi) is factorized following García-Donato and Paulo (2022). Each factor is
+represented by its rank defficient dummy parametrization, making each model with a factor
+active be the representation of the model space given by the 2^l-l different submodels with
+at least one dummy active, where l is the number of levels. This approach derives in a
+hierarchical prior where the part over the covariates and factors is a standard model
+prior given by \code{prior.models}. The prior over the submodels defined by the dummies,
+assumes a prior independence between factors and within a factor two options are available:
+"Constant" assigns the same prior to every submodel and "ScottBerger" to each model size,
+which is the recommended. Within all these priors, the prior inclusion probabilities
+of factors and numerical variables are 1/2, which does not happen when the selection is
+directly over dummies. A non-treatment of factors can be performed through \code{marginal.factors}.
 }
 \examples{
 \dontrun{
@@ -225,6 +257,14 @@ García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
 Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 
+Garcia-Donato, G. and Paulo, R. (2022)<DOI:10.1080/01621459.2021.1889565>
+Variable Selection in the Presence of Factors: A Model Selection Perspective.
+Journal of the American Statistical Association. 117. 1-27.
+
+Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes multiplicity
+adjustment in the variable-selection problem. The Annals of Statistics.
+38: 2587–2619.
+
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 Statistics. 6(2): 461–464.
 
@@ -246,9 +286,11 @@ by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 \seealso{
 Use \code{\link[MissingBVS]{MissingGibbsBvs.glm}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
+
+Consider \code{\link[MissingBVS]{plot.MissingBvs}} for graphical summaries of the
+posterior distribution.
 }
 \author{
 Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
-\keyword{package}

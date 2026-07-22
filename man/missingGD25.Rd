@@ -10,8 +10,6 @@ missingGD25(
   prior.models = "ScottBerger",
   priorprobs = NULL,
   n.keep = 10,
-  imp.time.test = TRUE,
-  initialimp.mice.method = "norm",
   n.imp = 390,
   imp.seed = runif(1, 0, 9011975)
 )
@@ -22,90 +20,86 @@ analysis. See details.}
 
 \item{data}{Data frame containing the data.}
 
-\item{prior.models}{Prior distribution over the model space (to be literally specified).
-Possible choices are "Constant", "ScottBerger" and "User" (see details).}
+\item{prior.models}{Model prior distribution over the covariates and/or factors
+model space (to be literally specified). Possible choices are "Constant",
+"ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
-dimensional vector defining the prior model probabilities (used for chosen
-\code{prior.models}= "User"; see details).}
+\item{priorprobs}{A p+1 (being p the number of competing variables) dimensional
+vector defining the prior model size probabilities (if \code{prior.models}= "User";
+see details).}
 
-\item{n.keep}{Number of the most probable models kept. By default it is set to
-10 and automatically adjusted if 10 is greater than the total number of models.}
+\item{n.keep}{It can be either the character "all" to return the whole model
+space or a numeric for the exact number of the most probable models to keep.
+By default it is set to 10 and automatically adjusted if 10 is greater than
+the total number of models.}
 
-\item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 30} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
-
-\item{initialimp.mice.method}{Method for mice's imputation.}
-
-\item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
+\item{n.imp}{Number of imputed datasets for model posterior computation.}
 
 \item{imp.seed}{Seed for imputation.}
 }
 \value{
 \code{missingGD25} returns an object of class \code{missingBVS}
 with the following elements:
-\item{time}{The internal time consumed in solving the problem}
-\item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
-for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
-the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
-\item{lmnull}{The \code{lm} class object that results when the null model,
-the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
-\item{variables}{Names of all the potential (non-fixed) explanatory variables}
+\item{time}{Time lasted solving the problem}
+\item{lmfull}{If missings on the \code{formula} competing variables, combination
+of the estimates of fitted full model over the \code{n.imp} imputed datasets.
+Otherwise, it is the \code{\link[stats]{lm}} object}
+\item{lmnull}{The \code{lm} class object that results when \code{null.model}
+is fitted by \code{\link[stats]{lm}}}
+\item{variables}{Names of all the competing variables given by \code{formula}}
 \item{n}{Number of observations}
-\item{p}{Number of explanatory variables to select from}
-\item{k}{Number of fixed variables}
+\item{p}{Number of explanatory covariates to select from}
+\item{k}{Number of fixed variables, which is fixed to 1}
 \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
 \item{MPMbin}{Binary expression of the Median Probability model}
-\item{modelsprob}{A (n.keep)x(p+1) \code{matrix} which summaries the \code{n.keep}
+\item{modelsprob}{A \code{n.keep} x (p+1) matrix which summarizes the \code{n.keep}
 most probable a posteriori models and their associated probability}
-\item{inclprob}{Named vector with the inclusion probabilities of the potential
-explanatory variables.}
-\item{postprobdim}{Posterior probabilities over the true model dimension}
-\item{priorprobs}{Prior probabilities over the true model dimension}
+\item{inclprob}{Named vector with the inclusion probabilities of p competing variables}
+\item{postprobdim}{Posterior probabilities over the true model size}
+\item{C}{The value of the normalizing constant C=sum_i AvBi * Pr(Mi)}
 \item{call}{The \code{call} to the function}
-\item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
-model space)}
-\item{imp.args}{List of arguments used for the imputation step}
+\item{priorprobs}{Prior probabilities over the true model size}
+\item{imp.info}{List of arguments used for the imputation step and other information}
 \item{compress.imp.list}{Compressed list of imputed datasets and covariance
 matrices}
 \item{logprior.models}{Function used to compute the log-prior over the model space}
-\item{method}{\code{Full}}
+\item{prior.models}{Argument chosen for \code{prior.models}}
+\item{method}{String "Full" denoting exhaustive model search}
 }
 \description{
 Computation and summaries of posterior distribution over the model space
-in problems of small to moderate size when missingness occurs in linear
-models with normally distributed covariates.
+in problems of small to moderate size, when missingness occurs in linear
+models with normally distributed covariates under the g'-imputation prior of
+García-Donato et al. (2025).
 }
 \details{
-The set of competing models is made up by all the possible subsets of
-regressors specified by \code{formula}: Mi for i in 1,...,2^p, being p the number
-of potential (non-fixed) covariates in the variable selection problem. The simplest,
-nested in all of them, contains only the intercept. \code{MissingGD25} performs
-\code{n.imp} imputations given by the result of \code{\link[MissingBVS]{MC.imputation}}
-and computes the posterior distribution over this model space through Bayes' theorem:
+The set of competing models is made up by all the possible subsets of regressors
+specified by \code{formula}: Mi for i in 1,...,2^p, being p the number of potential
+regressors in the variable selection problem. It is assumed that the intercept term
+is present in all models, and the simplest one, the null, contains only this term.
+\code{\link[MissingBVS]{missingGD25}} performs for the regressors \code{n.imp}
+imputations from an objective Bayesian multivariate normal model (Sun and Berger, 2006),
+along with their variance-covariance matrices. Hence, the posterior distribution
+over the model space is given through Bayes' theorem:
 
-Pr(Mi | \code{data})=Pr(Mi)*Bi/C,
+Pr(Mi | \code{data}) = Pr(Mi) * Bi / C,
 
-where Bi is the Bayes factor(BF) of Mi to M0 under missing data proposed by
-García-Donato et al (2025), Pr(Mi) is the prior probability of Mi and C is
-the normalizing constant.
+where Bi is the Bayes factor (BF) of Mi to M0 derived a the expected value of g'BF of
+García-Donato et al. (2025) for normal random regressors, Pr(Mi) is the prior
+probability of Mi and C is the normalizing constant. The g'BFs are computed
+with \code{\link[MissingBVS]{BF.miss.X}}, which resemble g-prior BFs (Zellner, 1986)
+for random covariates, for each pair of imputed dataset and  variance-covariance
+matrix simulated. The integral of g'BF is approximated with a Monte Carlo scheme.
 
-Bi is computed as the MonteCarlo approximation of the integral defining the
-BF, for Mi to M0 calculated for the jth imputed data set.
-
-The prior over the model space Pr(Mi) offers three possibilities:
-"Constant" assigns the same prior probability to every model.
-"ScottBerger" is the default choice. It assigns the same prior probability to
-every possible model dimension and, therefore, accounts for multiplicity issues
-(Scott and Berger 2010).
-"User" (see below).
-
-If \code{prior.models}="User" is chosen, user has to provide a p+1 dimensional
-parameter vector with the model dimension prior probabilities through \code{priorprobs}.
-The first component of \code{priorprobs} must contain the probability of the
-model with fixed covariates; next p components correspond to the p prior probabilities
-of the possible model dimensions.
+The prior over the model space Pr(Mi) offers three options throuh \code{prior.models}:
+-"Constant" assigns the same prior probability to every model.
+-"ScottBerger" is the default choice. It assigns the same prior probability to
+every possible model size and, therefore, accounts for multiplicity issues
+(Scott and Berger, 2010).
+-"User": if chosen, user has to provide a p+1 dimensional vector with the model size
+prior probabilities through \code{priorprobs}. The first component must contain the
+probability of the null model M0 and next p components correspond to the p prior
+probabilities of model sizes 1,...,p.
 }
 \examples{
 \dontrun{
@@ -140,15 +134,21 @@ adjustment in the variable-selection problem. The Annals of Statistics.
 Barbieri, M and Berger, J (2004)<DOI:10.1214/009053604000000238> Optimal
 Predictive Model Selection. The Annals of Statistics, 32, 870-897.
 
-van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
+Zellner, A. (1986)<DOI:10.2307/2233941> On Assessing Prior Distributions and
+Bayesian Regression Analysis with g-prior Distributions. In Bayesian
+Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
+Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
+
+Sun, D. and Berger, J. O. (2006) Objective Bayesian analysis for the multivariate
+normal model. In Bernardo, J. M., Bayarri, M. J., Berger, J. O., Dawid, A. P.,
+Heckerman, D., Smith, A. F. M., and West, M. (eds.), Proc. Valencia / ISBA 8th
+World Meeting on Bayesian statistics. Oxford university Press. MR2433206. 16
 }
 \seealso{
 Use \code{\link[MissingBVS]{MissingGibbsGD25}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
 }
 \author{
-arolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
+Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
-\keyword{package}

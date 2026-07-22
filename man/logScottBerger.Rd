@@ -4,7 +4,7 @@
 \alias{logScottBerger}
 \title{Logarithm of the Scott and Berger model prior}
 \usage{
-logScottBerger(p, model)
+logScottBerger(p = length(model), model)
 }
 \arguments{
 \item{p}{Number of covariates to select from.}
@@ -20,12 +20,11 @@ Computes the logarithm of the prior that assigns an uniform distribution to
 model size (Scott and Berger, 2010)
 }
 \details{
-It is derived by assigning an independent Bernouilli distribution with
-probability Beta(1,1) to the a priori inclusion probability of each
-competing variable.
+This prior is derived by assigning an independent Bernouilli distribution with
+probability Beta(1,1) to the a priori inclusion probability of each competing variable.
 }
 \examples{
-logScottBerger(7, c(rep(1,4),rep(0,3))) # log((p + 1)^(-1) / choose(p, sum(model)))
+logScottBerger(model = c(rep(1,4),rep(0,3))) # log((p + 1)^(-1) / choose(p, sum(model)))
 
 }
 \references{

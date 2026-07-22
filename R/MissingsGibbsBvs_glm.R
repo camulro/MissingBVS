@@ -1,13 +1,17 @@
-#' Bayesian Variable Selection with Missing data for generalized linear models
-#' using Gibbs sampling
+#' Bayesian Imputation Averaging for Variable Selection with Missing data in
+#' generalized linear models using Gibbs sampling
 #'
-#' Approximate computation of summaries of the posterior distribution using a
-#' Gibbs sampling algorithm to explore the model space and frequency of
-#' "visits" to construct the estimates. It was originally proposed by George
-#' and McCulloch (1997) and further studied by Garcia-Donato and
-#' Martinez-Beneito (2013). They shown that the sampling strategy in
-#' combination with estimates based on frequency of visits provides very
-#' reliable results.
+#' Approximate computation of summaries of the posterior model distribution using a
+#' Gibbs sampling algorithm to explore the model space. Each posterior model probability is computed following the
+#' Bayesian Imputation Averaging (BIA) framework, using standard priors for model coefficients
+#' and the hierarchical approach of García-Donato and Paulo (2022) with factors.
+#'
+#' Gibbs sampling search algorithm to avoid exhaustive enumeration of model space
+#' when it is unfeasible. It draws from the model posterior distribution and uses
+#' frequency of "visits" to construct the estimates. The algorithm was originally
+#' proposed by  George and McCulloch (1997). Later, Garcia-Donato and Martinez-Beneito (2013)
+#' shown that the sampling strategy in combination with estimates based on frequency of
+#' visits provides very reliable results.
 #'
 #' \code{\link[MissingBVS]{MissingGibbsBvs.glm}} is a heuristic approximation of
 #' \code{\link[MissingBVS]{MissingBvs.glm}}. See the later for common details.
@@ -17,61 +21,54 @@
 #' analysis. See details.
 #' @param data Data frame containing the data.
 #' @param family String, function or the call to a family function among
-#' \code{\link[stats]{family}} to specify the error distribution and link
-#' function to be used in the model. If it is one of the implemented families in
-#' \pkg{BAS}: \code{binomial(link = "logit")},
-#' \code{poisson(link = "log")} and \code{Gamma(link = "log")}; a faster version
-#' using BAS logmarginal computation is performed.
-#' @param null.model Formula defining which is the simplest (null) model, which.
-#' should be nested in the full one. By default, it is defined to be the one
+#' \code{\link[stats]{family}} to specify the error distribution and link function to be
+#' used in the model. If it is one of the implemented families in \pkg{BAS}:
+#' \code{binomial(link = "logit")}, \code{poisson(link = "log")} and \code{Gamma(link = "log")};
+#' a faster version using \pkg{BAS} log-marginal computation is performed.
+#' @param null.model Formula defining which is the simplest (null) model, nested in
+#' the full one with possible fixed variables. By default, it is defined to be the one
 #' with just the intercept.
-#' @param BF.approx.method Method used to approximate Bayes factors with missing
-#' data (to be literally specified). Possible choices include "BIC", "TBF" and
-#' "gprior" (see details).
-#' @param prior.betas Prior distribution for regression parameters within each
-#' model (to be literally specified). Possible choices are the ones implemented
-#' in \pkg{BayesVarSel}: "Robust", "Liangetal", "gZellner", "ZellnerSiow",
-#' "FLS", "intrinsic.MGC" and "IHG" (see details).
-#' @param prior.models Prior distribution over the model space (to be literally specified). Possible
-#' choices are "Constant", "ScottBerger" and "User" (see details).
-#' @param prior.models.dummies Prior distribution over the model space of the
-#' factor levels (to be literally specified). Possible choices are "Constant" and
-#' "ScottBerger" (see details).
-#' @param priorprobs A p+1 (being p the number of non-fixed variables)
-#' dimensional vector defining the prior model probabilities (used for chosen
-#' \code{prior.models}= "User"; see details.)
-#' @param init.model The model at which the simulation process starts. Options
-#' include "Null" (the model only with the variables specified in
-#' \code{null.model}), "Full" (the model defined by \code{formula}), "Random" (a
-#' randomly selected model) and a vector with p (the number of factors and/or
-#' covariates to select from) zeros and ones defining a model.
-#' @param n.iter The total number of iterations performed after the burn in
-#' process.
-#' @param n.burnin Length of burn in, i.e. number of iterations to discard at
-#' the beginning.
-#' @param n.thin Positive integer defining the thinning rate. Default is 1.
-#' Set 'n.thin' > 1 to save memory and computation time if 'n.iter' is large.
-#' A large \code{n.thin} can reduce the accuracy because it, along with \code{n.iter},
-#' sets the number of simulations used to construct the estimates.
-#' @param parallelmice Logital to indicate whether or not to use parallel
-#' \code{\link[mice]{mice}} imputation. If \code{NULL}, automatically performs
-#' the parallel mice imputation if the number of imputations or the dataset are
-#' big enough.
-#' @param n.core See \code{\link[mice]{futuremice}} for details.
-#' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 30} if the number of variables or
-#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
-#' @param imp.mice.method Method for mice's imputation. Can be a string or a
-#' vector of strings of length p1, where p1 is the number of independent
-#' variables given by \code{formula} with \code{NAs}.
-#' @param imp.predict.mat \code{matrix} with p1 rows and p2 columns, where p2
-#' is the number of variables used to impute. Each entry equals 1 if the
-#' column variable is used as a predictor for the corresponding row variable in the
-#' imputation step. By default, the \code{\link[mice]{quickpred}} function
-#' is used for the variables with NAs in formula and 0s for the rest of them.
-#' @param n.imp Number of imputed data sets used for Bayes factor computation.
-#' @param imp.datasets Array or list for imputed datasets if given by user. By
-#' default \code{NULL} and imputation is performed following the other parameters.
+#' @param BF.approx.method Method used to compute or approximate data-driven Bayes factors
+#' (to be literally specified). Possible choices include "BIC", "TBF" and "gprior"
+#' (see details).
+#' @param prior.betas Prior distribution for model coefficients if "gprior" method is
+#' chosen (to be literally specified). Possible choices are: "Robust", "Liangetal",
+#' "gZellner", "FLS" and "intrinsic.WNC" (see details).
+#' @param prior.models Model prior distribution over the covariates and/or factors
+#' model space (to be literally specified). Possible choices are "Constant",
+#' "ScottBerger" and "User" (see details).
+#' @param prior.models.dummies Prior distribution over the dummies submodel space
+#' given by the active factors (to be literally specified). Possible choices are
+#' "Constant" and "ScottBerger" (see details).
+#' @param marginal.factors Logical to indicate whether or not to marginalize factors'
+#' probabilities such as García-Donato and Paulo (2022). By default, it is set to TRUE.
+#' @param priorprobs A p+1 (being p the number of non-fixed variables) dimensional
+#' vector defining the prior model size probabilities (if \code{prior.models}= "User";
+#' see details).
+#' @param init.model The model at which the simulation process starts.
+#' It can be either a string: "Null" for \code{null.model}, "Full" for \code{formula}
+#' and "Random" for a randomly selected model; or a vector with p (the number of factors
+#' and/or covariates to select from) zeros and ones defining a model.
+#' @param n.iter The total number of iterations performed after burn in.
+#' @param n.burnin Number of iterations to discard at the beginning.
+#' @param n.thin Positive integer that states the number of models to discard before one
+#' is saved. Default is 1, larger values are suggested if needed less memory and computation
+#' but they can reduce accuracy because estimates are based on fewer simulations.
+#' @param imp.mice.method Method for \pck{mice}'s imputation. Can be either a string
+#' or a vector of strings of length the number of variables in data, except the response.
+#' @param imp.predict.mat Matrix with \code{formula}'s competing variables in rows
+#' and some \code{data}'s variables in columns. Each entry equals 1 if the column variable
+#' is used as a predictor for the corresponding row variable in the imputation step. Order
+#' in columns defines the imputation visit sequence. By default, a shortcut is used to
+#' define the most important predictors for each variable based on correlations.
+#' @param n.imp Number of imputed datasets for model posterior computation.
+#' @param maxit Number of iterations for \pck{mice}'s imputation. By default, it is 5.
+#' @param parallelmice Logical to indicate whether or not to use parallelization on
+#' \code{\link[mice]{mice}}'s imputation. By default, automatically performs it if the
+#' number of imputations or competing variables given by \code{formula} are big enough.
+#' @param n.core Number of cores for parallel imputation.
+#' @param imp.datasets Array or list for imputed datasets if given by user. By default
+#' it is set to NULL and imputation is performed following other imputation arguments.
 #' @param Gibbs.seed Seed for the Gibbs sampler algorithm.
 #' @param imp.seed Seed for imputation.
 #' @param weights NULL or numeric vector of the same length as \code{y} to
@@ -81,56 +78,56 @@
 #' @param control List of parameters for controlling the glm fitting process.
 #' It is set to \code{[stats]{glm.control()}} by default.
 #' @param laplace Logical variable to access the Laplace approximation to the
-#' marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
-#' for more details.
+#' marginal likelihood of \pkg{BAS}.
 #'
-#' @return \code{missingGibbsBVS.lm} returns an object of class \code{missingBVS}
+#' @return \code{missingGibbsBVS.glm} returns an object of class \code{missingBVS}
 #' with the following elements:
-#' \item{time}{The internal time consumed in solving the problem}
-#' \item{glmfull}{If missings on the competing variables, object of class
-#' \code{\link[mice]{mipo}} that combines the estimates for the model defined by
-#' \code{formula} fitted by \code{\link[stats]{glm}} over
-#' the \code{n.imp} (if \code{> 1}) imputed datasets; see \code{\link[mice]{pool}}
-#' for details. Otherwise, it is the \code{glm} object for the \code{formula} model}
-#' \item{glmnull}{The \code{glm} class object that results when the null model,
-#' the one with just the intercept term, is fitted by \code{\link[stats]{glm}}}
-#' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
+#' \item{time}{Time lasted solving the problem}
+#' \item{glmfull}{If missings on the \code{formula} competing variables, combination
+#' of the estimates of glm fitted full model over the \code{n.imp} imputed datasets.
+#' Otherwise, it is the \code{\link[stats]{glm}} object}
+#' \item{glmnull}{The \code{glm} class object that results when \code{null.model}
+#' is fitted by \code{\link[stats]{glm}}}
+#' \item{variables}{Names of all the competing variables given by \code{formula}}
 #' \item{n}{Number of observations}
-#' \item{p}{Number of explanatory variables to select from}
-#' \item{k}{Number of fixed variables}
+#' \item{p}{Number of explanatory variables (covariates and/or factors) to select from}
+#' \item{k}{Number of fixed variables given by \code{null.model}}
 #' \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
-#' \item{MPMbin}{Binary expression of the Median Probability model using
-#' \code{inclprobRB}}
-#' \item{positions}{\code{matrix} with L rows and p plus the number of dummies
-#' resulting from factors columns - L, where L is the number of factors, with 1
-#' if the column dummy corresponds to the row factor and 0 otherwise}
+#' \item{MPMbin}{Binary expression of the Median Probability model using \code{inclprobRB}}
+#' \item{positions}{Matrix with L rows and p1 * (sum_j l_j - L), where p1 is the number
+#' of covariates, L the number of factors and l_j the number of levels of the jth factor,
+#' with 1 if the column dummy makes up the row factor and 0 otherwise (when relevant)}
 #' \item{positionsx}{Logical vector of length p indicating whether or not the
-#' variable is a numerical covariate}
-#' \item{modelsrankdeflogBF.PM}{A \code{floor(n.iter/n.thin)}xx(p+number of dummies+1)
-#' \code{matrix} which summaries the keeped models and their associated Bayes
-#' factor plus model prob in logaritmic scale}
-#' \item{modelslogBF}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
-#' summaries the keeped models and their associated Bayes factor in logaritmic scale}
-#' \item{inclprob}{Named vector with the inclusion probabilities of the potential
-#' explanatory variables}
+#' variable is a numerical covariate (when relevant)}
+#' \item{modelsrankdefprob}{A floor(\code{n.iter}/\code{n.thin}) x (p1 * (sum_j l_j - L)+1)
+#' matrix which summarizes the floor(\code{n.iter}/\code{n.thin}) visited submodels
+#' and their log-Bayes factors (when relevant)}
+#' \item{modelslogBF}{A floor(\code{n.iter}/\code{n.thin}) x (p+1) matrix which summarizes
+#' the floor(\code{n.iter}/\code{n.thin}) visited models and their associated log-Bayes factors}
+#' \item{inclprob}{Named vector with the inclusion probabilities of p competing variables}
 #' \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-#' \item{postprobdim}{Estimated posterior probabilities over the true model dimension}
-#' \item{priorprobs}{Prior probabilities over the true model dimension}
+#' \item{postprobdim}{Estimated posterior probabilities over the true model size}
+#' \item{C}{The value of the estimated normalizing constant}
+#' \item{postprobs}{Estimated posterior probability}
 #' \item{call}{The \code{call} to the function}
-#' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
-#' model space)}
-#' \item{imp.args}{List of arguments used for the imputation step}
-#' \item{compress.imp.array}{Compressed array of imputed datasets}
+#' \item{priorprobs}{Prior probabilities over the true model size}
+#' \item{imp.info}{List of arguments used for the imputation step and other
+#' information (when relevant)}
+#' \item{compress.imp.array}{Compressed array of imputed datasets (when relevant)}
 #' \item{family}{Family function among \code{\link[stats]{family}} used to specify
 #' the error distribution and link function to be used in the model}
 #' \item{weights}{Weights vector used in the glm fitting process}
 #' \item{offset}{Offset vector used in the glm fitting process}
-#' \item{BF.approx.method}{Function used to compute Bayes factors}
-#' \item{prior.betas}{\code{prior.betas}}
-#' \item{logprior.models}{Function used to compute the log-prior over the model space}
-#' \item{logprior.models.dumm}{Function used to compute the log-prior over the
-#' model space of the factor levels}
-#' \item{method}{\code{Gibbs}}
+#' \item{BF.approx.method}{Function used to compute data-driven Bayes factors}
+#' \item{prior.betas}{Chosen \code{prior.betas} argument}
+#' \item{logprior.models}{Function used to compute the log-prior over the model space
+#' defined by covariates and/or factors}
+#' \item{prior.models}{Two-dimensional vector with \code{prior.models} and
+#' \code{prior.models.dummies} chosen. If there are no factors or \code{marginal.factors}
+#' is set to FALSE, it saves the only argument used, \code{prior.models}}
+#' \item{marginal.factors}{Logical to indicate whether or not are marginalized factors'
+#' model space probabilities such as García-Donato and Paulo (2022)}
+#' \item{method}{String "Gibbs" denoting Gibbs sampling model search}
 #'
 #' @author  Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
@@ -168,8 +165,6 @@
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 #' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 #'
-#' @keywords package
-#'
 #' @examples
 #' \dontrun{
 #' #Indian Prime Diabetes Data from VIM's package
@@ -198,22 +193,23 @@ missingGibbsBVS.glm <- function (formula,
                                  prior.betas = "Robust",
                                  prior.models = "ScottBerger",
                                  prior.models.dummies = "ScottBerger",
+                                 marginal.factors = TRUE,
                                  priorprobs = NULL,
                                  init.model = "Full",
                                  n.iter = 10000,
                                  n.burnin = 500,
                                  n.thin = 1,
-                                 parallelmice = NULL,
-                                 n.core = NULL,
-                                 imp.time.test = TRUE,
                                  imp.mice.method = "pmm",
                                  imp.predict.mat = NULL,
                                  n.imp = 039E1,
+                                 maxit = 5,
+                                 parallelmice = NULL,
+                                 n.core = NULL,
                                  imp.datasets = NULL,
                                  Gibbs.seed = runif(1,0,26061970),
                                  imp.seed = runif(1,0,09011975),
-                                 weights = rep(1, dim(data)[1]),
-                                 offset = rep(0, dim(data)[1]),
+                                 weights = rep.int(1, dim(data)[1]),
+                                 offset = rep.int(0, dim(data)[1]),
                                  control = glm.control(),
                                  laplace = 0L) {
 
@@ -227,31 +223,24 @@ missingGibbsBVS.glm <- function (formula,
     stop("The response in the full and null model does not coincide.\n")
   }
 
-  #check whether the family chosen is among the options provided by BAS
-  inBAS <- checkforfamily(family, BF.approx.method)
-
   #select environment to get glm arguments
-  environment(formula) <- environment()
-  environment(null.model) <- environment()
-
-  #for the C code
-  weights <- as.numeric(weights)
-  offset <- as.numeric(offset)
-  laplace <- as.integer(laplace)
+  environment(formula) <- environment(null.model) <- env <- environment()
 
   #Build matrices and objects needed later on
-  buildmatrices.list <- buildmatrices(formula, null.model, data)
-  list2env(buildmatrices.list, envir = environment())
-
-  #Check arguments and compute init.model
-  init.model <- checkGibbsarguments(p, p0, namesnull, namesx, init.model)
+  buildmatrices.list <- buildmatrices(formula, null.model, data, marginal.factors)
+  list2env(buildmatrices.list, envir = env)
 
   #Check model priors chosen and define the function to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, q)
 
-  if (L > 0) {
-    lprior.models.dummies <- checkforprior.models.dummies(prior.models.dummies, l)
-  } else lprior.models.dummies <- function(delta, tau) 0
+  mF <- L > 0 & marginal.factors
+  #Check arguments and compute init.model
+  init.model <- checkGibbsarguments(p, p0, namesnull, namesx, init.model, mF,
+                                    positions, positionsfac, l, firstd)
+
+  #Check if factors present and if marginalization of their probabilities. Define model prior
+  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions, positionsfac,
+                                     firstd, lprior.models)
 
   #Evaluate the null model:
   glmnull <- glm(formula = null.model,
@@ -261,85 +250,83 @@ missingGibbsBVS.glm <- function (formula,
                  weights = weights,
                  offset = offset,
                  control = control)
+  #correct glm arguments
+  family <- glmnull$family; weights <- glmnull$prior.weights; offset <- glmnull$offset
 
   #The response variable
   y <- glmnull$y; obsnotNA <- names(y) #without missings
-  y <- as.numeric(y)
   n <- length(y) #observations without missings on the response
   devnull <- glmnull$deviance #deviance of the null model
+  logmargnull <- as.numeric(-0.5 * devnull) #= log-marginal likelihood of null model - K, K constant
 
-  weights <- weights[as.numeric(obsnotNA)]
-  offset <- offset[as.numeric(obsnotNA)]
+  y <- as.numeric(y); laplace <- as.integer(laplace) #for the C code
+
+  #check whether the family chosen is among the options provided by BAS
+  inBAS <- checkforfamily(family, BF.approx.method)
 
   #Check approx method and priors chosen and define the function to be used
-  BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
-                                              n, p, p0, y, null.model,
-                                              data[obsnotNA,], family, devnull,
+  BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS, n, p, p0, y,
+                                              logmargnull, family, devnull,
                                               weights, offset, control, laplace)
 
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
   #check for missings and define competing variables with NAs
   NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
-
   #Imputation step
-  if (!is.null(NAvars)) {
-    if (is.null(imp.datasets)) { #if not given imputed array
-      buildimputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat,
-                                              n.imp, n, q, p0, imp.time.test, imp.mice.method, imp.seed,
-                                              parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-      list2env(buildimputation.list, envir = environment())
-    } else {
-      extimputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
-                                          ordvars, obsnotNA, p0, BF.approx.method, NAvars)
-      list2env(extimputation.list, envir = environment())
-    }
+  if (anyNAvar <- !is.null(NAvars)) {
+    if (is.null(imp.datasets)) { #if there are no given imputations, build them
+      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
+                                         n, q, p0, imp.mice.method, imp.seed,
+                                         parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
+    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
+                                            ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+    list2env(imputation.list, envir = env)
   }
 
   #Info:
   cat("Info. . .\n")
-  cat("Most complex model has a total of", q + q0, "covariates and/or factors.\n")
+  if (mF) {
+    cat("Most complex model has a total of", q + q0, "covariates and/or factors.\n")
+  } else cat("Most complex model has a total of", q + q0, "competing variables.\n")
   if (q0 == 1) {
-    cat(paste0("From those 1 is fixed (the intercept) and we should select from the remaining ",
-               q, ".\n"))
-  } else  cat(paste0("From those ", q0, " are fixed and we should select from the remaining ",
-                     q, ".\n"))
-
-  cat("  Numerical covariates:", depvars[positionsx], "\n")
-  if (L > 0) cat(" Factors:", depvars[!positionsx], "\n")
+    cat("From those 1 is fixed (the intercept) and we should select from the remaining",
+        q, ".\n")
+  } else cat("From those", q0, "are fixed and we should select from the remaining",
+             q, ".\n")
+  if (mF) {
+    cat("  Numerical covariates:", depvars[positionsx], "\n")
+    cat(" Factors:", depvars[!positionsx], "\n")
+  } else  cat("  Competing variables:", depvars, "\n")
 
   cat("The problem has a total of", 2^p, "competing models.\n")
   cat("Of these,", n.iter + n.burnin, "are sampled with replacement.\n")
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
   #George and McCulloch's Gibbs exploration
-  gibbs.list <- GM97.Gibbs(y, X0, X.full, p, namesxnotnull, NAvars,
-                           lprior.models, lprior.models.dummies, lBF.method, BF.approx.method,
-                           positions, positionsfac, l, L, firstd,
-                           init.model, n.iter, n.burnin, n.thin, Gibbs.seed)
-  list2env(gibbs.list, envir = environment())
+  set.seed(Gibbs.seed)
+  gibbs.list <- GM97.Gibbs(X0, X.full, p, namesxnotnull, NAvars, lp.model, lBF.method,
+                           BF.approx.method, mF, positions, init.model, n.iter, n.burnin, n.thin)
+  list2env(gibbs.list, envir = env)
 
   #Summ up Gibbs sampling results
-  summ.Gibbs.list <- summ.Gibbs(cf.models.lPM, inclprobRB, q, n.iter, n.thin,
-                                lprior.models, lprior.models.dummies, positionsx)
-  list2env(summ.Gibbs.list, envir = environment())
+  summ.Gibbs.list <- summ.Gibbs(cf.models.lBF, all.lBF.PM, inclprobRB, q, n.iter)
+  list2env(summ.Gibbs.list, envir = env)
 
-  if (!is.null(NAvars)) {#Pool results for imputed datasets
+  if (anyNAvar) {#Pool results for imputed datasets
     imp.array <- imputation.array
     #remove first dummy on each factor, first p0 vars are the fixed ones
-    if (L > 0) imp.array <- imp.array[,-c(indf + p0), , drop = FALSE]
+    if (mF) imp.array <- imp.array[,-c(indf + p0), , drop = FALSE]
     #Evaluate glm of full model with missings using Rubin's rule
     fit <- list()
     mt <- attr(framefull, "terms")
     for (i in 1:n.imp) {
       z <- glm.fit(x = imp.array[,,i], y = y, family = family,
                    weights = weights, offset = offset, control = control)
-      z$terms <- mt
-      class(z) <- "glm"
-
-      fit[[i]] <- z
+      z$terms <- mt; class(z) <- "glm"; fit[[i]] <- z
     }
     glmfull <- mice::pool(fit)
+    glmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read lmfull$call
   } else glmfull <- glm(formula,
                         data,
                         x = TRUE, y = TRUE,
@@ -364,57 +351,57 @@ missingGibbsBVS.glm <- function (formula,
   result$MPMbin <- mpm #The binary code for the MPM model
   names(result$MPMbin) <- depvars
 
-  if (L > 0) {
+  if (mF) {
     #matrix for the factors index
     result$positions <- positionsfac
     result$positionsx <- positionsx
-    result$modelsrankdeflogBF.PM <- all.models.lPM # rank deficient models and probs
+    result$modelsrankdefprob <- cbind(all.models.lBF[,-(p+1)], post) # rank deficient models and probs
   }
 
   #The binary code for all the visited models (after n.thin is applied) and the logBF
   result$modelslogBF <- cf.models.lBF
 
   result$inclprob <- inclprob #inclusion probability for each variable
-  result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
+  result$inclprobRB <- inclprobRB[n.iter, ] #Rao-Blackwellized inclusion probability
+  names(result$inclprobRB) <- depvars
 
   result$postprobdim <- probdim #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:q + q0 #dimension of the true model
+  result$C <- C #estimated normilizing constant
+  #Estimation of posterior probabilities based on C
+  result$postprobs <- post
 
   result$call <- match.call()
-  result$C <- C #estimated normilizing constant
 
   if(!identical(lprior.models, logUser)){
     priorprobs <- numeric(q+1)
     priorprobs[1] <- exp(lprior.models(numeric(q))) #prior inclusion prob for dimension 0
     for (i in seq_len(q)) {
-      priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, q - i))) + lchoose(q, i))
+      priorprobs[i+1] <- exp(lprior.models(c(rep.int(1, i), rep.int(0, q - i))) + lchoose(q, i))
       #prior inclusion probability for each dimension
     }
   }
   result$priorprobs <- priorprobs
   names(result$priorprobs) <- 0:q + q0 #dimension prior probability
 
-  #Estimation of posterior probabilities based on C
-  result$postprobs <- post
-
-  if (!is.null(NAvars)) {
+  if (anyNAvar) {
     #arguments used for imputation
-    result$imp.args <- imp.args
-
+    result$imp.info <- imp.info
     #save the imputed datasets for BMA or sensitivity analysis
     raw.imp.array <- serialize(imputation.array, NULL)
     result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
   }
 
   #glm arguments
-  result$family <- family
-  result$weights <- weights
-  result$offset <- offset
+  result$family <- family; result$weights <- weights; result$offset <- offset
 
   result$BF.approx.method <- BF.approx.method #function used for BF computation
   result$prior.betas <- prior.betas
-  result$logprior.models <- lprior.models #function used for model prior
-  if (L > 0) result$logprior.models.dumm <- lprior.models.dummies
+  result$logprior.models <- lp.model #function used for model prior
+  if (mF) {
+    result$prior.models <- c(prior.models, prior.models.dummies)
+  } else result$prior.models <- prior.models
+  result$marginal.factors <- marginal.factors #whether or not factors are marginalized
 
   result$method <- "Gibbs"
   class(result) <- "MissingBvs"

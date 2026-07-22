@@ -4,7 +4,7 @@
 \alias{logUser}
 \title{Logarithm of a User model prior}
 \usage{
-logUser(p, model, priorprobs)
+logUser(p = length(model), model, priorprobs)
 }
 \arguments{
 \item{p}{Number of covariates to select from.}
@@ -24,15 +24,15 @@ Computes the logarithm of the prior that assigns a user given prior for model
 size
 }
 \details{
-It is derived by assigning a fixed prior for model sizes given by user
+This prior is derived by assigning a fixed prior for model sizes given by user
 through the numeric vector \code{priorprobs}. Its first entry correspond to
 the null model, the second to the ones with exactly one active variable, and
 so on. Models of a given size receive the same amount of probability, such
-as Scott and Berger (2010).
+as Scott and Berger (2010)'s prior.
 }
 \examples{
 logUser(7, c(rep(1,4),rep(0,3)), c(0.3,rep(0.2,3),rep(0.1,4)))
-# log(priorprobs[sum(model)]/sum(priorprobs) / choose(p, sum(model)))
+# log(priorprobs[sum(model) + 1]/sum(priorprobs) / choose(p, sum(model)))
 
 }
 \references{

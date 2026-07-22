@@ -2,31 +2,30 @@
 % Please edit documentation in R/aux_fun_BF.R
 \name{BF.miss.X}
 \alias{BF.miss.X}
-\title{Logarithm of the Bayes factor in the MC step}
+\title{Logarithm of the g'-Bayes factor for an iteration in the MC step}
 \usage{
 BF.miss.X(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.center))
 }
 \arguments{
-\item{X.center}{Matrix of dimension \code{n}xk containing the imputed data.}
+\item{X.center}{Matrix of dimension \code{n}x\code{k} containing the imputed data.}
 
-\item{Sigma11}{Matrix of dimension kxk containing the corresponding
-covariance matrix.}
+\item{Sigma11}{Matrix of dimension \code{k}x\code{k} containing covariance matrices.}
 
 \item{y}{Response variable in the linear model.}
 
-\item{SS0}{Sum of squared error of the null model considered.}
+\item{SS0}{Sum of squared error of the null model.}
 
 \item{n}{Number of observations.}
 
 \item{k}{Number of model-specific coefficients.}
 }
 \value{
-\code{BF.miss.X} returns, in logarithmic scale, the Bayes factor in
-García-Donato et al (2025) for imputed data given by \code{X.center} and
-covariance matrix \code{Sigma11}.
+\code{BF.miss.X} returns, in logarithmic scale, the g'-Bayes factor
+of García-Donato et al (2025) for imputed data \code{X.center} and covariance
+matrix \code{Sigma11}.
 }
 \description{
-Computes the logarithm of the Bayes factor in the linear regression model
+Computes the logarithm of the g'-Bayes factor in the linear regression model
 with complete data, for normally distributed covariates. It employs the imputed
 data and covariance matrices of an \code{MC.imputation} object.
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/aux_fun_imputation.R
 \name{mice.imputation}
 \alias{mice.imputation}
-\title{\pkg{mice}'s imputation for Missing Bayesian Variable Selection (\pkg{MissingBVS})}
+\title{\pkg{mice}'s imputation for Bayesian Imputation Averaging in variable selection}
 \usage{
 mice.imputation(
   X,
@@ -10,7 +10,9 @@ mice.imputation(
   n.imp = 390,
   imp.predict.mat = mice::quickpred(X),
   imp.mice.method = "pmm",
+  visit.seq = NULL,
   seed = runif(1, 0, 9011975),
+  maxit = 5,
   parallel = n.imp > 120,
   n.core = NULL,
   time.test = FALSE
@@ -21,23 +23,28 @@ mice.imputation(
 
 \item{formula}{Formula defining the most complex (full) regression model.}
 
-\item{n.imp}{Number of imputed datasets to compute the average Bayes factor.}
+\item{n.imp}{Number of imputed datasets to compute the Average Bayes factor.}
 
-\item{imp.predict.mat}{\code{matrix} with p1 rows and \code{ncol(X)} columns,
-where p1 is the number of independent variables given by \code{formula} with
-\code{NAs}. Each entry equals 1 if the column variable is used as a predictor
-for the corresponding row variable in the \code{\link[mice]{mice}} imputation.
-By default, the \code{\link[mice]{quickpred}} function is used.}
+\item{imp.predict.mat}{\code{matrix} with ncol(\code{X}) rows and columns,
+where the order is defined by \code{X}. Each entry equals 1 if the column variable
+is used as a predictor of the corresponding row variable in the
+\code{\link[mice]{mice}} imputation. By default, the \code{\link[mice]{quickpred}}
+is used to specify each imputation model.}
 
 \item{imp.mice.method}{Method used by \code{\link[mice]{mice}} to impute the
-values. It can be a string or a vector of strings of length p1, where p1 is the number of independent
-variables given by \code{formula} with \code{NAs}.}
+values. It can be a string or a vector of strings of length ncol(\code{X}).}
+
+\item{visit.seq}{Vector of strings containing the names of the variables in \code{X}.
+The order given is the one that iterations of each imputation will follow.}
 
 \item{seed}{Seed chosen for the imputations.}
 
+\item{maxit}{Number of iterations of each imputation for convergence. By default,
+it is set to 5.}
+
 \item{parallel}{Logical to indicate whether or not to use parallel
-\code{\link[mice]{mice}} imputation. By default performs parallel mice
-imputation if the number of imputations is big enough (\code{n.imp > 120}).}
+\code{\link[mice]{mice}} imputation. By default, performs parallelization if the
+number of imputations is big enough (\code{n.imp} > 120).}
 
 \item{n.core}{See \code{\link[mice]{futuremice}} for details.}
 
@@ -47,18 +54,26 @@ imputation if the number of imputations is big enough (\code{n.imp > 120}).}
 \value{
 An object of class \code{MissingBVS.imputation}, an array of dimension
 nxpx\code{n.imp}, where n is the number of observations and p the number of
-competing covariates, containing the imputed datasets.
+competing covariates given by \code{formula}, containing the imputed datasets.
 }
 \description{
 Performs the Multiple Imputation by Chained Equations of \pkg{mice} and makes
-an array with the proper form to compute Bayesian Variable Selection in the
-presence of missing data. It can be applied to any kind of data with the correct
-imputation method.
+an array with the proper form to compute Bayesian Imputation Averaging for Variable
+Selection in the presence of missing data.
 }
 \details{
-A parallel version of \pkg{mice} can be performed through the \code{parallelmice}
-argument, which makes the imputation a lot faster for a big number of imputations
-or huge datasets.
+Performs flexible imputation for most kind of data with the correct arguments.
+The imputation model of each incomplete variable in \code{formula} can be explicitly
+specified with the matrix \code{imp.predict.mat}. If entry ij equals 1, the jth
+column variable is used as a predictor for the ith row variable, where the imputation
+model is given by the string or vector \code{imp.mice.method}. See \code{\link[mice]{mice}}
+for more details of the imputation method. Moreover, the order of imputed variables
+on each iteration of the method can be specified with \code{visit.seq} and the maximum
+number of iterations for convergence of each imputed dataset can be set with \code{maxit}.
+
+A parallel computation version of \pkg{mice} can be performed through the
+\code{parallelmice} argument, which makes the imputation procedure a lot faster
+for a big number \code{n.imp} of imputations or huge datasets \code´{X}.
 }
 \examples{
 \dontrun{

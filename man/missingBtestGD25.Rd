@@ -2,16 +2,13 @@
 % Please edit documentation in R/MissingsBtestGD25.R
 \name{missingBtestGD25}
 \alias{missingBtestGD25}
-\title{Bayes factors with missing data and posterior probabilities for lm and normal
-regressos}
+\title{Bayes factors and posterior probabilities for linear regression models with missing data}
 \usage{
 missingBtestGD25(
   data,
   models,
   prior.models = "Constant",
   priorprobs = NULL,
-  imp.time.test = TRUE,
-  initialimp.mice.method = "norm",
   n.imp = 390,
   imp.seed = runif(1, 0, 9011975)
 )
@@ -19,65 +16,72 @@ missingBtestGD25(
 \arguments{
 \item{data}{Data frame containing the data.}
 
-\item{models}{List with the entertained models and their defining formulas,
-with one nested in all the others. If the list is unnamed, default names are
-given.}
+\item{models}{List with the entertained models and their defining formulas, with one
+nested in all the others. If the list is unnamed, default names are given.}
 
-\item{prior.models}{Prior distribution over the model space (literally specified).
-Possible choices are "Constant", "ScottBerger" and "User" (see details).}
+\item{prior.models}{Model prior distribution over the covariates and/or factors
+model space (to be literally specified). Possible choices are "Constant",
+"ScottBerger" and "User" (see details).}
 
-\item{priorprobs}{A p+1 (being p the number of non-fixed covariates)
-dimensional vector defining the prior model probabilities (used for chosen
+\item{priorprobs}{A N dimensional vector (being N the number of competing models)
+defining the prior model probabilities for each one in \code{models} (if
 \code{prior.models}= "User"; see details).}
 
-\item{imp.time.test}{Logical to indicate whether to check or not time of performance
-of the imputation process with \code{n.imp = 30} if the number of variables or
-the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).}
-
-\item{initialimp.mice.method}{Method for mice's imputation.}
-
-\item{n.imp}{Number of imputed data sets used for Bayes factor computation.}
+\item{n.imp}{Number of imputed datasets for model posterior computation.}
 
 \item{imp.seed}{Seed for imputation.}
 }
 \value{
 \code{\link[MissingBVS]{MissingGD25Btest}} returns an object of type
 \code{MissingBtest} with the following elements:
-\item{lBFi0}{Bayes factor in logaritmic scale of each model to the null.}
-\item{PostProbi}{Posterior probabilities for each model in \code{models}.}
+\item{lBFi0}{Bayes factors in logaritmic scale of each model to the null}
+\item{PostProbi}{Posterior probabilities for each model in \code{models}}
 \item{models}{List with the entertained models.}
-\item{nullmodel}{Name in \code{models} of the null (simplest) model.}
-\item{modelspool}{List of objects of class \code{\link[mice]{mipo}} that
-combine the estimates for each model on \code{models} fitted by
-\code{\link[stats]{lm}} over the \code{n.imp} (if \code{> 1}) imputed
-datasets, see \code{\link[mice]{pool}} for details; and \code{lm} object
-when there are no missings}
-\item{imp.args}{List of arguments used for the imputation step}
-\item{prior.models}{Function used to compute the prior over the model space}
-\item{priorprobs}{Prior probabilities over the true model dimension}
+\item{nullmodel}{Name in \code{models} of the null (simplest) model}
+\item{modelspool}{If missings, list of the combined estimates for each model
+in \code{models} fitted by \code{\link[stats]{lm}} over the \code{n.imp} imputed
+datasets; or \code{lm} object when there are no missings}
+\item{imp.info}{List of arguments used for the imputation step and other information}
+\item{compress.imp.array}{Compressed array of imputed datasets}
+\item{logprior.models}{Function used to compute the log-prior over the model space
+defined by covariates and/or factors}
+\item{prior.models}{Argument chosen for \code{prior.models}}
+\item{priorprobs}{Prior probabilities over the true model size}
+\item{call}{The \code{call} to the function}
 }
 \description{
-It computes the Bayes factors and posterior probabilities in the presence
-of missing data of a list of linear regression models proposed to explain a
-common response. See \code{\link[MissingBVS]{MissingGD25}} for more details.
+The model space is build from a list of linear regression models proposed to explain
+a common response. It returns the Bayes factors and posterior probabilities computed
+in linear models with normally distributed covariates under the g' imputation prior of
+García-Donato et al. (2025).
 }
 \details{
-Null model is fixed to be the one with just the intercept term. If not provided
-by \code{models}, it is added at the end of the list.
+Given a list of competing models, the model space is made up by them, assuming that the
+intercept term is present in every model. The simplest one, the null, is fixed to be the
+one with just the intercept term. If not provided by \code{models}, it is automatically added.
+\code{\link[MissingBVS]{missingBtestGD25}} performs for the regressors \code{n.imp}
+imputations from an objective Bayesian multivariate normal model (Sun and Berger, 2006),
+along with their variance-covariance matrices. Hence, the posterior distribution
+over the model space is given through Bayes' theorem:
 
-The prior over the model space Pr(Mi) offers three possibilities:
-"Constant" assigns the same prior probability to every model, default choice.
-"ScottBerger" assigns the same prior probability to every possible model with
-the same size and, therefore, accounts for multiplicity issues
-(Scott and Berger 2010).
-"User" (see below).
+Pr(Mi | \code{data}) = Pr(Mi) * Bi / C,
 
-If \code{prior.models}="User" is chosen, user has to provide a q+1 dimensional
-parameter vector, where q is the number of diferent sizes among \code{models},
-with the model dimension prior probabilities through \code{priorprobs}.
-The first component of \code{priorprobs} must contain the probability of the
-null model; next q components correspond to the q prior probabilities
-of the possible model dimensions.
+where Bi is the Bayes factor (BF) of Mi to M0 derived a the expected value of g'BF of
+García-Donato et al. (2025) for normal random regressors, Pr(Mi) is the prior
+probability of Mi and C is the normalizing constant. The g'BFs are computed
+with \code{\link[MissingBVS]{BF.miss.X}}, which resemble g-prior BFs (Zellner, 1986)
+for random covariates, for each pair of imputed dataset and  variance-covariance
+matrix simulated. The integral of g'BF is approximated with a Monte Carlo scheme.
+
+The prior over the model space Pr(Mi) offers three options throuh \code{prior.models}:
+-"Constant" assigns the same prior probability to every model.
+-"ScottBerger" is the default choice. It assigns the same prior probability to
+every possible model size and, therefore, accounts for multiplicity issues
+(Scott and Berger, 2010).
+-"User": if chosen, user has to provide a p+1 dimensional vector with the model size
+prior probabilities through \code{priorprobs}. The first component must contain the
+probability of the null model M0 and next p components correspond to the p prior
+probabilities of model sizes 1,...,p.
 }
 \examples{
 \dontrun{
@@ -102,8 +106,19 @@ García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
 Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 
-van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
+Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes multiplicity
+adjustment in the variable-selection problem. The Annals of Statistics.
+38: 2587–2619.
+
+Zellner, A. (1986)<DOI:10.2307/2233941> On Assessing Prior Distributions and
+Bayesian Regression Analysis with g-prior Distributions. In Bayesian
+Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
+Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
+
+Sun, D. and Berger, J. O. (2006) Objective Bayesian analysis for the multivariate
+normal model. In Bernardo, J. M., Bayarri, M. J., Berger, J. O., Dawid, A. P.,
+Heckerman, D., Smith, A. F. M., and West, M. (eds.), Proc. Valencia / ISBA 8th
+World Meeting on Bayesian statistics. Oxford university Press. MR2433206. 16
 }
 \seealso{
 Use \code{\link[MissingBVS]{MissingGD25}} for an exact computation
@@ -113,4 +128,3 @@ of the model posterior distribution (recommended when p<20).
 Carolina Mulet and Gonzalo García-Donato
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
-\keyword{package}

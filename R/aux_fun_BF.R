@@ -1,19 +1,20 @@
-#' Logarithm of the MC approximation of the Bayes factor in linear models
+#' Logarithm of the MC approximation of the GD25 Bayes factor in linear models
 #'
-#' Computes the logarithm of the Bayes factor in the linear regression model
-#' when missingness occurs, assuming normally distributed covariates. It does so
-#' by approximating the integral via a MonteCarlo scheme with an
-#' \code{MC.imputation} object and using the BF computation auxiliary function
-#' given by \code{BF.miss.aux}.
+#' Computes the logarithm of the Bayes factor in linear regression models when
+#' covariates are random and normally distributed (García-Donato et al., 2025).
+#'
+#' The Bayes factor approximation is via a MonteCarlo scheme given the imputed datasets
+#' and variance-covariance matrices simuled in a \code{MissingBVS.imputation} object.
+#' The g'BF is computed with the auxiliary function \code{BF.miss.aux}.
 #'
 #' @param model Vector of indexes in {1,2,...,p} denoting the active variables
 #' for a given model with p competing covariates.
 #' @param imputation.list Object of class \code{MC.imputation} with the
 #' following elements: \code{rX.imput}Array of dimension \code{n}xpx\code{nMC}
-#' containing the imputed datasets \code{rSigma}Array of dimension
+#' containing the imputed datasets; \code{rSigma}Array of dimension
 #' pxpx\code{nMC} containing the corresponding covariance matrices
-#' @param BF.miss.aux Auxiliary function to compute the Bayes factor for each
-#' entry in \code{imputation.list}.
+#' @param BF.miss.aux Auxiliary function with needed fixed parameters to compute
+#' the g'-Bayes factor for each entry in \code{imputation.list}.
 #' @param n Number of observations.
 #' @param nMC Number of samples used to approximate, by MonteCarlo, the integral
 #' defining the Bayes factor.
@@ -75,23 +76,22 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
   return(lBF.miss)
 }
 
-#' Logarithm of the Bayes factor in the MC step
+#' Logarithm of the g'-Bayes factor for an iteration in the MC step
 #'
-#' Computes the logarithm of the Bayes factor in the linear regression model
+#' Computes the logarithm of the g'-Bayes factor in the linear regression model
 #' with complete data, for normally distributed covariates. It employs the imputed
 #' data and covariance matrices of an \code{MC.imputation} object.
 #'
-#' @param X.center Matrix of dimension \code{n}xk containing the imputed data.
-#' @param Sigma11 Matrix of dimension kxk containing the corresponding
-#' covariance matrix.
+#' @param X.center Matrix of dimension \code{n}x\code{k} containing the imputed data.
+#' @param Sigma11 Matrix of dimension \code{k}x\code{k} containing covariance matrices.
 #' @param y Response variable in the linear model.
-#' @param SS0 Sum of squared error of the null model considered.
+#' @param SS0 Sum of squared error of the null model.
 #' @param n Number of observations.
 #' @param k Number of model-specific coefficients.
 #'
-#' @return \code{BF.miss.X} returns, in logarithmic scale, the Bayes factor in
-#' García-Donato et al (2025) for imputed data given by \code{X.center} and
-#' covariance matrix \code{Sigma11}.
+#' @return \code{BF.miss.X} returns, in logarithmic scale, the g'-Bayes factor
+#' of García-Donato et al (2025) for imputed data \code{X.center} and covariance
+#' matrix \code{Sigma11}.
 #'
 #' @author María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
@@ -124,32 +124,32 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 
   return(lBFi0)
 }
-#' Logarithm of the Bayes factor with missing data
+#' Logarithm of the Average Bayes factor for any regression model with missing data
 #'
-#' Computes the logarithm of the Bayes factor when missingness occurs, with any
-#' type of covariates. It does so by averaging over the \code{n.imp} imputed
-#' datasets given by an \code{MissingBVS.imputation} object and using the BF
-#' computation auxiliary function given by \code{BF.approx.method}.
+#' Computes the logarithm of the Average Bayes factor (AvBF) when missingness occurs,
+#' for any type of covariates and regression model.
+#'
+#' The AvBF is computed by averaging over the \code{n.imp} imputed datasets given by a
+#' \code{MissingBVS.imputation} object, the \code{n.imp} data-driven BF for each given
+#' imputation. These BFs are computed with the auxiliary function \code{BF.approx.method}.
 #'
 #' @param model Vector of indexes in {1,2,...,p} denoting the active variables
 #' for a given model with p competing covariates.
-#' @param imputation.array Array of dimension \code{n}x(p+p0)x\code{n.imp}
+#' @param imputation.array Array of dimension nx(p+\code{p0})x\code{n.imp}
 #' containing the imputed datasets, where n is the number of observations.
-#' @param BF.approx.method Auxiliary function to compute the Bayes factor for
-#' each entry in \code{imputation.list}.
-#' @param p0 Number of fixed covariates (including the intercept).
-#' @param n.imp Number of imputed datasets by \code{mice.imputation} or
-#' \code{futuremice.imputation} functions.
+#' @param BF.approx.method Auxiliary function with some parameters fixed to compute
+#' the data-driven Bayes factor over each imputed datased in \code{imputation.list}.
+#' @param p0 Number of fixed covariates (including the intercept term).
+#' @param n.imp Number of imputed datasets.
 #'
-#' @return \code{lBF.approx} returns, in logarithmic scale, the average Bayes
-#' factor over the \code{n.imp} imputed datasets.
+#' @return \code{lBF.approx} returns, in logarithmic scale, the Average Bayes
+#' factor over the \code{n.imp} imputed datasets in \code{imputation.array}.
 #'
 #' @author María Eugenia Castellanos and Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{mice.imputation}} or
-#' \code{\link[MissingBVS]{futuremice.imputation}} for computing the
-#' MissingBVS.imputation object used in the average. Use
+#' @seealso Use \code{\link[MissingBVS]{mice.imputation}} for computing the
+#' \code{MissingBVS.imputation} object used in the average. Use
 #' \code{\link[MissingBVS]{MissingBvs.lm}} with linear models or
 #' \code{\link[MissingBVS]{MissingBvs.glm}} with generalized linear models for
 #' an exact computation of the model  posterior distribution in the VS problem
@@ -369,7 +369,6 @@ BF.approx.TBF.lm <- function(y, X, SS0, prior.betas = "gBF",
 #' Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
 #' Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
 #'
-#'
 BF.approx.gprior.lm <- function(y, X, SS0, prior.betas = "RobustBF",
                                 n = length(y), k = as.integer(ncol(X)-p0), p0 = 1L) {
   SSE.model <- crossprod(.lm.fit(y = y, x = X)$residuals)
@@ -433,7 +432,10 @@ BF.approx.FLS.lm <- function(y, X, SS0, dmax,
   return(log(BFi0))
 }
 
-c_glm.fit <- utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute logmarginals in glm
+# c_glm.fit <- utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute logmarginals in glm
+c_glm.fit <- function() {
+  utils::getFromNamespace("C_glm_deterministic", "BAS")
+}
 
 #' Logarithm of the BIC approximation of the Bayes factor in glm
 #'
@@ -500,7 +502,7 @@ BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
                               control = glm.control(),
                               laplace = 0L) {
   initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
-  fit1 <- .Call(c_glm.fit, Y = y, X = X, Roffset = offset, Rweights = weights,
+  fit1 <- .Call(c_glm.fit(), Y = y, X = X, Roffset = offset, Rweights = weights,
                 Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::beta.binomial(1, 1),
                 betaprior = BAS::bic.prior(length(y)), family = family,
                 Rcontrol = control, Rlaplace = laplace)
@@ -641,7 +643,7 @@ BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
                               control = glm.control(),
                               laplace = 0L) {
   initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
-  fit1 <- .Call(c_glm.fit, Y = y, X = X, Roffset = offset, Rweights = weights,
+  fit1 <- .Call(c_glm.fit(), Y = y, X = X, Roffset = offset, Rweights = weights,
                 Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::beta.binomial(1, 1),
                 betaprior = prior.betas, family = family, Rcontrol = control, Rlaplace = laplace)
   #fixed g for now
@@ -788,7 +790,7 @@ BF.approx.gprior.glm <- function(y, X, family = binomial(link = "logit"),
                                  control = glm.control(),
                                  laplace = 0L) {
   initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
-  fit1 <- .Call(c_glm.fit, Y = y, X = X, Roffset = offset, Rweights = weights,
+  fit1 <- .Call(c_glm.fit(), Y = y, X = X, Roffset = offset, Rweights = weights,
                 Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::beta.binomial(1, 1),
                 betaprior = prior.betas, family = family, Rcontrol = control, Rlaplace = laplace)
 

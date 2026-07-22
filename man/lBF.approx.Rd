@@ -2,7 +2,7 @@
 % Please edit documentation in R/aux_fun_BF.R
 \name{lBF.approx}
 \alias{lBF.approx}
-\title{Logarithm of the Bayes factor with missing data}
+\title{Logarithm of the Average Bayes factor for any regression model with missing data}
 \usage{
 lBF.approx(
   model,
@@ -16,26 +16,28 @@ lBF.approx(
 \item{model}{Vector of indexes in {1,2,...,p} denoting the active variables
 for a given model with p competing covariates.}
 
-\item{imputation.array}{Array of dimension \code{n}x(p+p0)x\code{n.imp}
+\item{imputation.array}{Array of dimension nx(p+\code{p0})x\code{n.imp}
 containing the imputed datasets, where n is the number of observations.}
 
-\item{BF.approx.method}{Auxiliary function to compute the Bayes factor for
-each entry in \code{imputation.list}.}
+\item{BF.approx.method}{Auxiliary function with some parameters fixed to compute
+the data-driven Bayes factor over each imputed datased in \code{imputation.list}.}
 
-\item{p0}{Number of fixed covariates (including the intercept).}
+\item{p0}{Number of fixed covariates (including the intercept term).}
 
-\item{n.imp}{Number of imputed datasets by \code{mice.imputation} or
-\code{futuremice.imputation} functions.}
+\item{n.imp}{Number of imputed datasets.}
 }
 \value{
-\code{lBF.approx} returns, in logarithmic scale, the average Bayes
-factor over the \code{n.imp} imputed datasets.
+\code{lBF.approx} returns, in logarithmic scale, the Average Bayes
+factor over the \code{n.imp} imputed datasets in \code{imputation.array}.
 }
 \description{
-Computes the logarithm of the Bayes factor when missingness occurs, with any
-type of covariates. It does so by averaging over the \code{n.imp} imputed
-datasets given by an \code{MissingBVS.imputation} object and using the BF
-computation auxiliary function given by \code{BF.approx.method}.
+Computes the logarithm of the Average Bayes factor (AvBF) when missingness occurs,
+for any type of covariates and regression model.
+}
+\details{
+The AvBF is computed by averaging over the \code{n.imp} imputed datasets given by a
+\code{MissingBVS.imputation} object, the \code{n.imp} data-driven BF for each given
+imputation. These BFs are computed with the auxiliary function \code{BF.approx.method}.
 }
 \examples{
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
@@ -59,9 +61,8 @@ van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 }
 \seealso{
-Use \code{\link[MissingBVS]{mice.imputation}} or
-\code{\link[MissingBVS]{futuremice.imputation}} for computing the
-MissingBVS.imputation object used in the average. Use
+Use \code{\link[MissingBVS]{mice.imputation}} for computing the
+\code{MissingBVS.imputation} object used in the average. Use
 \code{\link[MissingBVS]{MissingBvs.lm}} with linear models or
 \code{\link[MissingBVS]{MissingBvs.glm}} with generalized linear models for
 an exact computation of the model  posterior distribution in the VS problem

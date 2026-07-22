@@ -2,19 +2,17 @@
 % Please edit documentation in R/aux_fun_modelprior.R
 \name{logScottBerger.d}
 \alias{logScottBerger.d}
-\title{Logarithm of the Scott and Berger model prior for the dummy level}
+\title{Logarithm of the Scott and Berger model prior for the dummy level, if factors}
 \usage{
 logScottBerger.d(delta, tau, l)
 }
 \arguments{
-\item{delta}{Integer vector of length \code{L} specifying the number of
-active levels for each factor, where \code{L} is the number of factors.}
+\item{delta}{Integer vector of length L specifying the number of active levels
+for each factor, where L is the number of factors.}
 
-\item{tau}{Logical vector of length \code{L} denoting whether or not a factor
-is active.}
+\item{tau}{Logical vector of length L denoting whether or not a factor is active.}
 
-\item{l}{Integer vector of length \code{L} specifying the number of levels
-making up each factor.}
+\item{l}{Integer vector of length L specifying the number of levels making up each factor.}
 }
 \value{
 \code{logScottBerger.d} returns the logarithm of the Scott and Berger
@@ -23,13 +21,12 @@ prior at the dummies level, assuming independence between factors.
 \description{
 If there are factors present, computes the logarithm of the prior that assigns
 an uniform distribution to model size (Scott and Berger, 2010) on the level
-of the dummies that make up each different factor. It assumes independence
-among the dummy variables corresponding to different factors.
+of the dummies that make up each different factor.
 }
 \details{
-It is derived by assigning an independent Bernouilli distribution with
-probability Beta(1,1) to the a priori inclusion probability of each
-competing dummy variable.
+This prior is derived by assigning an independent Bernouilli distribution with
+probability Beta(1,1) to the a priori inclusion probability of each competing
+dummy variable and assumming independence between different factors.
 }
 \examples{
 logScottBerger.d(0:3, c(F,rep(T,3)), c(3,2,4,3))

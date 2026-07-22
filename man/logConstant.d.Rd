@@ -2,16 +2,15 @@
 % Please edit documentation in R/aux_fun_modelprior.R
 \name{logConstant.d}
 \alias{logConstant.d}
-\title{Logarithm of the Constant model prior for the dummy level}
+\title{Logarithm of the Constant model prior for the dummy level, if factors}
 \usage{
 logConstant.d(tau, l)
 }
 \arguments{
-\item{tau}{Logical vector of length \code{L} denoting whether or not a factor
-is active, where \code{L} is the number of factors.}
+\item{tau}{Logical vector of length L denoting whether or not a factor is active,
+where L is the number of factors.}
 
-\item{l}{Integer vector of length \code{L} specifying the number of levels
-making up each factor.}
+\item{l}{Integer vector of length L specifying the number of levels making up each factor.}
 }
 \value{
 \code{logConstant.d} returns the logarithm of the Constant prior
@@ -20,13 +19,12 @@ at the dummies level, assuming independence between factors.
 \description{
 Computes the logarithm of the prior that assigns an uniform distribution to
 the model space on the level of the dummies that make up each different
-factor. It assumes independence among the dummy variables corresponding to
-different factors.
+factor.
 }
 \details{
-It is derived by assigning an independent Bernouilli distribution with fixed
+This prior is derived by assigning an independent Bernouilli distribution with fixed
 probability 0.5 to the a priori inclusion probability of each competing
-dummy variable.
+dummy variable and assumming independence between different factors.
 }
 \examples{
 logConstant.d(c(F,rep(T,3)), c(3,2,4,3))

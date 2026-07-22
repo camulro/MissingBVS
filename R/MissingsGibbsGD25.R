@@ -1,99 +1,72 @@
 #' Bayesian Variable Selection with Missing data for linear regression models
+#' using Gibbs sampling
 #'
-#' Computation and summaries of posterior distribution over the model space
-#' in problems of small to moderate size when missingness occurs in linear
-#' models with normally distributed covariates.
+#' Approximate computation of summaries of the posterior model distribution using a
+#' Gibbs sampling algorithm to explore the model space. Each posterior model probability
+#' is computed under the g'-imputation prior of García-Donato et al. (2025) in
+#' linear models with normally distributed covariates.
 #'
-#' The set of competing models is made up by all the possible subsets of
-#' regressors specified by \code{formula}: Mi for i in 1,...,2^p, being p the number
-#' of potential (non-fixed) covariates in the variable selection problem. The simplest,
-#' nested in all of them, contains only the intercept. \code{MissingGD25} performs
-#' \code{n.imp} imputations given by the result of \code{\link[MissingBVS]{MC.imputation}}
-#' and computes the posterior distribution over this model space through Bayes' theorem:
+#' Gibbs sampling search algorithm to avoid exhaustive enumeration of model space
+#' when it is unfeasible. It draws from the model posterior distribution and uses
+#' frequency of "visits" to construct the estimates. The algorithm was originally
+#' proposed by  George and McCulloch (1997). Later, Garcia-Donato and Martinez-Beneito (2013)
+#' shown that the sampling strategy in combination with estimates based on frequency of
+#' visits provides very reliable results.
 #'
-#' Pr(Mi | \code{data})=Pr(Mi)*Bi/C,
-#'
-#' where Bi is the Bayes factor(BF) of Mi to M0 under missing data proposed by
-#' García-Donato et al (2025), Pr(Mi) is the prior probability of Mi and C is
-#' the normalizing constant.
-#'
-#' Bi is computed as the MonteCarlo approximation of the integral defining the
-#' BF, for Mi to M0 calculated for the jth imputed data set.
-#'
-#' The prior over the model space Pr(Mi) offers three possibilities:
-#' "Constant" assigns the same prior probability to every model.
-#' "ScottBerger" is the default choice. It assigns the same prior probability to
-#' every possible model dimension and, therefore, accounts for multiplicity issues
-#' (Scott and Berger 2010).
-#' "User" (see below).
-#'
-#' If \code{prior.models}="User" is chosen, user has to provide a p+1 dimensional
-#' parameter vector with the model dimension prior probabilities through \code{priorprobs}.
-#' The first component of \code{priorprobs} must contain the probability of the
-#' model with fixed covariates; next p components correspond to the p prior probabilities
-#' of the possible model dimensions.
-#'
+#' \code{\link[MissingBVS]{missingGibbsGD25}} is a heuristic approximation of
+#' \code{\link[MissingBVS]{missingGD25}}. See the later for common details.
 #'
 #' @export
 #' @param formula Formula defining the most complex (full) regression model in the
 #' analysis. See details.
 #' @param data Data frame containing the data.
-#' @param prior.models Prior distribution over the model space (to be literally specified).
-#' Possible choices are "Constant", "ScottBerger" and "User" (see details).
-#' @param priorprobs A p+1 (being p the number of non-fixed covariates)
-#' dimensional vector defining the prior model probabilities (used for chosen
-#' \code{prior.models}= "User"; see details).
-#' @param init.model The model at which the simulation process starts. Options
-#' include "Null" (the model only with the covariates specified in
-#' \code{null.model}), "Full" (the model defined by \code{formula}), "Random" (a
-#' randomly selected model) and a vector with p (the number of covariates to
-#' select from) zeros and ones defining a model.
-#' @param n.iter The total number of iterations performed after the burn in
-#' process.
-#' @param n.burnin Length of burn in, i.e. number of iterations to discard at
-#' the beginning.
-#' @param n.thin Positive integer defining the thinning rate. Default is 1.
-#' Set 'n.thin' > 1 to save memory and computation time if 'n.iter' is large.
-#' A large \code{n.thin} can reduce the accuracy because it, along with \code{n.iter},
-#' sets the number of simulations used to construct the estimates.
-#' @param imp.time.test Logical to indicate whether to check or not time of performance
-#' of the imputation process with \code{n.imp = 30} if the number of variables or
-#' the number of imputed datasets are large enough (\code{p>10} or \code{n.imp>390}).
-#' @param initialimp.mice.method Method for mice's imputation.
-#' @param n.imp Number of imputed data sets used for Bayes factor computation.
+#' @param prior.models Model prior distribution over the covariates and/or factors
+#' model space (to be literally specified). Possible choices are "Constant",
+#' "ScottBerger" and "User" (see details).
+#' @param priorprobs A p+1 (being p the number of competing variables) dimensional
+#' vector defining the prior model size probabilities (if \code{prior.models}= "User";
+#' see details).
+#' @param init.model The model at which the simulation process starts.
+#' It can be either a string: "Null" for \code{null.model}, "Full" for \code{formula}
+#' and "Random" for a randomly selected model; or a vector with p (the number of factors
+#' and/or covariates to select from) zeros and ones defining a model.
+#' @param n.iter The total number of iterations performed after burn in.
+#' @param n.burnin Number of iterations to discard at the beginning.
+#' @param n.thin Positive integer that states the number of models to discard before one
+#' is saved. Default is 1, larger values are suggested if needed less memory and computation
+#' but they can reduce accuracy because estimates are based on fewer simulations.
+#' @param n.imp Number of imputed datasets for model posterior computation.
 #' @param Gibbs.seed Seed for the Gibbs sampler algorithm.
 #' @param imp.seed Seed for imputation.
 #'
 #' @return \code{missingGibbsGD25} returns an object of class \code{missingBVS}
 #' with the following elements:
-#' \item{time}{The internal time consumed in solving the problem}
-#' \item{lmfull}{Object of class \code{\link[mice]{mipo}} that combines the estimates
-#' for the model defined by \code{formula} fitted by \code{\link[stats]{lm}} over
-#' the \code{n.imp} imputed datasets. See \code{\link[mice]{pool}} for details}
-#' \item{lmnull}{The \code{lm} class object that results when the null model,
-#' the one with just the intercept term, is fitted by \code{\link[stats]{lm}}}
-#' \item{variables}{Names of all the potential (non-fixed) explanatory variables}
+#' \item{time}{Time lasted solving the problem}
+#' \item{lmfull}{If missings on the \code{formula} competing variables, combination
+#' of the estimates of fitted full model over the \code{n.imp} imputed datasets.
+#' Otherwise, it is the \code{\link[stats]{lm}} object}
+#' \item{lmnull}{The \code{lm} class object that results when \code{null.model}
+#' is fitted by \code{\link[stats]{lm}}}
+#' \item{variables}{Names of all the competing variables given by \code{formula}}
 #' \item{n}{Number of observations}
-#' \item{p}{Number of explanatory variables to select from}
-#' \item{k}{Number of fixed variables}
+#' \item{p}{Number of explanatory covariates to select from}
+#' \item{k}{Number of fixed variables, which is fixed to 1}
 #' \item{HPMbin}{Binary expression of the Highest Posterior Probability model}
-#' \item{MPMbin}{Binary expression of the Median Probability model using
-#' \code{inclprobRB}}
-#' \item{modelslogBF}{A \code{floor(n.iter/n.thin)}x(p+1) \code{matrix} which
-#' summaries the keeped models and their associated Bayes factor in logaritmic scale}
-#' \item{inclprob}{Named vector with the inclusion probabilities of the potential
-#' explanatory variables.}
+#' \item{MPMbin}{Binary expression of the Median Probability model}
+#' \item{modelslogBF}{A floor(\code{n.iter}/\code{n.thin}) x (p+1) matrix which summarizes
+#' the floor(\code{n.iter}/\code{n.thin}) visited models and their associated log-Bayes factors}
+#' \item{inclprob}{Named vector with the inclusion probabilities of p competing variables}
 #' \item{inclprobRB}{Rao-Blackwellized inclusion probabilities}
-#' \item{postprobdim}{Estimated posterior probabilities over the true model dimension}
-#' \item{priorprobs}{Prior probabilities over the true model dimension}
+#' \item{postprobdim}{Estimated posterior probabilities over the true model size}
+#' \item{C}{The value of the estimated normalizing constant}
+#' \item{postprobs}{Estimated posterior probability}
 #' \item{call}{The \code{call} to the function}
-#' \item{C}{The value of the normalizing constant (C=sum BiPr(Mi), for Mi in the
-#' model space)}
-#' \item{imp.args}{List of arguments used for the imputation step}
-#' \item{compress.imp.list}{Compressed list of imputed datasets and covariance
-#' matrices}
+#' \item{priorprobs}{Prior probabilities over the true model size}
+#' \item{imp.info}{List of arguments used for the imputation step and other information}
+#' \item{compress.imp.array}{Compressed array of imputed datasets}
 #' \item{logprior.models}{Function used to compute the log-prior over the model space}
-#' \item{method}{\code{Gibbs}}
+#' \item{prior.models}{Argument chosen for \code{prior.models}}
+#' \item{method}{String "Gibbs" denoting Gibbs sampling model search}
 #'
 #' @author Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
@@ -119,11 +92,6 @@
 #'
 #' Barbieri, M and Berger, J (2004)<DOI:10.1214/009053604000000238> Optimal
 #' Predictive Model Selection. The Annals of Statistics, 32, 870-897.
-#'
-#' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
-#' by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
-#'
-#' @keywords package
 #'
 #' @examples
 #' \dontrun{
@@ -153,8 +121,6 @@ missingGibbsGD25 <- function (formula,
                               n.iter = 10000,
                               n.burnin = 500,
                               n.thin = 1,
-                              imp.time.test = TRUE,
-                              initialimp.mice.method = "norm",
                               n.imp = 039E1,
                               Gibbs.seed = runif(1,0,26061970),
                               imp.seed = runif(1,0,09011975)) {
@@ -179,11 +145,12 @@ missingGibbsGD25 <- function (formula,
   namesx <- dimnames(X.full)[[2]]
   p <- length(namesx) #Number of covariates to select from
 
-  #Check arguments and compute init.model
-  init.model <- checkGibbsarguments(p, 1, "(Intercept)", c("(Intercept)", namesx), init.model)
-
   #Check model priors chosen and define the function to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, p)
+
+  #Check arguments and compute init.model
+  init.model <- checkGibbsarguments(p, 1, "(Intercept)", c("(Intercept)", namesx),
+                                    init.model, FALSE, NULL, NULL, NULL, NULL)
 
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
@@ -198,29 +165,15 @@ missingGibbsGD25 <- function (formula,
 
   #BF function
   BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
-                                                           y = y, SS0 = SS0,
-                                                           n = n, k)
+                                                           y = y, SS0 = SS0, n = n, k)
 
   #Imputation of missing data
-  if (imp.time.test & (p*n > 10000 | n.imp > 039E1)) {
-    #test imputation time
-    cat("Time test . . . \n")
-    time.test <- MC.imputation(X = X.full,
-                               time.test = TRUE)
+  if (p*n > 10000 | n.imp > 039E1) cat("Imputation step could take a while.\n",
+    "Consider reducing the number of imputed datasets if that is the case.\n")
 
-    estim.time <- time.test * n.imp / (60 * 30) #30 imputed datasets used to test
-    cat("The whole imputation would take ", estim.time,
-        "minutes (approx.) to run.\n Do you want to continue? (y/n)\n")
-    if (tolower(readline()) != "y") {
-      stop("Reduce the number of imputed datasets.\n")
-    }
-  }
   cat("Performing imputation of missing data with Garcia-Donato's 2025 method.\n",
       "Please wait . . . \n")
-  imputation.list <- MC.imputation(X = X.full,
-                                   nMC = n.imp,
-                                   seed = imp.seed,
-                                   initialimp.mice.method = initialimp.mice.method)
+  imputation.list <- MC.imputation(X = X.full, nMC = n.imp, seed = imp.seed)
 
   #remove observations with missings on the response
   imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA, , , drop = FALSE]
@@ -237,99 +190,32 @@ missingGibbsGD25 <- function (formula,
   #Info:
   cat("Info. . .\n")
   cat("Most complex model has a total of", p + 1, "single covariates.\n")
-  cat(paste0("From those 1 is fixed (the intercept) and we should select from the remaining ",
-      p, ":\n"))
-  cat(paste(paste(namesx, collapse = ", ", sep = ""), "\n", sep = ""))
+  cat("From those 1 is fixed (the intercept) and we should select from the remaining",
+      p, ":\n")
+  cat(paste(namesx, collapse = ", ", sep = ""))
 
-  cat("The problem has a total of", 2^p, "competing models.\n")
+  cat("\nThe problem has a total of", 2^p, "competing models.\n")
   cat("Of these,", n.iter + n.burnin, "are sampled with replacement.\n")
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
-  #progress bar for loop
-  pb <- txtProgressBar(min = 0,
-                       max = n.iter + n.burnin,
-                       style = 3,
-                       width = 50,
-                       char = "=")
-
   #George and McCulloch's Gibbs exploration
   set.seed(Gibbs.seed)
-  all.models.lPM <- matrix(0, nr = n.iter + n.burnin, nc = p+1) #last column is log(BF_a0*Pr(M))
-  #Rao-Blackwellized inclusion probabilities:
-  inclprobRB <- matrix(0, nr = n.iter + n.burnin, nc = p)
+  gibbs.list <- GM97.Gibbs(1, X.full, p, namesx, namesx, lprior.models, lBF.method, BF.miss.aux,
+                           FALSE, NULL, init.model, n.iter, n.burnin, n.thin)
+  list2env(gibbs.list, envir = environment())
 
-  current.model <- init.model
-  #If init.model is the null
-  if(sum(current.model) > 0){
-    lBF.PMcurrent <- lBF.method(model = which(current.model == 1)) +
-      lprior.models(current.model) #log(BF_a0*Pr(M))
-  } else { #null
-    lBF.PMcurrent <- lprior.models(current.model) #BF_a0 = 1
-  }
-
-  #visited models with hash and the corresponding log(BF_a0*Pr(M))
-  visited.models.lBF.PM <- list()
-  visited.models.lBF.PM$models <- digest::digest(current.model)
-  visited.models.lBF.PM$lBF.PM <- lBF.PMcurrent
-  for (i in seq_len(n.iter + n.burnin)){
-    setTxtProgressBar(pb, i)
-    for (j in seq_len(p)){
-      proposal.model <- current.model; proposal.model[j] <- 1 - current.model[j]
-      hash.proposal <-  digest::digest(proposal.model)
-
-      #avoiding recomputing the BF for models already visited
-      already.visited <- which(visited.models.lBF.PM$models == hash.proposal)
-      if (length(already.visited) > 0) {
-        lBF.PMproposal <- visited.models.lBF.PM$lBF.PM[already.visited]
-      } else {
-        #Check if proposal.model is the null model
-        if(sum(proposal.model) > 0){
-          lBF.PMproposal <- lBF.method(model = which(proposal.model == 1)) +
-                            lprior.models(proposal.model) #log(BF_a0*Pr(M))
-        } else { #null
-          lBF.PMproposal <- lprior.models(proposal.model) #BF_a0 = 1
-        }
-        visited.models.lBF.PM$models <- c(visited.models.lBF.PM$models, hash.proposal)
-        visited.models.lBF.PM$lBF.PM <- c(visited.models.lBF.PM$lBF.PM, lBF.PMproposal)
-      }
-
-      ratio <- exp(lBF.PMproposal - log(exp(lBF.PMproposal) + exp(lBF.PMcurrent)))
-      if (runif(1) < ratio) {
-        current.model[j] <- proposal.model[j]; lBF.PMcurrent <- lBF.PMproposal
-      }
-
-      if(i > 1) {
-        inclprobRB[i,j] <- inclprobRB[i-1,j] + proposal.model[j]*ratio +
-                           (1 - proposal.model[j])*(1 - ratio)
-      }
-    }
-
-    all.models.lPM[i,] <-  c(current.model, lBF.PMcurrent)
-  }
-  colnames(all.models.lPM) <- c(namesx, "logBF.PM")
-
-  for(j in seq_len(p)) inclprobRB[,j] <- inclprobRB[,j] / seq(1,(n.iter + n.burnin))
-  colnames(inclprobRB) <- namesx
-
-  if (n.burnin > 0) all.models.lPM <- all.models.lPM[-seq_len(n.burnin),] #remove burnin
-  all.models.lPM <- all.models.lPM[seq(1, n.iter, by = n.thin), ] #keep 1 each n.thin iterations
-
-  summ.Gibbs.list <- summ.Gibbs(all.models.lPM, inclprobRB, p, n.iter, n.thin,
-                                lprior.models, function(d,t) 0, rep(1,p))
+  summ.Gibbs.list <- summ.Gibbs(cf.models.lBF, all.lBF.PM, inclprobRB, p, n.iter)
   list2env(summ.Gibbs.list, envir = environment())
 
   if (!is.null(NAvars)) {#Pool results for imputed datasets
     #Evaluate lm of full model with missings using Rubin's rule
-    fit <- list()
-    mt <- attr(framefull, "terms")
+    fit <- list(); mt <- attr(framefull, "terms")
     for (i in 1:n.imp) {
       z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
-      z$terms <- mt
-      class(z) <- "lm"
-
-      fit[[i]] <- z
+      z$terms <- mt; class(z) <- "lm"; fit[[i]] <- z
     }
     lmfull <- mice::pool(fit)
+    lmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read lmfull$call
   } else lmfull <- lm(formula, data, x = TRUE, y = TRUE)
 
   #result
@@ -352,37 +238,36 @@ missingGibbsGD25 <- function (formula,
   result$modelslogBF <- cf.models.lBF
 
   result$inclprob <- inclprob #inclusion probability for each variable
-  result$inclprobRB <- inclprobRB #Rao-Blackwellized inclusion probability
+  result$inclprobRB <- inclprobRB[n.iter, ] #Rao-Blackwellized inclusion probability
+  names(result$inclprobRB) <- depvars
 
   result$postprobdim <- probdim #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:p + 1 #dimension of the true model
+  result$C <- C #estimated normilizing constant
+  #Estimation of posterior probabilities based on C
+  result$postprobs <- post
 
   result$call <- match.call()
-  result$C <- C #estimated normilizing constant
 
   if(!identical(lprior.models, logUser)){
     priorprobs <- numeric(p+1)
     priorprobs[1] <- exp(lprior.models(numeric(p))) #prior inclusion prob for dimension 0
     for (i in seq_len(p)) {
-      priorprobs[i+1] <- exp(lprior.models(c(rep(1, i), rep(0, p - i))) + lchoose(p, i))
+      priorprobs[i+1] <- exp(lprior.models(c(rep.int(1, i), rep.int(0, p - i))) + lchoose(p, i))
       #prior inclusion probability for each dimension
     }
   }
   result$priorprobs <- priorprobs
   names(result$priorprobs) <- 0:p + 1 #dimension prior probability
 
-  #Estimation of posterior probabilities based on C
-  result$postprobs <- post
-
   #arguments used for imputation
-  result$imp.args <- list(initialimp.mice.method = initialimp.mice.method,
-                          n.imp = n.imp, imp.seed = imp.seed)
-
+  result$imp.info <- list(n.imp = n.imp, imp.seed = imp.seed)
   #save the imputed datasets for sensitivity analysis
   raw.imp.list <- serialize(imputation.list, NULL)
   result$compress.imp.list <- memCompress(raw.imp.list, type = "xz")
 
   result$logprior.models <- lprior.models #function used for model prior
+  result$prior.models <- prior.models
 
   result$method <- "Gibbs"
   class(result) <- "MissingBvs"

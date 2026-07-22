@@ -2,7 +2,7 @@
 % Please edit documentation in R/aux_fun_imputation.R
 \name{MC.imputation}
 \alias{MC.imputation}
-\title{\pkg{MissingBVS}'s imputation for normally distributed covariates}
+\title{\pkg{MissingBVS}'s objective Bayesian imputation for multivariate normal covariates}
 \usage{
 MC.imputation(
   X,
@@ -18,10 +18,10 @@ MC.imputation(
 \item{nMC}{Number of samples used to approximate, by MonteCarlo, the integral
 defining the Bayes factor.}
 
-\item{seed}{Seed chosen for the gibbs sampler on the imputation step.}
+\item{seed}{Seed chosen for the Gibbs sampler on the imputation step.}
 
 \item{initialimp.mice.method}{Method used by \code{\link[mice]{mice}} to impute the
-initial values. See \code{\link[mice]{mice}} for possible choices.}
+initial values. By default, it is set to "norm" since \code{X} has to be normal.}
 
 \item{time.test}{Logical to indicate whether to check time of performance with
 \code{nMC = 30} or not.}
@@ -31,14 +31,13 @@ initial values. See \code{\link[mice]{mice}} for possible choices.}
 with the following elements:
 \item{rX.imput}{Array of dimension nxpx\code{nMC}, where n is the number of
 observations and p the number of competing covariates, containing the imputed datasets}
-\item{rSigma}{Array of dimension pxpx\code{nMC} containing the corresponding
-covariance matrices}
-\item{rmu}{Vector of dimension px\code{nMC} containing the corresponding means}
+\item{rSigma}{Array of dimension pxpx\code{nMC} containing the covariance matrices}
+\item{rmu}{Vector of dimension px\code{nMC} containing the simulated means}
 }
 \description{
 Performs the multiple imputation used by García-Donato et al (2025) for
-continuous and normally distributed covariates to compute Bayesian Variable
-Selection in the presence of missing data.
+continuous and normally distributed covariates to perform objective Bayesian
+Variable Selection in the presence of missing data.
 }
 \examples{
 \dontrun{
