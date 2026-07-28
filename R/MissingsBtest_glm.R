@@ -36,13 +36,18 @@
 #' using the \pkg{BAS} log-marginal computation (Clyde, 2025) if the \code{family}
 #' chosen is ones of the available. Otherwise, method \code{"gprior"} is not provided.
 #' The choices currently available are:
-#' -"Robust" is the default option and denotes the criteria-based prior of Bayarri,
-#' Berger, Forte and Garcia-Donato (2012).
-#' -"gZellner" corresponds to the prior in Zellner (1986) with g=n fixed.
+#' -"Robust" denotes the criteria-based prior of Bayarri, Berger, Forte and
+#' Garcia-Donato (2012).
+#' -"gZellner" is the default option and corresponds to the prior in Zellner (1986)
+#' with g=n fixed.
 #' -"Liangetal" prior is the hyper-g/n of Liang et al (2008) with a=3.
 #' -"FLS" corresponds to the prior in Zellner (1986) with g=max(n, p*p) fixed, the
 #' (benchmark) prior recommended by Fernandez, Ley and Steel (2001).
 #' -"intrinsic.WNC" is the intrinsic prior derived by Womack, Novelo and Casella (2014).
+#'
+#' If the BF computation method chosen is \code{"TBF"}, \code{prior.betas} also determines
+#' the formula of the BF as before. In this case, the choices available are: "gZellner",
+#' "FLS", "Liangetal" and the adapted version of the ZellnerSiow" prior for TBF.
 #'
 #' The prior over the model space Pr(Mi) offers three options through \code{prior.models}:
 #' -"Constant" assigns the same prior probability to every model, default one.
@@ -195,15 +200,14 @@
 #' @examples
 #' \dontrun{
 #' #Indian Prime Diabetes Data from VIM's package
-#' data.diabetes <- VIM::diabetes
 #'
-#' #Default choices are: BIC approximation, Constant prior and 390 imputed
-#' #datasets with mice's pmm method.
 #' models.list = list(M0 = Outcome ~ 1, M1 = Outcome ~ Pregnancies,
 #'   M2 = Outcome ~ Glucose, M3 = Outcome ~ Insulin,
 #'   M4 = Outcome ~ Pregnancies + Glucose, M5 = Outcome ~ Pregnancies + Insulin,
 #'   M6 = Outcome ~ Pregnancies + Glucose + Insulin)
 #'
+#' #Default choices are: BIC approximation, Constant prior and 390 imputed
+#' #datasets with mice's pmm method.
 #' diabetes.mtest <- missingBtest.glm(data = VIM::diabetes,
 #'   models = models.list, family = binomial())
 #'
@@ -216,7 +220,7 @@ missingBtest.glm <- function (data,
                               family = binomial(link = "logit"),
                               null.model = NULL,
                               BF.approx.method = "BIC",
-                              prior.betas = "Robust",
+                              prior.betas = "gZellner",
                               prior.models = "Constant",
                               prior.models.dummies = "ScottBerger",
                               marginal.factors = TRUE,
@@ -243,15 +247,8 @@ missingBtest.glm <- function (data,
   Btestarg.list <- checkBtestarguments(models, null.model)
   list2env(Btestarg.list, envir = env)
 
-  #check whether the family chosen is among the options provided by BAS
-  inBAS <- checkforfamily(family, BF.approx.method)
-
-  #for the C code
-  weights <- as.numeric(weights); offset <- as.numeric(offset)
-  laplace <- as.integer(laplace)
-
   Dev <- numeric(N) #deviances for each model
-  Dim <- rep.int(0,N)
+  Dim <- rep.int(0L,N)
   mt <- list() #list of terms for each model
 
   covar.list <- list() #list that contains the names of the variables in each model
@@ -281,7 +278,7 @@ missingBtest.glm <- function (data,
   nullmodel.pos <- ordered.Dev$ix[1]
 
   #Check null model
-  if (!is.null(null.model) & nullmodel.pos != pos.user.null.model) {
+  if (relax.nest) if (!is.null(null.model) & nullmodel.pos != pos.user.null.model) {
       stop("The given null model does not coincide with the one with\n",
            "the largest deviance (and it should).\n")
   }
@@ -299,24 +296,32 @@ missingBtest.glm <- function (data,
 
   Dim <- Dim - p0 #model dimension (without fixed vars)
 
+  #Evaluate the null model:
+  glmnull <- glm(formula = null.model,
+                 data,
+                 y = TRUE, x = TRUE,
+                 family = family,
+                 weights = weights,
+                 offset = offset,
+                 control = control)
+  #correct glm arguments
+  family <- glmnull$family; weights <- glmnull$prior.weights; offset <- glmnull$offset
+
   #The response variable
-  obsnotNA <- rownames(X0)
-  y <- na.omit(model.response(framenull)) #response variable without missings
-  n <- length(y)
-  devnull <- Dev[nullmodel.pos]
+  y <- glmnull$y; obsnotNA <- names(y) #without missings
+  n <- length(y) #observations without missings on the response
+  y <- as.numeric(y); laplace <- as.integer(laplace) #for the C code
+  devnull <- glmnull$deviance
 
-  #is the response a factor?
-  if (is.factor(y)) y <- y != levels(y)[1L]
-
-  weights <- weights[as.numeric(obsnotNA)]; offset <- offset[as.numeric(obsnotNA)]
+  #check whether the family chosen is among the options provided by BAS
+  inBAS <- checkforfamily(family, BF.approx.method)
 
   #Compute model prior
   lprior.models <- priormodels.btest(prior.models, N, Dim, priorprobs)
 
   #Check approx method and priors chosen and define the function to be used
-  BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS, n, p = max(Dim),
-                                              p0, y, null.model, data[obsnotNA,], family, devnull,
-                                              weights, offset, control, laplace)
+  BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
+                                              n, p, p0, y, glmnull, laplace)
 
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
@@ -325,19 +330,29 @@ missingBtest.glm <- function (data,
   #Imputation step
   if (anyNAvar <- !is.null(NAvars)) {
     if (is.null(imp.datasets)) { #if there are no given imputations, build them
-      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
-                                         n, q, p0, imp.mice.method, imp.seed,
-                                         parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
-                                            ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      imputation.list <- buildimputation(NAvars, full.formula, data, imp.predict.mat, n.imp,
+                                         maxit, n, q, p0, imp.mice.method, imp.seed,
+                                         parallelmice, n.core, obsnotNA, ordvars)
+
+    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1],
+                                            framefull, ordvars, obsnotNA, p0, NAvars)
     list2env(imputation.list, envir = env)
   }
 
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model as an average of BF computed
+    #by BF.approx.method over the imputed datasets
+    lBF.method <- function (model) lBF.approx(model,
+                                              imputation.array = imputation.array,
+                                              BF.approx.method = BF.approx.method,
+                                              p0 = p0, n.imp = n.imp)
+  } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                         X = imputation.array[,c(1:p0, model+p0),])
   mF <- L > 0 & marginal.factors
   #Check if factors present and if marginalization of their probabilities.
   #Define model prior and BF
   lBF.comp <- BFcomp.btest(lprior.models, prior.models.dummies, Dim, mF, positionsfac,
-                           namesxnotnull, NAvars, lBF.method, X0, X.full, BF.approx.method, covar.list)
+                           namesxnotnull, NAvars, lBF.method, X0, X.full, BF.approx.method)
 
   #Posterior computation of model space defined by models list
   post.btest.list <- posterior.btest(competing.models, namesxnotnull, namesnull, covar.list,

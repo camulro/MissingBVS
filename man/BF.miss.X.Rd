@@ -32,12 +32,10 @@ data and covariance matrices of an \code{MC.imputation} object.
 \examples{
 #Daily air quality measurements in New York
 data("airquality")
+imp1 <- MC.imputation(X = airquality[,c("Ozone", "Wind", "Temp")], nMC = 1)
 
-Xair = airquality[,c("Ozone", "Wind", "Temp")]
-imp1 <- MC.imputation(X = Xair, nMC = 1)
-
-lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
-lBF.imp1 <- BF.miss.X(imp1$rX.imput[names(lmnull$y),,], imp1$rSigma[,,1],
+lmnull <- lm(Solar.R ~ 1, data = airquality, y = T)
+lBF.imp1 <- BF.miss.X(imp1$rX.imput[-lmnull$na.action,,], imp1$rSigma[,,1],
   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
 
 }
@@ -48,7 +46,7 @@ Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 }
 \seealso{
 Use \code{\link[MissingBVS]{MC.imputation}} for computing the
-\code{MC.imputation} object containing the \code{X.center} and \code{Sigma11}
+\code{MissingBVS.imputation} object containing the \code{X.center} and \code{Sigma11}
 matrices. Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
 of the model posterior distribution in the VS problem (recommended when p<20).
 }

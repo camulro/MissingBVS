@@ -190,7 +190,7 @@ missingGibbsBVS.glm <- function (formula,
                                  family = binomial(link = "logit"),
                                  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
                                  BF.approx.method = "BIC",
-                                 prior.betas = "Robust",
+                                 prior.betas = "gZellner",
                                  prior.models = "ScottBerger",
                                  prior.models.dummies = "ScottBerger",
                                  marginal.factors = TRUE,
@@ -239,8 +239,8 @@ missingGibbsBVS.glm <- function (formula,
                                     positions, positionsfac, l, firstd)
 
   #Check if factors present and if marginalization of their probabilities. Define model prior
-  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions, positionsfac,
-                                     firstd, lprior.models)
+  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions,
+                                     positionsfac, firstd, lprior.models)
 
   #Evaluate the null model:
   glmnull <- glm(formula = null.model,
@@ -265,9 +265,8 @@ missingGibbsBVS.glm <- function (formula,
   inBAS <- checkforfamily(family, BF.approx.method)
 
   #Check approx method and priors chosen and define the function to be used
-  BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS, n, p, p0, y,
-                                              logmargnull, family, devnull,
-                                              weights, offset, control, laplace)
+  BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
+                                              n, p, p0, y, glmnull,laplace)
 
   X.full <- X.full[obsnotNA,] #remove NA obs from null model
 
@@ -278,11 +277,22 @@ missingGibbsBVS.glm <- function (formula,
     if (is.null(imp.datasets)) { #if there are no given imputations, build them
       imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
                                          n, q, p0, imp.mice.method, imp.seed,
-                                         parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
-                                            ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+                                         parallelmice, n.core, obsnotNA, ordvars)
+
+    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1],
+                                            framefull, ordvars, obsnotNA, p0, NAvars)
     list2env(imputation.list, envir = env)
   }
+
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model as an average of BF computed
+    #by BF.approx.method over the imputed datasets
+    lBF.method <- function (model) lBF.approx(model,
+                                              imputation.array = imputation.array,
+                                              BF.approx.method = BF.approx.method,
+                                              p0 = p0, n.imp = n.imp)
+  } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                         X = imputation.array[,c(1:p0, model+p0),])
 
   #Info:
   cat("Info. . .\n")
@@ -326,7 +336,7 @@ missingGibbsBVS.glm <- function (formula,
       z$terms <- mt; class(z) <- "glm"; fit[[i]] <- z
     }
     glmfull <- mice::pool(fit)
-    glmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read lmfull$call
+    glmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read glmfull$call
   } else glmfull <- glm(formula,
                         data,
                         x = TRUE, y = TRUE,
@@ -377,7 +387,8 @@ missingGibbsBVS.glm <- function (formula,
     priorprobs <- numeric(q+1)
     priorprobs[1] <- exp(lprior.models(numeric(q))) #prior inclusion prob for dimension 0
     for (i in seq_len(q)) {
-      priorprobs[i+1] <- exp(lprior.models(c(rep.int(1, i), rep.int(0, q - i))) + lchoose(q, i))
+      priorprobs[i+1] <-
+        exp(lprior.models(c(rep.int(1, i), rep.int(0, q - i))) + lchoose(q, i))
       #prior inclusion probability for each dimension
     }
   }

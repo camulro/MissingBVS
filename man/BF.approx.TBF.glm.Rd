@@ -8,14 +8,15 @@ BF.approx.TBF.glm(
   y,
   X,
   family = binomial(link = "logit"),
-  devnull,
-  prior.betas = BAS::g.prior(g = length(y)),
+  prior.betas,
+  logmargnull,
   k = ncol(X) - p0,
   p0 = 1L,
   weights = rep(1, length(y)),
   offset = rep(0, length(y)),
   control = glm.control(),
-  laplace = 0L
+  laplace = 0L,
+  c_glm.marg
 )
 }
 \arguments{
@@ -30,12 +31,12 @@ function to be used in the model. For now, only available the implemented
 families in \pkg{BAS}: \code{binomial(link = "logit")},
 \code{poisson(link = "log")} and \code{Gamma(link = "log")}.}
 
-\item{devnull}{Deviance of the null model considered.}
+\item{prior.betas}{\code{BAS::testBF.prior()} with the
+\code{hyper.parameters$loglik_null} parameter specified as
+\code{as.numeric(-0.5 * null.deviance)}, where \code{null.deviance} is the
+deviance of null model.}
 
-\item{prior.betas}{Prior distribution for model-specific coefficients.
-Options include \code{\link[BAS]{g.prior}}, \code{\link[BAS]{CCH}},
-\code{\link[BAS]{robust}} and \code{\link[BAS]{intrinsic}} among others.
-See \code{\link[BAS]{BAS}} for more details.}
+\item{logmargnull}{Log-marginal likelihood of the null model considered.}
 
 \item{k}{Number of model-specific coefficients.}
 
@@ -53,6 +54,8 @@ It is set to \code{[stats]{glm.control()}} by default.}
 \item{laplace}{Logical variable to access the Laplace approximation to the
 marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
 for more details.}
+
+\item{c_glm.marg}{Function to compute log-marginal.}
 }
 \value{
 \code{BF.approx.TBF.glm} returns, in logarithmic scale, the TBF
@@ -69,11 +72,13 @@ complete data in generalized linear models.
 Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
 f <- Outcome ~ Pregnancies + Glucose + Insulin
 imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS")
 
-glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
-  x = T, y = T)
-lBF.imp1 <- BF.approx.TBF.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
-  family = binomial(), devnull = glmnull$deviance)
+glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(), y = T)
+prior.betas <- BAS::testBF.prior(g = length(glmnull$y))
+prior.betas$hyper.parameters$loglik_null <- as.numeric(-0.5 * glmnull$deviance)
+lBF.imp1 <- BF.approx.TBF.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
+  family = binomial(), prior.betas = prior.betas, logmargnull = 0, c_glm.marg = c_glm.marg)
 
 }
 \references{

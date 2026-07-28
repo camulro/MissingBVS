@@ -239,7 +239,7 @@ missingGibbsGD25 <- function (formula,
 
   result$inclprob <- inclprob #inclusion probability for each variable
   result$inclprobRB <- inclprobRB[n.iter, ] #Rao-Blackwellized inclusion probability
-  names(result$inclprobRB) <- depvars
+  names(result$inclprobRB) <- namesx
 
   result$postprobdim <- probdim #vector with the estimated posterior dimension probability
   names(result$postprobdim) <- 0:p + 1 #dimension of the true model

@@ -11,7 +11,7 @@ missingGibbsBVS.glm(
   family = binomial(link = "logit"),
   null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   BF.approx.method = "BIC",
-  prior.betas = "Robust",
+  prior.betas = "gZellner",
   prior.models = "ScottBerger",
   prior.models.dummies = "ScottBerger",
   marginal.factors = TRUE,

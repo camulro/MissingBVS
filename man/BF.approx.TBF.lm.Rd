@@ -4,15 +4,7 @@
 \alias{BF.approx.TBF.lm}
 \title{Logarithm of the test-based Bayes factor (TBF) in lm}
 \usage{
-BF.approx.TBF.lm(
-  y,
-  X,
-  SS0,
-  prior.betas = "gBF",
-  n = length(y),
-  k = ncol(X) - p0,
-  p0 = 1L
-)
+BF.approx.TBF.lm(y, X, SS0, lTBF, n = length(y), k = ncol(X) - p0, p0 = 1L)
 }
 \arguments{
 \item{y}{Response variable in the linear model.}
@@ -22,10 +14,7 @@ the fixed terms and the intercept.}
 
 \item{SS0}{Sum of squared error of the null model considered.}
 
-\item{prior.betas}{Prior distribution for model-specific coefficients in the
-\pkg{BayesVarSel} codification. Options include "gBF", "RobustBF", "LiangBF",
-"ZSBF", "flsBF", "intrinsicBF" and "geointrinsicBF". See
-\code{\link[BayesVarSel]{Bvs}} for more details.}
+\item{lTBF}{Function to compute log-TBF, with the corresponding fixed parameters.}
 
 \item{n}{Number of observations.}
 
@@ -49,9 +38,10 @@ XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
 f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
 imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 
-lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-lBF.imp1 <- BF.approx.TBF.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
-  SS0 = crossprod(lmnull$residuals))
+lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
+lTBF <- function (k, dev) lTBF.gfixed(g = length(lmnull$y), k, dev, devnull = 0)
+lBF.imp1 <- BF.approx.TBF.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
+  SS0 = crossprod(lmnull$residuals), lTBF = lTBF)
 
 }
 \references{

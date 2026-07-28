@@ -230,8 +230,8 @@ missingGibbsBVS.lm <- function (formula,
                                     positions, positionsfac, l, firstd)
 
   #Check if factors present and if marginalization of their probabilities. Define model prior
-  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions, positionsfac,
-                                     firstd, lprior.models)
+  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions,
+                                     positionsfac, firstd, lprior.models)
 
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
@@ -248,16 +248,27 @@ missingGibbsBVS.lm <- function (formula,
 
   #check for missings and define competing variables with NAs
   NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
+
   #Imputation step
   if (anyNAvar <- !is.null(NAvars)) {
     if (is.null(imp.datasets)) { #if there are no given imputations, build them
-      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
-                                         n, q, p0, imp.mice.method, imp.seed,
-                                         parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
-                                            ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp,
+                                         maxit, n, q, p0, imp.mice.method, imp.seed,
+                                         parallelmice, n.core, obsnotNA, ordvars)
+    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1],
+                                            framefull, ordvars, obsnotNA, p0, NAvars)
     list2env(imputation.list, envir = env)
   }
+
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model as an average of BF computed
+    #by BF.approx.method over the imputed datasets
+    lBF.method <- function (model) lBF.approx(model,
+                                              imputation.array = imputation.array,
+                                              BF.approx.method = BF.approx.method,
+                                              p0 = p0, n.imp = n.imp)
+  } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                         X = imputation.array[,c(1:p0, model+p0),])
 
   #Info:
   cat("Info. . .\n")
@@ -432,9 +443,8 @@ GM97.Gibbs <- function (X0, X.full, p, namesxnotnull, NAvars, lp.model, lBF.meth
             X.i <- cbind(X0, X.full[, which(proposal.model == 1)])
             lBFproposal <- BF.approx.method(k = sum(proposal.model == 1), X = X.i)
           }
-        } else { #null
-          lBFproposal <- 0
-        }
+        } else lBFproposal <- 0 #null
+
         lBF.PMproposal <- lBFproposal + lpm #log(BF_a0*Pr(M))
         visited.models$models <- c(visited.models$models, hash.proposal)
         visited.models$lBF <- c(visited.models$lBF, lBFproposal)
@@ -476,6 +486,7 @@ GM97.Gibbs <- function (X0, X.full, p, namesxnotnull, NAvars, lp.model, lBF.meth
 
     inclprobRB <- inclprobRB %*% t(positions)
   } else cf.models.lBF <- all.models.lBF
+  dimnames(cf.models.lBF) <- list(1:nrow(cf.models.lBF), colnames(cf.models.lBF))
   #cf.models.lBF is exactly all.models.lBF if there are no factor
 
   return(list(cf.models.lBF = cf.models.lBF, all.models.lBF = all.models.lBF,
@@ -517,8 +528,8 @@ summ.Gibbs <- function (cf.models.lBF, all.lBF.PM, inclprobRB, q, n.iter) {
   mpm <- numeric(q)
   mpm[which(inclprobRB[n.iter, ] >= 0.5)] <- 1
 
-  return(list(cf.models.lBF = cf.models.lBF, post = post, C = C,
-              inclprob = inclprob, probdim = probdim, hpm = hpm, mpm = mpm))
+  return(list(post = post, C = C, inclprob = inclprob, probdim = probdim,
+              hpm = hpm, mpm = mpm))
 }
 
 #' @keywords internal

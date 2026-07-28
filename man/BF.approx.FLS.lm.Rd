@@ -34,7 +34,7 @@ the fixed terms and the intercept.}
 \code{BF.approx.FLS.lm} returns, in logarithmic scale, the exact
 value of the Bayes factor derived from assigning the FLS Benchmark g-prior
 in linear models for a given model through \code{X}. See
-\code{\link[BayesVarSel]{Bvs}} for more details.
+\code{\link[MissingBVS]{MissingBvs.lm}} for more details.
 }
 \description{
 Computes the logarithm of the Bayes factors derived from the
@@ -47,8 +47,8 @@ XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
 f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
 imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 
-lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-lBF.imp1 <- BF.approx.FLS.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
+lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
+lBF.imp1 <- BF.approx.FLS.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
   SS0 = crossprod(lmnull$residuals), dmax = ncol(XS97))
 
 }

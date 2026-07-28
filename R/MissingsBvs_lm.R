@@ -45,6 +45,10 @@
 #' -"IHG" corresponds to the intrinsic hyper-g prior derived in Berger, Garcia-Donato,
 #' Moreno and Pericchi (2022).
 #'
+#' If the BF computation method chosen is \code{"TBF"}, \code{prior.betas} also determines
+#' the formula of the BF as before. In this case, the choices available are: "gZellner",
+#' "FLS", "Liangetal" and the adapted version of the ZellnerSiow" prior for TBF.
+#'
 #' The prior over the model space Pr(Mi) offers three options throuh \code{prior.models}:
 #' -"Constant" assigns the same prior probability to every model.
 #' -"ScottBerger" is the default choice. It assigns the same prior probability to
@@ -267,8 +271,8 @@ missingBVS.lm <- function (formula,
 
   mF <- L > 0 & marginal.factors
   #Check if factors present and if marginalization of their probabilities. Define model prior
-  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions, positionsfac,
-                                     firstd, lprior.models)
+  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions,
+                                     positionsfac, firstd, lprior.models)
 
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
@@ -285,16 +289,32 @@ missingBVS.lm <- function (formula,
 
   #check for missings and define competing variables with NAs
   NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
+
+  #Define function to get binary expression for each model
+  num2bin.model.fun <- function (x) num2bin.model(x, p = p,
+                                                  namesxnotnull = namesxnotnull,
+                                                  NAvars = NAvars)
   #Imputation step
   if (anyNAvar <- !is.null(NAvars)) {
     if (is.null(imp.datasets)) { #if there are no given imputations, build them
-      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
-                                         n, q, p0, imp.mice.method, imp.seed,
-                                         parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
-                                            ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp,
+                                         maxit, n, q, p0, imp.mice.method, imp.seed,
+                                         parallelmice, n.core, obsnotNA, ordvars)
+
+    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1],
+                                            framefull, ordvars, obsnotNA, p0, NAvars)
     list2env(imputation.list, envir = env)
   }
+
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model as an average of BF computed
+    #by BF.approx.method over the imputed datasets
+    lBF.method <- function (model) lBF.approx(model,
+                                              imputation.array = imputation.array,
+                                              BF.approx.method = BF.approx.method,
+                                              p0 = p0, n.imp = n.imp)
+  } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                         X = imputation.array[,c(1:p0, model+p0),])
 
   #Info:
   cat("Info. . .\n")
@@ -315,12 +335,12 @@ missingBVS.lm <- function (formula,
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
   #Compute exact posterior distribution and normalizing constant
-  posterior.list <- exact.posterior.comput(p, namesxnotnull, NAvars, lBF.method,
+  posterior.list <- exact.posterior.comput(p, num2bin.model.fun, lBF.method,
                                            lp.model, X0, X.full, BF.approx.method)
   list2env(posterior.list, envir = env)
 
   #Summ up the posterior distribution
-  summ.posterior.list <- summ.posterior(all.models.PM, p, q, mF, positions)
+  summ.posterior.list <- summ.posterior(all.models.PM, p, q, mF, positions, num2bin.model.fun)
   list2env(summ.posterior.list, envir = env)
 
   if (anyNAvar) {#Pool results for imputed datasets
@@ -377,7 +397,8 @@ missingBVS.lm <- function (formula,
     priorprobs <- numeric(q+1)
     priorprobs[1] <- exp(lprior.models(numeric(q))) #prior inclusion prob for dimension 0
     for (i in seq_len(q)) {
-      priorprobs[i+1] <- exp(lprior.models(c(rep.int(1, i), rep.int(0, q - i))) + lchoose(q, i))
+      priorprobs[i+1] <-
+        exp(lprior.models(c(rep.int(1, i), rep.int(0, q - i))) + lchoose(q, i))
       #prior inclusion probability for each dimension
     }
   }
@@ -410,7 +431,8 @@ missingBVS.lm <- function (formula,
 }
 
 #' @keywords internal
-exact.posterior.comput <- function (p, namesxnotnull, NAvars, lBF.method, lp.model,
+exact.posterior.comput <- function (p, num2bin.model.fun,#namesxnotnull, NAvars,
+                                    lBF.method, lp.model,
                                     X0, X.full, BF.approx.method) {
   #Compute exact posterior distribution and normalizing constant
 
@@ -423,18 +445,18 @@ exact.posterior.comput <- function (p, namesxnotnull, NAvars, lBF.method, lp.mod
     setTxtProgressBar(pb, i)
 
     #transform the number of the model into a binary number
-    current.model <- BayesVarSel:::integer.base.b_C(i, p)
-    all.models.lPM[i, seq_len(p)] <- current.model
+    current.model <- num2bin.model.fun(i)
+    all.models.lPM[i, seq_len(p)] <- current.model["bin",]
 
-    lpm <- lp.model(current.model) #log-model prior
+    lpm <- lp.model(current.model["bin",]) #log-model prior
     if (is.na(lpm)) next #do not visit saturated or oversaturated models
 
     #check if there are NAs in the model considered to save computation time
-    if (any(namesxnotnull[which(current.model == 1)] %in% NAvars)) {
-      lBF.PM <- lBF.method(model = which(current.model == 1)) + lpm #log(BF_a0*Pr(M))
+    if (sum(current.model["NA",]) > 0) {
+      lBF.PM <- lBF.method(model = which(current.model["bin",] == 1)) + lpm #log(BF_a0*Pr(M))
     } else { #if there are no missings, compute the BF by the method selected
-      X.i <- cbind(X0, X.full[, which(current.model == 1)])
-      lBF.PM <- BF.approx.method(k = sum(current.model == 1), X = X.i) + lpm #log(BF_a0*Pr(M))
+      X.i <- cbind(X0, X.full[, which(current.model["bin",] == 1)])
+      lBF.PM <- BF.approx.method(k = sum(current.model["bin",] == 1), X = X.i) + lpm #log(BF_a0*Pr(M))
     }
     all.models.lPM[i, p+1] <- lBF.PM
   }
@@ -449,13 +471,13 @@ exact.posterior.comput <- function (p, namesxnotnull, NAvars, lBF.method, lp.mod
   C <- sum(exp(all.models.lPM[, p+1]))
   all.models.PM <- all.models.lPM
   all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
-  colnames(all.models.PM) <- c(namesxnotnull, "Post")
+  colnames(all.models.PM) <- c(colnames(current.model), "Post")
 
   return(list(all.models.PM = all.models.PM, C = C))
 }
 
 #' @keywords internal
-summ.posterior <- function (all.models.PM, p, q, mF, positions) {
+summ.posterior <- function (all.models.PM, p, q, mF, positions, num2bin.model.fun) {
   #Summ up the posterior distribution
 
   if (mF) {
@@ -465,14 +487,14 @@ summ.posterior <- function (all.models.PM, p, q, mF, positions) {
     colnames(cf.models.PM)[q+1] <- "Post"
 
     modelsprob <- cbind(t(sapply(seq_len(2^q)-1,
-                                 function(j) BayesVarSel:::integer.base.b_C(j, q))), numeric(2^q))
+                                 function(j) num2bin.model.fun(j)["bin",])), numeric(2^q))
     for (i in seq_len(nrow(cf.models.PM))) {
       modeli <- cf.models.PM[i, seq_len(q)] > 0
       j <- which(apply(modelsprob[, seq_len(q)], 1, function(x) all(x == modeli)))
       modelsprob[j, q + 1] <- modelsprob[j, q + 1] + cf.models.PM[i, q + 1]
     }
-    colnames(modelsprob) <- colnames(cf.models.PM)
   } else modelsprob <- all.models.PM
+  dimnames(modelsprob) <- list(1:nrow(modelsprob), colnames(all.models.PM))
 
   inclprob <- numeric(q)
   probdim <- numeric(q+1)
@@ -584,7 +606,7 @@ buildmatrices <- function (formula, null.model, data, marginal.factors) {
 #' @keywords internal
 buildimputation <- function(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
                             n, q, p0, imp.mice.method, imp.seed,
-                            parallelmice, n.core, obsnotNA, ordvars, BF.approx.method) {
+                            parallelmice, n.core, obsnotNA, ordvars) {
   #Build imp.predict matrix to imputation, imputed datasets and BF function
 
   #Impute just competing variables with NAs
@@ -651,25 +673,16 @@ buildimputation <- function(NAvars, formula, data, imp.predict.mat, n.imp, maxit
   #remove observations with missings on the response or fixed vars,
   #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
   imputation.array <- imput$imputation.array[obsnotNA, ordvars, , drop = FALSE]
-  if (n.imp > 1) {
-    #function to compute log(BFa0) for a given model as an average of BF computed
-    #by BF.approx.method over the imputed datasets
-    lBF.method <- function (model) lBF.approx(model,
-                                              imputation.array = imputation.array,
-                                              BF.approx.method = BF.approx.method,
-                                              p0 = p0, n.imp = n.imp)
-  } else lBF.method <- function (model) BF.approx.method(k = length(model),
-                                                         X = imputation.array[,c(1:p0, model+p0),])
 
   imp.info <- list(loggedEvents = imput$logEvents, parallelmice = parallelmice, imp.mice.method = imp.mice.method,
                    imp.predict.mat = imp.predict.mat, n.imp = n.imp, imp.seed = imp.seed, NAvars = NAvars)
 
-  return(list(imputation.array = imputation.array, lBF.method = lBF.method, imp.info = imp.info))
+  return(list(imputation.array = imputation.array, imp.info = imp.info))
 }
 
 #' @keywords internal
 extimputation <- function (formula, imp.datasets, n0, framefull, ordvars, obsnotNA,
-                           p0, BF.approx.method, NAvars) {
+                           p0, NAvars) {
   X.formula <- as.formula(paste(formula[1], formula[3]))
   isarray <- is.array(imp.datasets)
   islist <- is.list(imp.datasets)
@@ -732,20 +745,9 @@ extimputation <- function (formula, imp.datasets, n0, framefull, ordvars, obsnot
   #remove observations with missings on the response or fixed vars
   imputation.array <- imputation.array[obsnotNA, ordvars, , drop = FALSE]
 
-  if (n.imp > 1) {
-    #function to compute log(BFa0) for a given model as an average of BF computed
-    #by BF.approx.method over the imputed datasets
-    lBF.method <- function (model) lBF.approx(model,
-                                              imputation.array = imputation.array,
-                                              BF.approx.method = BF.approx.method,
-                                              p0 = p0, n.imp = n.imp)
-  } else lBF.method <- function (model) BF.approx.method(k = length(model),
-                                                         X = imputation.array[,c(1:p0, model+p0),])
-
   imp.info <- list(n.imp = n.imp, NAvars = NAvars)
 
-  return(list(imputation.array = imputation.array, lBF.method = lBF.method,
-              imp.info = imp.info, n.imp = n.imp))
+  return(list(imputation.array = imputation.array, imp.info = imp.info, n.imp = n.imp))
 }
 
 
@@ -878,27 +880,38 @@ checkforprior.betas.lm <- function (BF.approx.method, prior.betas, n, p, p0, y, 
     stop("Only BF approximations 'BIC', 'TBF' and 'gprior' supported.")
   }
 
-  if (BF.approx.method == "gprior") {
-    switch (prior.betas, # change the string for the corresponding tag in BayesVarSel code
-            gZellner = {prior.betas <- "gBF"}, #fixed g=n
-            Robust = {prior.betas <- "RobustBF"}, #random g: criteria-based prior from Bayarri et al (2012)
-            Liangetal = {prior.betas <- "LiangBF"}, #random g: hyper-g/n with a=3
-            `Zellner-Siow` = {prior.betas <- "ZSBF"}, #random g: cauchy prior
-            FLS = {prior.betas <- "flsBF"}, #fixed g Benchmark prior: g=max(n, p*p)
-            `intrinsic.MGC` = {prior.betas <- "intrinsicBF"}, #intrinsic prior from Moreno, Giron, Casella (2015)
-            IHG = {prior.betas <- "geointrinsicBF"}, #intrinsic hyper-g prior
-    stop("prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'ZellnerSiow',\n",
-         "'FLS', 'intrinsic.MGC' or  'IHG' when using BF.approx.gprior method.\n"))
-  }
-
   switch (BF.approx.method,
           BIC = {BF.approx.method.f <-
             function (k, X) BF.approx.BIC.lm(y = y, X, SS0 = SS0, n = n, k, p0 = p0)},
-          TBF = {BF.approx.method.f <-
-            function (k, X) BF.approx.TBF.lm(y = y, X, SS0 = SS0, prior.betas = prior.betas,
-                                             n = n, k, p0 = p0)},
-          gprior = {BF.approx.method.f <-
-            ifelse(prior.betas != "flsBF",
+
+          TBF = {switch (prior.betas, # build the function to compute log-TBF
+               #devnull is set to 0 because BF.approx.TBF.lm already computes zj, passed through dev (-zj)
+               gZellner = {lTBF <- function(k, dev) lTBF.gfixed(g = n, k, dev, devnull = 0)}, #fixed g=n
+               # Robust = {prior.betas <- "RobustBF"}, #random g
+               Liangetal = {lTBF <- function(k, dev) lTBF.hyperg(k, dev, devnull = 0)}, #random g: hyper-g/n with a=3
+               `Zellner-Siow` = {lTBF <- function(k, dev) lTBF.grandom(a = .5, b = (n+3)/2, k, dev, devnull = 0)}, #adapted Z-S by trG
+               FLS = {lTBF <- function(k, dev) lTBF.gfixed(g = max(n, p^2), k, dev, devnull = 0)}, #fixed Benchmark prior: g=max(n, p*p)
+               # `intrinsic.WNC` = {prior.betas <- "intrinsicBF"}, #intrinsic prior from Womack, Novelo and Casella (2014)
+               # IHG = {prior.betas <- "geointrinsicBF"} #intrinsic hyper-g prior, not available in BAS?
+               stop("Prior.betas must be one of 'gZellner', 'Liangetal', 'Zellner-Siow' or 'FLS'",
+                    "when using TBF method.\n")
+            )
+
+            BF.approx.method.f <- function (k, X) BF.approx.TBF.lm(y = y, X, SS0 = SS0, lTBF = lTBF, n = n, k, p0 = p0)},
+
+          gprior = {switch (prior.betas, # change the string for the corresponding tag in BayesVarSel code
+              gZellner = {prior.betas <- "gBF"}, #fixed g=n
+              Robust = {prior.betas <- "RobustBF"}, #random g: criteria-based prior from Bayarri et al (2012)
+              Liangetal = {prior.betas <- "LiangBF"}, #random g: hyper-g/n with a=3
+              `Zellner-Siow` = {prior.betas <- "ZSBF"}, #random g: cauchy prior
+              FLS = {prior.betas <- "flsBF"}, #fixed g Benchmark prior: g=max(n, p*p)
+              `intrinsic.MGC` = {prior.betas <- "intrinsicBF"}, #intrinsic prior from Moreno, Giron, Casella (2015)
+              IHG = {prior.betas <- "geointrinsicBF"}, #intrinsic hyper-g prior
+              stop("prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'ZellnerSiow',\n",
+                   "'FLS', 'intrinsic.MGC' or  'IHG' when using gprior method.\n")
+            )
+
+            BF.approx.method.f <- ifelse(prior.betas != "flsBF",
                    function (k, X) BF.approx.gprior.lm(y = y, X, SS0 = SS0, prior.betas = prior.betas,
                                                        n = n, k, p0 = p0),
                    function (k, X) BF.approx.FLS.lm(y = y, X, SS0 = SS0, dmax = p + p0,
@@ -907,6 +920,41 @@ checkforprior.betas.lm <- function (BF.approx.method, prior.betas, n, p, p0, y, 
   return(BF.approx.method.f)
 }
 
+#' Original code from package 2.6.0 \pck{BayesVarSel} (distributed under GPL-2),
+#' by Gonzalo García-Donato and Anabel Forte.
+#'
+#' Adapted by Carolina Mulet to fit \pck{MissingBVS}'s code and return a matrix
+#' with the binary expression of a model and the active variables with NA
+#' to reduce computational burden
+#'
+#' @keywords internal
+num2bin.model <- function(x, p, namesxnotnull, NAvars) {
+  #x is the number to get its binary expression, p is the number of variables,
+  #namesxnotnull is the name of the p competing vars and NAvars, the ones with NAs.
+  #If namesxnotnull = NULL and NAvars = NULL, the row "bin" equals integer.base.b_C
+  if (x == 0) {
+    res <- numeric(p)
+  } else {
+    ndigits <- (floor(logb(x, base = 2)) + 1)
+    res <- numeric(ndigits)
+    for (i in 1:ndigits) {
+      res[i] <- (x %% 2)
+      x <- (x %/% 2)
+    }
+
+    res <- c(res, numeric(p - ndigits))
+  }
+  resNA <- res * (namesxnotnull %in% NAvars) #variables in model with NA
+  return(matrix(c(res, resNA), byrow = T, nrow = 2, ncol = p,
+                dimnames = list(c("bin","NA"), namesxnotnull)))
+}
+
+#' Original code from package 3.1-0 \pck{lmerTest} (distributed under GPL-2, GPL-3),
+#' by Alexandra Kuznetsova, Per Bruun Brockhoff and Rune Haubo Bojesen Christensen.
+#'
+#' Adapted by Carolina Mulet to fit \pck{MissingBVS}'s code and obtain just
+#' rank defficient matrices.
+#'
 #' @keywords internal
 model.matrix.rankdef <- function (model.frame.aux) {
   #internal function to create rank defficient matrices from a given dataframe

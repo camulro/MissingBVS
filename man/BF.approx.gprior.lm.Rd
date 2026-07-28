@@ -25,7 +25,7 @@ the fixed terms and the intercept.}
 \item{prior.betas}{Prior distribution for model-specific coefficients in the
 \pkg{BayesVarSel} codification. Options include "gBF", "RobustBF", "LiangBF",
 "ZSBF", "flsBF", "intrinsicBF" and "geointrinsicBF". See
-\code{\link[BayesVarSel]{Bvs}} for more details.}
+\code{\link[MissingBVS]{MissingBvs.lm}} for more details.}
 
 \item{n}{Number of observations.}
 
@@ -49,8 +49,8 @@ XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
 f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
 imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 
-lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
-lBF.imp1 <- BF.approx.gprior.lm(y = lmnull$y, X = imp1[names(lmnull$y),,1],
+lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
+lBF.imp1 <- BF.approx.gprior.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
   SS0 = crossprod(lmnull$residuals))
 
 }

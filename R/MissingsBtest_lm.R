@@ -42,6 +42,10 @@
 #' -"IHG" corresponds to the intrinsic hyper-g prior derived in Berger, Garcia-Donato,
 #' Moreno and Pericchi (2022).
 #'
+#' If the BF computation method chosen is \code{"TBF"}, \code{prior.betas} also determines
+#' the formula of the BF as before. In this case, the choices available are: "gZellner",
+#' "FLS", "Liangetal" and the adapted version of the ZellnerSiow" prior for TBF.
+#'
 #' The prior over the model space Pr(Mi) offers three options through \code{prior.models}:
 #' -"Constant" assigns the same prior probability to every model, default one.
 #' -"ScottBerger" assigns the same prior probability to every different model size.
@@ -220,7 +224,7 @@ missingBtest.lm <- function (data,
   list2env(Btestarg.list, envir = env)
 
   SSE <- numeric(N) #SSEs for each model
-  Dim <- rep.int(0,N)
+  Dim <- rep.int(0L,N)
   mt <- list() #list of terms for each model
 
   covar.list <- list() #list that contains the names of the variables in each model
@@ -242,7 +246,7 @@ missingBtest.lm <- function (data,
   nullmodel.pos <- ordered.SSE$ix[1]
 
   #Check null model
-  if (!is.null(null.model) & nullmodel.pos != pos.user.null.model){
+  if (relax.nest) if (!is.null(null.model) & nullmodel.pos != pos.user.null.model){
       stop("The given null model does not coincide with the one with the\n",
            "largest sum of squared error (and it should).\n")
   }
@@ -280,19 +284,28 @@ missingBtest.lm <- function (data,
   #Imputation step
   if (!is.null(NAvars)) {
     if (is.null(imp.datasets)) { #if there are no given imputations, build them
-      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
-                                         n, q, p0, imp.mice.method, imp.seed,
-                                         parallelmice, n.core, obsnotNA, ordvars, BF.approx.method)
-    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1], framefull,
-                                            ordvars, obsnotNA, p0, BF.approx.method, NAvars)
+      imputation.list <- buildimputation(NAvars, full.formula, data, imp.predict.mat, n.imp,
+                                         maxit, n, q, p0, imp.mice.method, imp.seed,
+                                         parallelmice, n.core, obsnotNA, ordvars)
+    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1],
+                                            framefull, ordvars, obsnotNA, p0, NAvars)
     list2env(imputation.list, envir = env)
   }
 
+  if (n.imp > 1) {
+    #function to compute log(BFa0) for a given model as an average of BF computed
+    #by BF.approx.method over the imputed datasets
+    lBF.method <- function (model) lBF.approx(model,
+                                              imputation.array = imputation.array,
+                                              BF.approx.method = BF.approx.method,
+                                              p0 = p0, n.imp = n.imp)
+  } else lBF.method <- function (model) BF.approx.method(k = length(model),
+                                                         X = imputation.array[,c(1:p0, model+p0),])
   mF <- L > 0 & marginal.factors
   #Check if factors present and if marginalization of their probabilities.
   #Define model prior and BF
   lBF.comp <- BFcomp.btest(lprior.models, prior.models.dummies, Dim, mF, positionsfac,
-                           namesxnotnull, NAvars, lBF.method, X0, X.full, BF.approx.method, covar.list)
+                           namesxnotnull, NAvars, lBF.method, X0, X.full, BF.approx.method)
 
   #Posterior computation of model space defined by models list
   post.btest.list <- posterior.btest(competing.models, namesxnotnull, namesnull, covar.list,
@@ -418,7 +431,7 @@ priormodels.btest <- function (prior.models, N, Dim, priorprobs) {
 #' @keywords internal
 BFcomp.btest <- function (lprior.models, prior.models.dummies, Dim, mF,
                           positionsfac,  namesxnotnull, NAvars, lBF.method,
-                          X0, X.full, BF.approx.method, covar.list) {
+                          X0, X.full, BF.approx.method) {
   #Check arguments and define the functions to compute Bayes factors
 
   if (mF) {
@@ -438,6 +451,8 @@ BFcomp.btest <- function (lprior.models, prior.models.dummies, Dim, mF,
       pm <- positionsfac %*% modeli
       tau <- pm > 0; ltau <- pm[tau]
       m2 <- sum(tau) #number of factors active
+
+      NAmodeli <- any(namesxnotnull[which(modeli)] %in% NAvars)
       if (m2 > 0) {
         mats <- lapply(ltau, build_ind)
         mat.ind <- Reduce(function(x, y) merge(x, y, by = NULL), mats)
@@ -453,7 +468,7 @@ BFcomp.btest <- function (lprior.models, prior.models.dummies, Dim, mF,
           current.model[cn] <- dj
 
           #check if there are NAs in the model considered to save computation time
-          if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
+          if (NAmodeli) {
             lBF[j] <- lBF.method(model = which(current.model == 1)) #log(BF_a0)
             lpriorM[j] <- lprior.models.dummies(djsum, ltau) #log(Pr(M_delta))
           } else { #if there are no missings, compute the BF by the method selected
@@ -466,7 +481,7 @@ BFcomp.btest <- function (lprior.models, prior.models.dummies, Dim, mF,
         # lPriorModels[i] <- lprior.models(i)
       } else {
         #check if there are NAs in the model considered to save computation time
-        if (any(covar.list[[i]] %in% NAvars)) {
+        if (NAmodeli) {
           lBFi0 <- lBF.method(model = which(modeli))
         } else { #if there are no missings, compute the BF by the method selected
           X.i <- cbind(X0, X.full[,which(modeli)])
@@ -478,11 +493,10 @@ BFcomp.btest <- function (lprior.models, prior.models.dummies, Dim, mF,
   } else { #Define the standard BF
     lBF.comp <- function (modeli, i) {
       #check if there are NAs in the model considered to save computation time
-      if (any(covar.list[[i]] %in% NAvars)) {
+      if (any(namesxnotnull[which(modeli)] %in% NAvars)) {
         lBFi0 <- lBF.method(model = which(modeli))
       } else { #if there are no missings, compute the BF by the method selected
-        X.i <- cbind(X0, X.full[,which(modeli)])
-        lBFi0 <- BF.approx.method(k = Dim[i], X = X.i)
+        lBFi0 <- BF.approx.method(k = Dim[i], X = cbind(X0, X.full[,which(modeli)]))
       }
       return(lBFi0)
     }
@@ -520,7 +534,7 @@ checkBtestarguments <- function (models, null.model) {
 #' @keywords internal
 build_ind <- function(k) {
   ind <- t(sapply(2:2^k - 1,
-                  FUN = function(j2) BayesVarSel:::integer.base.b_C(j2,k)))
+                  FUN = function(j) num2bin.model(j, p = k, NULL, NULL)["bin",]))
 
   rs <- rowSums(ind)
   ind[!(rs == k | (rs == (k - 1) & ind[, k])), , drop = FALSE]

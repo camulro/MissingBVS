@@ -8,14 +8,15 @@ BF.approx.gprior.glm(
   y,
   X,
   family = binomial(link = "logit"),
-  logmargnull,
   prior.betas = BAS::robust(as.numeric(length(y))),
+  logmargnull,
   k = ncol(X) - p0,
   p0 = 1L,
   weights = rep(1, length(y)),
   offset = rep(0, length(y)),
   control = glm.control(),
-  laplace = 0L
+  laplace = 0L,
+  c_glm.marg
 )
 }
 \arguments{
@@ -26,16 +27,16 @@ the fixed terms and the intercept.}
 
 \item{family}{String, function or the call to a family function among
 \code{\link[stats]{family}} to specify the error distribution and link
-function to be used in the model. For now, only available the implemented
+function to be used in the model. Only available the implemented
 families in \pkg{BAS}: \code{binomial(link = "logit")},
 \code{poisson(link = "log")} and \code{Gamma(link = "log")}.}
-
-\item{logmargnull}{Log-marginal likelihood of the null model considered.}
 
 \item{prior.betas}{Prior distribution for model-specific coefficients.
 Options include \code{\link[BAS]{g.prior}}, \code{\link[BAS]{CCH}},
 \code{\link[BAS]{robust}} and \code{\link[BAS]{intrinsic}} among others.
 See \code{\link[BAS]{BAS}} for more details.}
+
+\item{logmargnull}{Log-marginal likelihood of the null model considered.}
 
 \item{k}{Number of model-specific coefficients.}
 
@@ -53,6 +54,8 @@ It is set to \code{[stats]{glm.control()}} by default.}
 \item{laplace}{Logical variable to access the Laplace approximation to the
 marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
 for more details.}
+
+\item{c_glm.marg}{Function to compute log-marginal.}
 }
 \value{
 \code{BF.approx.gprior.glm} returns, in logarithmic scale, the exact
@@ -70,11 +73,11 @@ for complete data in generalized linear models.
 Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
 f <- Outcome ~ Pregnancies + Glucose + Insulin
 imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS")
 
-glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(),
-  x = T, y = T)
-lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1[names(glmnull$y),,1],
-  family = binomial(), logmargnull = 0) #returns the logmarginal
+glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(), y = T)
+lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
+  family = binomial(), logmargnull = 0, c_glm.marg = c_glm.marg) #returns the logmarginal
 
 }
 \references{

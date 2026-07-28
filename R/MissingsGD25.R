@@ -170,6 +170,10 @@ missingGD25 <- function (formula,
   #check for missings
   NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
+  #Define function to get binary expression for each model
+  num2bin.model.fun <- function (x) num2bin.model(x, p = p,
+                                                  namesxnotnull = namesx,
+                                                  NAvars = NAvars)
   #BF function
   BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
                                                            y = y, SS0 = SS0, n = n, k)
@@ -218,11 +222,11 @@ missingGD25 <- function (formula,
     setTxtProgressBar(pb, i)
 
     #transform the number of the model into a binary number
-    current.model <- BayesVarSel:::integer.base.b_C(i, p)
-    all.models.lPM[i, seq_len(p)] <- current.model
+    current.model <- num2bin.model.fun(i)
+    all.models.lPM[i, seq_len(p)] <- current.model["bin",]
 
-    all.models.lPM[i, p+1] <- lBF.method(model = which(current.model == 1)) +
-      lprior.models(current.model) #log(BF_a0*Pr(M))
+    all.models.lPM[i, p+1] <- lBF.method(model = which(current.model["bin",] == 1)) +
+      lprior.models(current.model["bin",]) #log(BF_a0*Pr(M))
   }
   setTxtProgressBar(pb, 2^p)
   #null model
@@ -236,7 +240,7 @@ missingGD25 <- function (formula,
   colnames(all.models.PM) <- c(namesx, "Post")
 
   #Summ up the posterior distribution
-  summ.posterior.list <- summ.posterior(all.models.PM, p, p, FALSE, NULL)
+  summ.posterior.list <- summ.posterior(all.models.PM, p, p, FALSE, NULL, NULL)
   list2env(summ.posterior.list, envir = environment())
 
   if (!is.null(NAvars)) {#Pool results for imputed datasets

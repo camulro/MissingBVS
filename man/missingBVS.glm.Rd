@@ -10,7 +10,7 @@ missingBVS.glm(
   family = binomial(link = "logit"),
   null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
   BF.approx.method = "BIC",
-  prior.betas = "Robust",
+  prior.betas = "gZellner",
   prior.models = "ScottBerger",
   prior.models.dummies = "ScottBerger",
   marginal.factors = TRUE,
@@ -200,13 +200,18 @@ and developed for generalized linear models by Li and Clyde (2018). It proceeds
 using the \pkg{BAS} log-marginal computation (Clyde, 2025) if the \code{family}
 chosen is ones of the available. Otherwise, method \code{"gprior"} is not provided.
 The choices currently available are:
--"Robust" is the default option and denotes the criteria-based prior of Bayarri,
-Berger, Forte and Garcia-Donato (2012).
--"gZellner" corresponds to the prior in Zellner (1986) with g=n fixed.
+-"Robust" denotes the criteria-based prior of Bayarri, Berger, Forte and
+Garcia-Donato (2012).
+-"gZellner" is the default option and corresponds to the prior in Zellner (1986)
+with g=n fixed.
 -"Liangetal" prior is the hyper-g/n of Liang et al (2008) with a=3.
 -"FLS" corresponds to the prior in Zellner (1986) with g=max(n, p*p) fixed, the
 (benchmark) prior recommended by Fernandez, Ley and Steel (2001).
 -"intrinsic.WNC" is the intrinsic prior derived by Womack, Novelo and Casella (2014).
+
+If the BF computation method chosen is \code{"TBF"}, \code{prior.betas} also determines
+the formula of the BF as before. In this case, the choices available are: "gZellner",
+"FLS", "Liangetal" and the adapted version of the ZellnerSiow" prior for TBF.
 
 The prior over the model space Pr(Mi) offers three options throuh \code{prior.models}:
 -"Constant" assigns the same prior probability to every model.

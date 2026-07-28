@@ -46,10 +46,10 @@ XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
 f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
 imp2 <- mice.imputation(X = XS97, formula = f, n.imp = 2)
 
-lmnull <- lm(gr56092 ~ 1, data = dataS97, x = T, y = T)
+lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
 BF.fun <- function(X, k) BF.approx.BIC.lm(y = lmnull$y, X,
-  SS0 = crossprod(lmnull$residuals), k = k)
-lBF_f <- lBF.approx(1:3, imp2[names(lmnull$y),,], BF.approx.method = BF.fun)
+  SS0 = crossprod(lmnull$residuals))
+lBF_f <- lBF.approx(1:3, imp2$imputation.array[-lmnull$na.action,,], BF.approx.method = BF.fun)
 
 }
 \references{

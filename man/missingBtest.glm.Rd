@@ -11,7 +11,7 @@ missingBtest.glm(
   family = binomial(link = "logit"),
   null.model = NULL,
   BF.approx.method = "BIC",
-  prior.betas = "Robust",
+  prior.betas = "gZellner",
   prior.models = "Constant",
   prior.models.dummies = "ScottBerger",
   marginal.factors = TRUE,
@@ -177,13 +177,18 @@ and developed for generalized linear models by Li and Clyde (2018). It proceeds
 using the \pkg{BAS} log-marginal computation (Clyde, 2025) if the \code{family}
 chosen is ones of the available. Otherwise, method \code{"gprior"} is not provided.
 The choices currently available are:
--"Robust" is the default option and denotes the criteria-based prior of Bayarri,
-Berger, Forte and Garcia-Donato (2012).
--"gZellner" corresponds to the prior in Zellner (1986) with g=n fixed.
+-"Robust" denotes the criteria-based prior of Bayarri, Berger, Forte and
+Garcia-Donato (2012).
+-"gZellner" is the default option and corresponds to the prior in Zellner (1986)
+with g=n fixed.
 -"Liangetal" prior is the hyper-g/n of Liang et al (2008) with a=3.
 -"FLS" corresponds to the prior in Zellner (1986) with g=max(n, p*p) fixed, the
 (benchmark) prior recommended by Fernandez, Ley and Steel (2001).
 -"intrinsic.WNC" is the intrinsic prior derived by Womack, Novelo and Casella (2014).
+
+If the BF computation method chosen is \code{"TBF"}, \code{prior.betas} also determines
+the formula of the BF as before. In this case, the choices available are: "gZellner",
+"FLS", "Liangetal" and the adapted version of the ZellnerSiow" prior for TBF.
 
 The prior over the model space Pr(Mi) offers three options through \code{prior.models}:
 -"Constant" assigns the same prior probability to every model, default one.
@@ -207,15 +212,14 @@ which is the recommended. A non-treatment of factors can be performed through
 \examples{
 \dontrun{
 #Indian Prime Diabetes Data from VIM's package
-data.diabetes <- VIM::diabetes
 
-#Default choices are: BIC approximation, Constant prior and 390 imputed
-#datasets with mice's pmm method.
 models.list = list(M0 = Outcome ~ 1, M1 = Outcome ~ Pregnancies,
   M2 = Outcome ~ Glucose, M3 = Outcome ~ Insulin,
   M4 = Outcome ~ Pregnancies + Glucose, M5 = Outcome ~ Pregnancies + Insulin,
   M6 = Outcome ~ Pregnancies + Glucose + Insulin)
 
+#Default choices are: BIC approximation, Constant prior and 390 imputed
+#datasets with mice's pmm method.
 diabetes.mtest <- missingBtest.glm(data = VIM::diabetes,
   models = models.list, family = binomial())
 

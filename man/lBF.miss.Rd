@@ -22,7 +22,7 @@ containing the imputed datasets; \code{rSigma}Array of dimension
 pxpx\code{nMC} containing the corresponding covariance matrices}
 
 \item{BF.miss.aux}{Auxiliary function with needed fixed parameters to compute
-the g'-Bayes factor for each entry in \code{imputation.list}.}
+the g'-Bayes factor over \code{imputation.list}.}
 
 \item{n}{Number of observations.}
 
@@ -46,15 +46,13 @@ The g'BF is computed with the auxiliary function \code{BF.miss.aux}.
 \examples{
 #Daily air quality measurements in New York
 data("airquality")
+imp2 <- MC.imputation(X = airquality[,c("Ozone", "Wind", "Temp")], nMC = 2)
 
-Xair = airquality[,c("Ozone", "Wind", "Temp")]
-imp2 <- MC.imputation(X = Xair, nMC = 2)
-
-lmnull <- lm(Solar.R ~ 1, data = airquality, x = T, y = T)
-imp2$rX.imput <- imp2$rX.imput[names(lmnull$y),,]
+lmnull <- lm(Solar.R ~ 1, data = airquality, y = T)
+imp2$rX.imput <- imp2$rX.imput[-lmnull$na.action,,]
 BF.fun <- function(X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
-lBF_f <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
+lBF <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
 
 }
 \references{
@@ -64,7 +62,7 @@ Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 }
 \seealso{
 Use \code{\link[MissingBVS]{MC.imputation}} for computing the
-\code{MC.imputation} object used in the MonteCarlo approximation and
+\code{MissingBVS.imputation} object used in the MonteCarlo approximation and
 \code{\link[MissingBVS]{BF.miss.X}} for the Bayes factor for each MC step.
 Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
 of the model posterior distribution in the VS problem (recommended when p<20).

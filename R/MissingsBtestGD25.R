@@ -119,7 +119,7 @@ missingBtestGD25 <- function (data,
 
   namesm <- names(models)
 
-  Dim <- rep.int(0, N)
+  Dim <- rep.int(0L, N)
   lBFi0 <- lPriorModels <- PostProbi <- numeric(N)
   mt <- list() #list of terms for each model
 
@@ -211,9 +211,9 @@ missingBtestGD25 <- function (data,
     modeli <- which(namesx %in% covar.list[[i]])
 
     lBFi0[i] <- lBF.method(model = modeli)
-    lPriorModels[i] <- log(prior.models(i))
+    lPriorModels[i] <- lprior.models(i)
   }
-  lPriorModels[nullmodel.pos] <- log(prior.models(nullmodel.pos))
+  lPriorModels[nullmodel.pos] <- lprior.models(nullmodel.pos)
   lBFi0[nullmodel.pos] <- 0
   C <- sum(exp(lBFi0 + lPriorModels))
   PostProbi <- exp(lBFi0 + lPriorModels - log(C))
@@ -258,11 +258,11 @@ missingBtestGD25 <- function (data,
   #arguments used for imputation
   result$imp.info <- list(n.imp = n.imp, imp.seed = imp.seed)
   #save the imputed datasets for sensitivity analysis
-  raw.imp.array <- serialize(imputation.array, NULL)
+  raw.imp.array <- serialize(imputation.list, NULL)
   result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
 
   result$logprior.models <- lprior.models #function used for model prior
-  result$prior.models <- prior.models #function used for model prior
+  result$prior.models <- prior.models
   result$priorprobs <- exp(lPriorModels)
   result$call <- match.call()
 

@@ -154,6 +154,10 @@ Berger, Forte and Garcia-Donato (2012).
 -"IHG" corresponds to the intrinsic hyper-g prior derived in Berger, Garcia-Donato,
 Moreno and Pericchi (2022).
 
+If the BF computation method chosen is \code{"TBF"}, \code{prior.betas} also determines
+the formula of the BF as before. In this case, the choices available are: "gZellner",
+"FLS", "Liangetal" and the adapted version of the ZellnerSiow" prior for TBF.
+
 The prior over the model space Pr(Mi) offers three options through \code{prior.models}:
 -"Constant" assigns the same prior probability to every model, default one.
 -"ScottBerger" assigns the same prior probability to every different model size.
