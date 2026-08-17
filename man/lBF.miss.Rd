@@ -7,13 +7,13 @@
 lBF.miss(
   model,
   imputation.list,
-  BF.miss.aux,
+  lBF,
   n = dim(imputation.list$rX.imput)[1],
   nMC = dim(imputation.list$rSigma)[3]
 )
 }
 \arguments{
-\item{model}{Vector of indexes in {1,2,...,p} denoting the active variables
+\item{model}{Vector of indexes in \{1, 2, ..., p\} denoting the active variables
 for a given model with p competing covariates.}
 
 \item{imputation.list}{Object of class \code{MC.imputation} with the
@@ -21,7 +21,7 @@ following elements: \code{rX.imput}Array of dimension \code{n}xpx\code{nMC}
 containing the imputed datasets; \code{rSigma}Array of dimension
 pxpx\code{nMC} containing the corresponding covariance matrices}
 
-\item{BF.miss.aux}{Auxiliary function with needed fixed parameters to compute
+\item{lBF}{Auxiliary function with needed fixed parameters to compute
 the g'-Bayes factor over \code{imputation.list}.}
 
 \item{n}{Number of observations.}
@@ -41,19 +41,20 @@ covariates are random and normally distributed (García-Donato et al., 2025).
 \details{
 The Bayes factor approximation is via a MonteCarlo scheme given the imputed datasets
 and variance-covariance matrices simuled in a \code{MissingBVS.imputation} object.
-The g'BF is computed with the auxiliary function \code{BF.miss.aux}.
+The g'BF is computed with the auxiliary function \code{lBF}.
 }
 \examples{
+\dontshow{if (interactive()) withAutoprint(\{ # examplesIf}
 #Daily air quality measurements in New York
 data("airquality")
 imp2 <- MC.imputation(X = airquality[,c("Ozone", "Wind", "Temp")], nMC = 2)
 
 lmnull <- lm(Solar.R ~ 1, data = airquality, y = T)
 imp2$rX.imput <- imp2$rX.imput[-lmnull$na.action,,]
-BF.fun <- function(X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
+BF.fun <- function(X.center, Sigma11, k) MissingBVS:::BF.GD25(X.center, Sigma11,
   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
-lBF <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
-
+lBF <- MissingBVS:::lBF.miss(1:3, imp2, lBF = BF.fun)
+\dontshow{\}) # examplesIf}
 }
 \references{
 García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
@@ -63,11 +64,12 @@ Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 \seealso{
 Use \code{\link[MissingBVS]{MC.imputation}} for computing the
 \code{MissingBVS.imputation} object used in the MonteCarlo approximation and
-\code{\link[MissingBVS]{BF.miss.X}} for the Bayes factor for each MC step.
-Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+\code{\link[MissingBVS]{BF.GD25}} for the Bayes factor for each MC step.
+Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 of the model posterior distribution in the VS problem (recommended when p<20).
 }
 \author{
 María Eugenia Castellanos and Carolina Mulet
 Maintainer: <Carolina.Mulet1@alu.uclm.es>
 }
+\keyword{internal}

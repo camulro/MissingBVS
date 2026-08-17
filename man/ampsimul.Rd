@@ -19,17 +19,17 @@ Correlations between covariates was chosen to be approximately 0.5.
 Some entries are missing due to a MAR mechanism.
 }
 \examples{
-##get ampsimul from simul data:
-#data(simul)
+## Obtain the amputed version from the complete simulation:
+#data(simulation)
 #set.seed(1)
 #my.patterns <- weights <- matrix(0, nrow = 2, ncol = 10)
 #my.patterns[1,] <- c(0,rep(1,9))
 #my.patterns[2,] <- c(rep(1,3),0,rep(1,6))
 
 #weights[1,] <- weights[2,] <- c(0,1,rep(0,8))
-#aux = mice::ampute(simul[,-1], prop = 0.65, patterns = my.patterns,
+#aux <- mice::ampute(simulation[, -1], prop = 0.65, patterns = my.patterns,
 #  weights = weights, mech = "MAR")
-#ampsimul <- data.frame(y = simul[,1], aux$amp)
+#ampsimulation <- data.frame(y = simulation[, 1], aux$amp)
 
 data(ampsimulation)
 

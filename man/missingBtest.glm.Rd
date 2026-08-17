@@ -10,8 +10,8 @@ missingBtest.glm(
   models,
   family = binomial(link = "logit"),
   null.model = NULL,
-  BF.approx.method = "BIC",
-  prior.betas = "gZellner",
+  BF.method = "BIC",
+  prior.betas = NULL,
   prior.models = "Constant",
   prior.models.dummies = "ScottBerger",
   marginal.factors = TRUE,
@@ -47,7 +47,7 @@ the names of variables are used to identify the null. If provided, the string
 must coincide with the one with the largest sum of squared errors and should
 be the one with the smallest size.}
 
-\item{BF.approx.method}{Method used to compute or approximate data-driven Bayes factors
+\item{BF.method}{Method used to compute or approximate data-driven Bayes factors
 (to be literally specified). Possible choices include "BIC", "TBF" and "gprior"
 (see details).}
 
@@ -70,7 +70,7 @@ probabilities such as García-Donato and Paulo (2022). By default, it is set to 
 defining the prior model probabilities for each one in \code{models} (if
 \code{prior.models}= "User"; see details).}
 
-\item{imp.mice.method}{Method for \pck{mice}'s imputation. Can be either a string
+\item{imp.mice.method}{Method for \pkg{mice}'s imputation. Can be either a string
 or a vector of strings of length the number of variables in data, except the response.}
 
 \item{imp.predict.mat}{Matrix with \code{formula}'s competing variables in rows
@@ -81,7 +81,7 @@ define the most important predictors for each variable based on correlations.}
 
 \item{n.imp}{Number of imputed datasets for model posterior computation.}
 
-\item{maxit}{Number of iterations for \pck{mice}'s imputation. By default, it is 5.}
+\item{maxit}{Number of iterations for \pkg{mice}'s imputation. By default, it is 5.}
 
 \item{parallelmice}{Logical to indicate whether or not to use parallelization on
 \code{\link[mice]{mice}}'s imputation. By default, automatically performs it if the
@@ -108,7 +108,7 @@ marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
 for more details.}
 }
 \value{
-\code{\link[MissingBVS]{MissingBtest.glm}} returns an object of type
+\code{\link[MissingBVS]{missingBtest.glm}} returns an object of type
 \code{MissingBtest} with the following elements:
 \item{lBFi0}{Bayes factors in logaritmic scale of each model to the null}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}}
@@ -129,9 +129,8 @@ information (when relevant)}
 the error distribution and link function to be used in the model}
 \item{weights}{Weights vector used in the glm fitting process}
 \item{offset}{Offset vector used in the glm fitting process}
-\item{BF.approx.method}{Function used to compute Bayes factors}
+\item{BF.method}{Function used to compute Bayes factors}
 \item{prior.betas}{\code{prior.betas}}
-\item{logprior.models}{Function used to compute the log-prior over the model space}
 \item{prior.models}{Vector with \code{prior.models} and \code{prior.models.dummies}
 chosen. If there are no factors or \code{marginal.factors} is set to \code{FALSE},
 it saves the only argument used, \code{prior.models}}
@@ -151,7 +150,7 @@ Given a list of competing models, the model space is made up by them, assuming t
 intercept term is present in every model. The simplest one M0, can be specified (\code{null.model})
 and must be nested in the rest. In order to implement BIA, \code{\link[MissingBVS]{missingBtest.glm}}
 can, either perform \code{n.imp} imputations designed by \code{imp.predict.mat} and
-\code{imp.mice.method} with the \pck{mice} package, or use user-given imputated datasets
+\code{imp.mice.method} with the \pkg{mice} package, or use user-given imputated datasets
 by the \code{imp.datasets} argument. Hence, the posterior distribution over the model space
 is given through Bayes' theorem:
 
@@ -167,7 +166,7 @@ AvBi = 1/\code{n.imp} * (Bi(1) + ... + Bi(\code{n.imp})),
 where Bi(j) corresponds to the BF for model Mi to M0 under the jth imputed dataset.
 Data-driven BF can be either computed using popular g-prior choices or approximated
 with the BIC (Schwarz, 1978) or the test-based BF (Held, Gravestock and Sabanés, 2015)
-with the \code{BF.approx.method} argument. Approximations can be done through the
+with the \code{BF.method} argument. Approximations can be done through the
 \pkg{BAS} faster computation if the \code{family} is one of the implemented there:
 \code{binomial(link = "logit")}, \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
 
@@ -210,21 +209,33 @@ which is the recommended. A non-treatment of factors can be performed through
 \code{marginal.factors}.
 }
 \examples{
-\dontrun{
-#Indian Prime Diabetes Data from VIM's package
+\donttest{
+# Build a small reproducible binary-response example from airquality.
+data("airquality")
+glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+  "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+glm_data$Wind[c(1, 10)] <- NA_real_
 
-models.list = list(M0 = Outcome ~ 1, M1 = Outcome ~ Pregnancies,
-  M2 = Outcome ~ Glucose, M3 = Outcome ~ Insulin,
-  M4 = Outcome ~ Pregnancies + Glucose, M5 = Outcome ~ Pregnancies + Insulin,
-  M6 = Outcome ~ Pregnancies + Glucose + Insulin)
+models.list <- list(
+  M0 = Outcome ~ 1,
+  M1 = Outcome ~ Wind,
+  M2 = Outcome ~ Temp,
+  M3 = Outcome ~ Solar.R,
+  M4 = Outcome ~ Wind + Temp,
+  M5 = Outcome ~ Wind + Solar.R,
+  M6 = Outcome ~ Wind + Temp + Solar.R
+)
 
-#Default choices are: BIC approximation, Constant prior and 390 imputed
-#datasets with mice's pmm method.
-diabetes.mtest <- missingBtest.glm(data = VIM::diabetes,
-  models = models.list, family = binomial())
+glm.mtest <- missingBtest.glm(
+  data = glm_data, models = models.list, family = binomial(),
+  n.imp = 2, imp.seed = 1
+)
 
 #Show the results:
-diabetes.mtest
+glm.mtest
+glm.mtest$PostProbi
 }
 
 }
@@ -265,7 +276,7 @@ van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingBvs.glm}} for an exact computation
+Use \code{\link[MissingBVS]{missingBVS.glm}} for an exact computation
 of the model posterior distribution (recommended when p<20).
 }
 \author{

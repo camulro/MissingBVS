@@ -29,7 +29,10 @@ probability Beta(1,1) to the a priori inclusion probability of each competing
 dummy variable and assumming independence between different factors.
 }
 \examples{
-logScottBerger.d(0:3, c(F,rep(T,3)), c(3,2,4,3))
+delta <- c(0, 1, 2)
+tau <- c(FALSE, TRUE, TRUE)
+levels <- c(3, 2, 4)
+logScottBerger.d(delta = delta, tau = tau, l = levels)
 
 }
 \references{
@@ -42,7 +45,7 @@ Variable Selection in the Presence of Factors: A Model Selection Perspective.
 Journal of the American Statistical Association. 117. 1-27.
 }
 \seealso{
-\code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+\code{\link[MissingBVS]{missingGibbsBVS.lm}},
 \code{\link[MissingBVS]{logConstant.d}}.
 }
 \author{

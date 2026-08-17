@@ -19,7 +19,7 @@
 #' where Bi is the Bayes factor (BF) of Mi to M0 derived a the expected value of g'BF of
 #' García-Donato et al. (2025) for normal random regressors, Pr(Mi) is the prior
 #' probability of Mi and C is the normalizing constant. The g'BFs are computed
-#' with \code{\link[MissingBVS]{BF.miss.X}}, which resemble g-prior BFs (Zellner, 1986)
+#' with \code{\link[MissingBVS]{BF.GD25}}, which resemble g-prior BFs (Zellner, 1986)
 #' for random covariates, for each pair of imputed dataset and  variance-covariance
 #' matrix simulated. The integral of g'BF is approximated with a Monte Carlo scheme.
 #'
@@ -74,14 +74,13 @@
 #' \item{imp.info}{List of arguments used for the imputation step and other information}
 #' \item{compress.imp.list}{Compressed list of imputed datasets and covariance
 #' matrices}
-#' \item{logprior.models}{Function used to compute the log-prior over the model space}
 #' \item{prior.models}{Argument chosen for \code{prior.models}}
 #' \item{method}{String "Full" denoting exhaustive model search}
 #'
 #' @author Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{MissingGibbsGD25}} for a heuristic
+#' @seealso Use \code{\link[MissingBVS]{missingGibbsGD25}} for a heuristic
 #' approximation based on Gibbs sampling (recommended when p>20).
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
@@ -106,13 +105,15 @@
 #' World Meeting on Bayesian statistics. Oxford university Press. MR2433206. 16
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' #Daily air quality measurements in New York
 #' data("airquality")
 #'
-#' #Here we keep the 8 competing models:
+#' # The GD25 method is intended for numerical, approximately normal covariates.
 #' f <- Ozone ~ 1 + Wind + Temp + Solar.R
-#' airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+#' airq.mBVS <- missingGD25(
+#'   formula = f, data = airquality, n.keep = 8, n.imp = 2, imp.seed = 1
+#' )
 #'
 #' #Show the results:
 #' airq.mBVS
@@ -123,6 +124,7 @@
 #' #A plot with the posterior inclusion probabilities for each competing variable
 #' #and the dimension probability of the true model:
 #' plot(airq.mBVS)
+#' airq.mBVS$inclprob
 #' }
 #'
 missingGD25 <- function (formula,
@@ -154,7 +156,9 @@ missingGD25 <- function (formula,
   p <- length(namesx) #Number of covariates to select from
 
   #Check arguments and compute n.keep if needed
-  n.keep <- checkBvsarguments(p, 1, "(Intercept)", c("(Intercept)", namesx), n.keep, p)
+  n.keep <- checkBvsarguments(
+    p, 1, "(Intercept)", c("(Intercept)", namesx), n.keep, p
+  )
 
   #Check model priors chosen and define the function to be used
   lprior.models <- checkforprior.models(prior.models, priorprobs, p)
@@ -171,12 +175,12 @@ missingGD25 <- function (formula,
   NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Define function to get binary expression for each model
-  num2bin.model.fun <- function (x) num2bin.model(x, p = p,
-                                                  namesxnotnull = namesx,
-                                                  NAvars = NAvars)
+  num2bin.model.fun <- function (x) num2bin.model(x, matrices$p, NAvars)
+
   #BF function
-  BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
-                                                           y = y, SS0 = SS0, n = n, k)
+  lBF <- function (X.center, Sigma11, k) BF.GD25(
+    X.center, Sigma11, y = y, SS0 = SS0, n = n, k
+  )
   #Imputation of missing data
   if (p*n > 10000 | n.imp > 039E1) cat("Imputation step could take a while.\n",
     "Consider reducing the number of imputed datasets if that is the case.\n")
@@ -187,21 +191,17 @@ missingGD25 <- function (formula,
 
   #remove observations with missings on the response
   imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA, , , drop = FALSE]
-  #function to compute log(BFa0) for a given model with García-Donato's 2025 method
-  lBF.method <- function (model) lBF.miss(model,
-                                          imputation.list = imputation.list,
-                                          BF.miss.aux = BF.miss.aux,
-                                          n = n, nMC = n.imp)
 
   if (n.imp > 1) {
     #function to compute log(BFa0) for a given model with García-Donato's 2025 method
-    lBF.method <- function (model) lBF.miss(model,
-                                            imputation.list = imputation.list,
-                                            BF.miss.aux = BF.miss.aux,
-                                            n = n, nMC = n.imp)
-  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model,],
-                                                    Sigma11 = imputation.list$rSigma[model, model,],
-                                                    k = length(model))
+    lBF.method <- function (model) lBF.miss(
+      model, imputation.list = imputation.list, lBF = lBF, n = n, nMC = n.imp
+    )
+
+  } else lBF.method <- function (model) lBF(
+    X.center = imputation.list$rX.imput[,model,],
+    Sigma11 = imputation.list$rSigma[model, model,], k = length(model)
+  )
 
   #Info:
   cat("Info. . .\n")
@@ -225,7 +225,8 @@ missingGD25 <- function (formula,
     current.model <- num2bin.model.fun(i)
     all.models.lPM[i, seq_len(p)] <- current.model["bin",]
 
-    all.models.lPM[i, p+1] <- lBF.method(model = which(current.model["bin",] == 1)) +
+    all.models.lPM[i, p+1] <-
+      lBF.method(model = which(current.model["bin",] == 1)) +
       lprior.models(current.model["bin",]) #log(BF_a0*Pr(M))
   }
   setTxtProgressBar(pb, 2^p)
@@ -234,22 +235,24 @@ missingGD25 <- function (formula,
   all.models.lPM[2^p, p+1] <- lprior.models(numeric(p)) #BF = 1 for null model
 
   #renormalize
-  C <- sum(exp(all.models.lPM[, p+1]))
+  logC <- logsumexp.stable(all.models.lPM[, p+1])
   all.models.PM <- all.models.lPM
-  all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - log(C))
+  all.models.PM[, p+1] <- exp(all.models.lPM[, p+1] - logC)
   colnames(all.models.PM) <- c(namesx, "Post")
 
   #Summ up the posterior distribution
-  summ.posterior.list <- summ.posterior(all.models.PM, p, p, FALSE, NULL, NULL)
-  list2env(summ.posterior.list, envir = environment())
+  posterior <- list(all.models.PM = all.models.PM)
+  matrices <- list(p = p, q = p, positions = NULL)
+  posterior.summary <- summ.posterior(posterior, matrices, FALSE)
 
-  if (!is.null(NAvars)) {#Pool results for imputed datasets
+  if (sum(NAvars) > 0) {#Pool results for imputed datasets
     #Evaluate lm of full model with missings using Rubin's rule
     fit <- list(); mt <- attr(framefull, "terms")
     for (i in 1:n.imp) {
       z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
       z$terms <- mt; class(z) <- "lm"; fit[[i]] <- z
     }
+
     lmfull <- mice::pool(fit)
     lmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read lmfull$call
   } else lmfull <- lm(formula, data, x = TRUE, y = TRUE)
@@ -266,20 +269,21 @@ missingGD25 <- function (formula,
   result$n <- n #number of observations
   result$p <- p #number of competing variables
   result$k <- 1 # intercept #number of fixed covariates
-  result$HPMbin <- hpm #The binary code for the HPM model
-  result$MPMbin <- mpm #The binary code for the MPM model
+  result$HPMbin <- posterior.summary$hpm #The binary code for the HPM model
+  result$MPMbin <- posterior.summary$mpm #The binary code for the MPM model
   names(result$MPMbin) <- namesx
 
   #The binary code for the n.keep best models (after n.thin is applied) and the correspondent post
   result$modelsprob <- all.models.PM[order(all.models.PM[,p+1],
                                            decreasing = TRUE)[seq_len(n.keep)],]
+  dimnames(result$modelsprob) <- list(seq_len(n.keep), c(namesx, "Post"))
 
-  result$inclprob <- inclprob #inclusion probability for each variable
+  result$inclprob <- posterior.summary$inclprob #inclusion probability for each variable
   names(result$inclprob) <- namesx
 
-  result$postprobdim <- probdim #vector with the dimension probabilities.
+  result$postprobdim <- posterior.summary$probdim #vector with the dimension probabilities.
   names(result$postprobdim) <- 0:p + 1 #dimension of the true model
-  result$C <- C #normalizing constant
+  result$C <- exp(logC) #normalizing constant
 
   result$call <- match.call()
 
@@ -300,7 +304,6 @@ missingGD25 <- function (formula,
   raw.imp.list <- serialize(imputation.list, NULL)
   result$compress.imp.list <- memCompress(raw.imp.list, type = "xz")
 
-  result$logprior.models <- lprior.models #function used for model prior
   result$prior.models <- prior.models
 
   result$method <- "Full"

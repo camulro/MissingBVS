@@ -2,13 +2,13 @@
 % Please edit documentation in R/MissingsBvs_lm.R
 \name{num2bin.model}
 \alias{num2bin.model}
-\title{Original code from package 2.6.0 \pck{BayesVarSel} (distributed under GPL-2),
+\title{Original code from package 2.6.0 \pkg{BayesVarSel} (distributed under GPL-2),
 by Gonzalo García-Donato and Anabel Forte.}
 \usage{
-num2bin.model(x, p, namesxnotnull, NAvars)
+num2bin.model(x, p, NAvars)
 }
 \description{
-Adapted by Carolina Mulet to fit \pck{MissingBVS}'s code and return a matrix
+Adapted by Carolina Mulet to fit \pkg{MissingBVS}'s code and return a matrix
 with the binary expression of a model and the active variables with NA
 to reduce computational burden
 }

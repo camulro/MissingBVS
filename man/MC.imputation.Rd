@@ -40,16 +40,14 @@ continuous and normally distributed covariates to perform objective Bayesian
 Variable Selection in the presence of missing data.
 }
 \examples{
-\dontrun{
+\donttest{
 #Daily air quality measurements in New York
 data("airquality")
 
-Xair = airquality[,c("Ozone", "Wind", "Temp")]
-imp.air <- MC.imputation(X = Xair)
-
-#Plot the results:
-plot.MissingBVS.imputation(X = airquality, imputation = imp.air,
-  formula = Solar.R ~ 1 + Ozone + Wind + Temp)
+imp.air <- MC.imputation(X = airquality[, c("Ozone", "Wind", "Temp")],
+                         nMC = 2, seed = 1)
+dim(imp.air$rX.imput)
+dim(imp.air$rSigma)
 }
 
 }
@@ -67,7 +65,7 @@ by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 \seealso{
 Use \code{\link[MissingBVS]{lBF.miss}} for computing the logarithm
 of the MC approximation of the Bayes factor in linear models.
-Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 of the model posterior distribution in the VS problem (recommended when p<20).
 }
 \author{

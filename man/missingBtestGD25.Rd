@@ -32,7 +32,7 @@ defining the prior model probabilities for each one in \code{models} (if
 \item{imp.seed}{Seed for imputation.}
 }
 \value{
-\code{\link[MissingBVS]{MissingGD25Btest}} returns an object of type
+\code{\link[MissingBVS]{missingBtestGD25}} returns an object of type
 \code{MissingBtest} with the following elements:
 \item{lBFi0}{Bayes factors in logaritmic scale of each model to the null}
 \item{PostProbi}{Posterior probabilities for each model in \code{models}}
@@ -43,8 +43,6 @@ in \code{models} fitted by \code{\link[stats]{lm}} over the \code{n.imp} imputed
 datasets; or \code{lm} object when there are no missings}
 \item{imp.info}{List of arguments used for the imputation step and other information}
 \item{compress.imp.array}{Compressed array of imputed datasets}
-\item{logprior.models}{Function used to compute the log-prior over the model space
-defined by covariates and/or factors}
 \item{prior.models}{Argument chosen for \code{prior.models}}
 \item{priorprobs}{Prior probabilities over the true model size}
 \item{call}{The \code{call} to the function}
@@ -69,7 +67,7 @@ Pr(Mi | \code{data}) = Pr(Mi) * Bi / C,
 where Bi is the Bayes factor (BF) of Mi to M0 derived a the expected value of g'BF of
 García-Donato et al. (2025) for normal random regressors, Pr(Mi) is the prior
 probability of Mi and C is the normalizing constant. The g'BFs are computed
-with \code{\link[MissingBVS]{BF.miss.X}}, which resemble g-prior BFs (Zellner, 1986)
+with \code{\link[MissingBVS]{BF.GD25}}, which resemble g-prior BFs (Zellner, 1986)
 for random covariates, for each pair of imputed dataset and  variance-covariance
 matrix simulated. The integral of g'BF is approximated with a Monte Carlo scheme.
 
@@ -84,19 +82,27 @@ probability of the null model M0 and next p components correspond to the p prior
 probabilities of model sizes 1,...,p.
 }
 \examples{
-\dontrun{
+\donttest{
 #Daily air quality measurements in New York
 data("airquality")
 
-#Default choices are: Constant prior and 390 imputed datasets.
-models.list = list(M0 = Ozone ~ 1, M1 = Ozone ~ Solar.R,
-  M2 = Ozone ~ Wind, M3 = Ozone ~ Temp, M4 = Ozone ~ Solar.R + Wind,
-  M5 = Ozone ~ Solar.R + Temp, M6 = Ozone ~ Solar.R + Wind + Temp)
+models.list <- list(
+  M0 = Ozone ~ 1,
+  M1 = Ozone ~ Solar.R,
+  M2 = Ozone ~ Wind,
+  M3 = Ozone ~ Temp,
+  M4 = Ozone ~ Solar.R + Wind,
+  M5 = Ozone ~ Solar.R + Temp,
+  M6 = Ozone ~ Solar.R + Wind + Temp
+)
 
-airq.mtest <- missingBtestGD25(data = airquality, models = models.list)
+airq.mtest <- missingBtestGD25(
+  data = airquality, models = models.list, n.imp = 2, imp.seed = 1
+)
 
 #Show the results:
 airq.mtest
+airq.mtest$PostProbi
 
 }
 
@@ -121,7 +127,7 @@ Heckerman, D., Smith, A. F. M., and West, M. (eds.), Proc. Valencia / ISBA 8th
 World Meeting on Bayesian statistics. Oxford university Press. MR2433206. 16
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingGD25}} for an exact computation
+Use \code{\link[MissingBVS]{missingGD25}} for an exact computation
 of the model posterior distribution (recommended when p<20).
 }
 \author{

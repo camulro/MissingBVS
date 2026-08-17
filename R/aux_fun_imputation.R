@@ -26,20 +26,18 @@
 #'
 #' @seealso Use \code{\link[MissingBVS]{lBF.miss}} for computing the logarithm
 #' of the MC approximation of the Bayes factor in linear models.
-#' Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+#' Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20).
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' #Daily air quality measurements in New York
 #' data("airquality")
 #'
-#' Xair = airquality[,c("Ozone", "Wind", "Temp")]
-#' imp.air <- MC.imputation(X = Xair)
-#'
-#' #Plot the results:
-#' plot.MissingBVS.imputation(X = airquality, imputation = imp.air,
-#'   formula = Solar.R ~ 1 + Ozone + Wind + Temp)
+#' imp.air <- MC.imputation(X = airquality[, c("Ozone", "Wind", "Temp")],
+#'                          nMC = 2, seed = 1)
+#' dim(imp.air$rX.imput)
+#' dim(imp.air$rSigma)
 #' }
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
@@ -80,28 +78,30 @@ MC.imputation <- function(X, nMC = 039E1,
   X.full <- as.matrix(mice::complete(imputed))
 
   ###Gibbs sampler
-  set.seed(seed)
-  for(s in seq_len(nMC)) {
+  # set.seed(seed)
+  withr::with_seed(seed,
+    for(s in seq_len(nMC)) {
 
-    #posterior dist. with Jeffreys independent prior
-    Sigma <- LaplacesDemon::rinvwishart(nu=n-1, S=(n-1)*var(X.full))
-    mu <- LaplacesDemon::rmvn(1, colMeans(X.full), Sigma/n)
+      #posterior dist. with Jeffreys independent prior
+      Sigma <- LaplacesDemon::rinvwishart(nu=n-1, S=(n-1)*var(X.full))
+      mu <- LaplacesDemon::rmvn(1, colMeans(X.full), Sigma/n)
 
-    ###update missing data
-    for(i in these) {
-      b <- ( O[i,]==0 )
-      a <- ( O[i,]==1 )
-      solve.Sigma.a.a <- solve(Sigma[a,a])
-      thetab.mid.a <- mu[b]+Sigma[b,a]%*%solve.Sigma.a.a%*%(X.full[i,a]-mu[a])
-      Sigmab.mid.a <- Sigma[b,b] - as.matrix(Matrix::forceSymmetric(Sigma[b,a]%*%solve.Sigma.a.a%*%Sigma[a,b]))
-      X.full[i,b] <- LaplacesDemon::rmvn(1, as.vector(thetab.mid.a), Sigmab.mid.a)
+      ###update missing data
+      for(i in these) {
+        b <- ( O[i,]==0 )
+        a <- ( O[i,]==1 )
+        solve.Sigma.a.a <- solve(Sigma[a,a])
+        thetab.mid.a <- mu[b]+Sigma[b,a]%*%solve.Sigma.a.a%*%(X.full[i,a]-mu[a])
+        Sigmab.mid.a <- Sigma[b,b] - as.matrix(Matrix::forceSymmetric(Sigma[b,a]%*%solve.Sigma.a.a%*%Sigma[a,b]))
+        X.full[i,b] <- LaplacesDemon::rmvn(1, as.vector(thetab.mid.a), Sigmab.mid.a)
+      }
+
+      rX.imput[,,s] <- scale(X.full[, drop = FALSE], center = TRUE, scale = FALSE) #center
+      # rX.imput[,,s] <- sweep(X.full[, drop = FALSE], 2, mu, FUN = "-") #center
+      rSigma[,,s] <- Sigma
+      rmu[,s] <- mu
     }
-
-    rX.imput[,,s] <- scale(X.full[, drop = FALSE], center = TRUE, scale = FALSE) #center
-    # rX.imput[,,s] <- sweep(X.full[, drop = FALSE], 2, mu, FUN = "-") #center
-    rSigma[,,s] <- Sigma
-    rmu[,s] <- mu
-  }
+  )
   if (time.test) return(time <- Sys.time() - time)
 
   imputation.list <- list(rX.imput = rX.imput, rSigma = rSigma, rmu = rmu)
@@ -125,7 +125,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #'
 #' A parallel computation version of \pkg{mice} can be performed through the
 #' \code{parallelmice} argument, which makes the imputation procedure a lot faster
-#' for a big number \code{n.imp} of imputations or huge datasets \code´{X}.
+#' for a big number \code{n.imp} of imputations or huge datasets \code{X}.
 #'
 #' @export
 #' @param X Matrix with missing values to impute.
@@ -146,7 +146,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #' @param parallel Logical to indicate whether or not to use parallel
 #' \code{\link[mice]{mice}} imputation. By default, performs parallelization if the
 #' number of imputations is big enough (\code{n.imp} > 120).
-#' @param n.core See \code{\link[mice]{futuremice}} for details.
+#' @param n.core Number of cores used by parallel imputation when enabled.
 #' @param time.test Logical to indicate whether to check time of performance with
 #' \code{n.imp = 30} or not.
 #'
@@ -157,24 +157,22 @@ MC.imputation <- function(X, nMC = 039E1,
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} for computing the logarithm
-#' of the average Bayes factor among the \code{n.imp} imputed datasets.
-#' Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+#' @seealso Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20)
-#' in linear models and \code{\link[MissingBVS]{MissingBvs.glm}} for generalized
+#' in linear models and \code{\link[MissingBVS]{missingBVS.glm}} for generalized
 #' linear models.
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #'
-#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
-#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
-#' imp.S97 <- mice.imputation(X = XS97, formula = f)
+#' imp.S97 <- mice.imputation(X = dataS97[, c("lifee060", "gdpsh60l", "p60")],
+#'                            formula = gr56092 ~ 1 + lifee060 + gdpsh60l + p60,
+#'                            n.imp = 2, seed = 1, parallel = FALSE)
 #'
-#' #Plot the results:
-#' plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
+#' dim(imp.S97$imputation.array)
+#' imp.S97$logEvents
 #' }
 #'
 #' @references van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice:
@@ -182,7 +180,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #' Software. 45(3): 1–67.
 #'
 #' Volker, T.B. and Vink, G. (2022). futuremice: The future starts today.
-#' \link{https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html}
+#' <https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html>
 #'
 mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::quickpred(X),
                             imp.mice.method = "pmm", visit.seq = NULL, seed = runif(1,0,09011975),
@@ -224,13 +222,12 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
   }
 
   #Get final dim of full imputed datasets
-  n <- nrow(X)
   X.formula <- as.formula(paste(formula[1], formula[3]))
   aux <- model.matrix.rankdef(model.frame(X.formula, X, na.action = NULL))
   q <- ncol(aux)
 
-  imputation.array <- array(0, dim = c(n, q, n.imp), #an array with the matrices imputed
-                            dimnames = list(seq_len(n), colnames(aux), seq_len(n.imp)))
+  imputation.array <- array(0, dim = c(nrow(X), q, n.imp), #an array with the matrices imputed
+                            dimnames = list(rownames(X), colnames(aux), seq_len(n.imp)))
   for (s in seq_len(n.imp)) {
     aux.imps <- model.frame(X.formula, imps[[s]], na.action = NULL)
     imputation.array[, , s] <- model.matrix.rankdef(aux.imps) #build the model matrix
@@ -240,30 +237,6 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
   class(imputation.array) <- "MissingBVS.imputation"
   return(list(imputation.array = imputation.array, logEvents = imput$loggedEvents))
 }
-#' Binary matrix for missing data pattern
-#'
-#' Generates a matrix with 0 if the original entry was missing and 1 otherwise
-#' for observations with missing data and summarizes by variable.
-#'
-#' @param data Data frame containing the data with possible missing values.
-#' @param formula Formula defining the most complex (full) regression model.
-#' If \code{NULL}, the full data missing entries are chosen.
-#' @param show Logical that indicates whether or not to print que matrix pattern.
-#'
-#' @author Carolina Mulet
-#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
-#'
-#' @seealso Use \code{\link[MissingBVS]{MC.imputation}},
-#' \code{\link[MissingBVS]{mice.imputation}} and
-#' \code{\link[MissingBVS]{futuremice.imputation}} for performing multiple
-#' imputed dataset for \pkg{MissingBVS}.
-#'
-#' @examples
-#' #Daily air quality measurements in New York
-#' data("airquality")
-#'
-#' missing.model(airquality)
-#'
 # missing.model <- function (data, formula = NULL, show = TRUE) {
 #   #data is a matrix or dataframe
 #   #formula can either be null or a model formula
@@ -307,41 +280,6 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
 #   return(mO)
 # }
 
-#' Box-and-whisker plot for numerical observed and imputed data
-#'
-#' Produce box-and-whisker plots to represent the observed, given by \code{X},
-#' vs the imputed, given by \code{imputation}, values for each numerical regressor
-#' given by \code{formula}.
-#'
-#' @param X Matrix with missing values to impute.
-#' @param imputation Object of class \code{MissingBVS.imputation} containing the
-#' imputed datasets.
-#' @param formula Formula defining the most complex (full) regression model.
-#' @param mfrow Vector of the form \code{c(nr, nc)} for the number of rows and
-#' columns respectively. It selects the layout of the figures as an nr-by-nc array.
-#' If \code{NULL}, it will be automatically calculated.
-#'
-#' @author Carolina Mulet
-#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
-#'
-#' @seealso Use \code{\link[MissingBVS]{MC.imputation}},
-#' \code{\link[MissingBVS]{mice.imputation}} and
-#' \code{\link[MissingBVS]{futuremice.imputation}} for generating objects of
-#' class \code{MissingBVS.imputation}.
-#'
-#' @examples
-#' \dontrun{
-#' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
-#' data("dataS97")
-#'
-#' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
-#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
-#' imp.S97 <- mice.imputation(X = XS97, formula = f)
-#'
-#' #Plot the results:
-#' plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
-#' }
-#'
 # plot.MissingBVS.imputation <- function (X, imputation, formula, mfrow = NULL) {
 #   #X is a matrix or dataframe with missing data
 #   #imputation.array is the array with the whole imputed data

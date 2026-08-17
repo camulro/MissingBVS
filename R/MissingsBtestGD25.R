@@ -18,7 +18,7 @@
 #' where Bi is the Bayes factor (BF) of Mi to M0 derived a the expected value of g'BF of
 #' García-Donato et al. (2025) for normal random regressors, Pr(Mi) is the prior
 #' probability of Mi and C is the normalizing constant. The g'BFs are computed
-#' with \code{\link[MissingBVS]{BF.miss.X}}, which resemble g-prior BFs (Zellner, 1986)
+#' with \code{\link[MissingBVS]{BF.GD25}}, which resemble g-prior BFs (Zellner, 1986)
 #' for random covariates, for each pair of imputed dataset and  variance-covariance
 #' matrix simulated. The integral of g'BF is approximated with a Monte Carlo scheme.
 #'
@@ -45,7 +45,7 @@
 #' @param n.imp Number of imputed datasets for model posterior computation.
 #' @param imp.seed Seed for imputation.
 
-#' @return \code{\link[MissingBVS]{MissingGD25Btest}} returns an object of type
+#' @return \code{\link[MissingBVS]{missingBtestGD25}} returns an object of type
 #' \code{MissingBtest} with the following elements:
 #' \item{lBFi0}{Bayes factors in logaritmic scale of each model to the null}
 #' \item{PostProbi}{Posterior probabilities for each model in \code{models}}
@@ -56,8 +56,6 @@
 #' datasets; or \code{lm} object when there are no missings}
 #' \item{imp.info}{List of arguments used for the imputation step and other information}
 #' \item{compress.imp.array}{Compressed array of imputed datasets}
-#' \item{logprior.models}{Function used to compute the log-prior over the model space
-#' defined by covariates and/or factors}
 #' \item{prior.models}{Argument chosen for \code{prior.models}}
 #' \item{priorprobs}{Prior probabilities over the true model size}
 #' \item{call}{The \code{call} to the function}
@@ -65,7 +63,7 @@
 #' @author Carolina Mulet and Gonzalo García-Donato
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{MissingGD25}} for an exact computation
+#' @seealso Use \code{\link[MissingBVS]{missingGD25}} for an exact computation
 #' of the model posterior distribution (recommended when p<20).
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
@@ -87,19 +85,27 @@
 #' World Meeting on Bayesian statistics. Oxford university Press. MR2433206. 16
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' #Daily air quality measurements in New York
 #' data("airquality")
 #'
-#' #Default choices are: Constant prior and 390 imputed datasets.
-#' models.list = list(M0 = Ozone ~ 1, M1 = Ozone ~ Solar.R,
-#'   M2 = Ozone ~ Wind, M3 = Ozone ~ Temp, M4 = Ozone ~ Solar.R + Wind,
-#'   M5 = Ozone ~ Solar.R + Temp, M6 = Ozone ~ Solar.R + Wind + Temp)
+#' models.list <- list(
+#'   M0 = Ozone ~ 1,
+#'   M1 = Ozone ~ Solar.R,
+#'   M2 = Ozone ~ Wind,
+#'   M3 = Ozone ~ Temp,
+#'   M4 = Ozone ~ Solar.R + Wind,
+#'   M5 = Ozone ~ Solar.R + Temp,
+#'   M6 = Ozone ~ Solar.R + Wind + Temp
+#' )
 #'
-#' airq.mtest <- missingBtestGD25(data = airquality, models = models.list)
+#' airq.mtest <- missingBtestGD25(
+#'   data = airquality, models = models.list, n.imp = 2, imp.seed = 1
+#' )
 #'
 #' #Show the results:
 #' airq.mtest
+#' airq.mtest$PostProbi
 #'
 #' }
 #'
@@ -114,10 +120,9 @@ missingBtestGD25 <- function (data,
   N <- length(models)
 
   #Check Btest given arguments
-  Btestarg.list <- checkBtestarguments(models, NULL)
-  list2env(Btestarg.list, envir = environment())
+  btest.args <- checkBtestarguments(models, NULL, N)
 
-  namesm <- names(models)
+  models <- btest.args$models
 
   Dim <- rep.int(0L, N)
   lBFi0 <- lPriorModels <- PostProbi <- numeric(N)
@@ -154,12 +159,14 @@ missingBtestGD25 <- function (data,
     competing.models <- seq_len(N) #null.model is not provided by user
     #the null model has to be the one with the intercept
     null.model <- as.formula(paste(response, "~ 1"))
+    N <- N + 1
 
-    nullmodel.pos <- N + 1
+    nullmodel.pos <- N
     Dim[nullmodel.pos] <- 1
     models[[nullmodel.pos]] <- null.model
     cat("Null model", paste(response, "~ 1"), "added to the list of competing models.\n")
   }
+  namesm <- names(models)
 
   #Full design matrix
   formula <- as.formula(paste0(null.model[[2]], "~ ."))
@@ -180,9 +187,8 @@ missingBtestGD25 <- function (data,
   lprior.models <- priormodels.btest(prior.models, N, Dim, priorprobs)
 
   #Check methods and options
-  BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
-                                                           y = y, SS0 = SS0,
-                                                           n = n, k)
+  lBF <- function (X.center, Sigma11, k) BF.GD25(X.center, Sigma11,
+                                                 y = y, SS0 = SS0, n = n, k)
 
   #check for missings
   NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
@@ -193,19 +199,18 @@ missingBtestGD25 <- function (data,
 
   cat("Performing imputation of missing data with Garcia-Donato's 2025 method.\n",
       "Please wait . . . \n")
-  imputation.list <- MC.imputation(X = X.full, nMC = n.imp, seed = imp.seed)
+  imputation <- MC.imputation(X = X.full, nMC = n.imp, seed = imp.seed)
 
   #remove observations with missings on the response
-  imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA,,, drop = FALSE]
+  imputation$rX.imput <- imputation$rX.imput[obsnotNA, , , drop = FALSE]
   if (n.imp > 1) {
     #function to compute log(BFa0) for a given model with García-Donato's 2025 method
     lBF.method <- function (model) lBF.miss(model,
-                                            imputation.list = imputation.list,
-                                            BF.miss.aux = BF.miss.aux,
-                                            n = n, nMC = n.imp)
-  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model,],
-                                                    Sigma11 = imputation.list$rSigma[model, model,],
-                                                    k = length(model))
+                                            imputation.list = imputation,
+                                            lBF = lBF, n = n, nMC = n.imp)
+  } else lBF.method <- function (model) lBF(X.center = imputation$rX.imput[,model,],
+                                            Sigma11 = imputation$rSigma[model, model,],
+                                            k = length(model))
 
   for (i in competing.models){
     modeli <- which(namesx %in% covar.list[[i]])
@@ -215,8 +220,10 @@ missingBtestGD25 <- function (data,
   }
   lPriorModels[nullmodel.pos] <- lprior.models(nullmodel.pos)
   lBFi0[nullmodel.pos] <- 0
-  C <- sum(exp(lBFi0 + lPriorModels))
-  PostProbi <- exp(lBFi0 + lPriorModels - log(C))
+
+  lBF.PM <- lBFi0 + lPriorModels
+  logC <- logsumexp.stable(lBF.PM)
+  PostProbi <- exp(lBF.PM - logC)
 
   #Names to save
   null.name <- paste0("(", response, " ~ 1)")
@@ -236,9 +243,10 @@ missingBtestGD25 <- function (data,
     if (any(namesx[namesj] %in% NAvars)) {
       fit <- list()
       for (i in 1:n.imp) {
-        Xi <- cbind(1, imputation.list$rX.imput[,namesj,i])
+        Xi <- cbind(1, imputation$rX.imput[, namesj, i])
         colnames(Xi) <- c("(Intercept)", namesx[namesj])
         z <- lm.fit(x = Xi, y = y)
+
         z$terms <- mt[[j]]; class(z) <- "lm"; fit[[i]] <- z
       }
       modelspool[[j]] <- mice::pool(fit)
@@ -258,10 +266,9 @@ missingBtestGD25 <- function (data,
   #arguments used for imputation
   result$imp.info <- list(n.imp = n.imp, imp.seed = imp.seed)
   #save the imputed datasets for sensitivity analysis
-  raw.imp.array <- serialize(imputation.list, NULL)
+  raw.imp.array <- serialize(imputation, NULL)
   result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
 
-  result$logprior.models <- lprior.models #function used for model prior
   result$prior.models <- prior.models
   result$priorprobs <- exp(lPriorModels)
   result$call <- match.call()

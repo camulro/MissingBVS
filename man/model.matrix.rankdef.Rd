@@ -2,13 +2,13 @@
 % Please edit documentation in R/MissingsBvs_lm.R
 \name{model.matrix.rankdef}
 \alias{model.matrix.rankdef}
-\title{Original code from package 3.1-0 \pck{lmerTest} (distributed under GPL-2, GPL-3),
+\title{Original code from package 3.1-0 \pkg{lmerTest} (distributed under GPL-2, GPL-3),
 by Alexandra Kuznetsova, Per Bruun Brockhoff and Rune Haubo Bojesen Christensen.}
 \usage{
 \method{model.matrix}{rankdef}(model.frame.aux)
 }
 \description{
-Adapted by Carolina Mulet to fit \pck{MissingBVS}'s code and obtain just
+Adapted by Carolina Mulet to fit \pkg{MissingBVS}'s code and obtain just
 rank defficient matrices.
 }
 \keyword{internal}

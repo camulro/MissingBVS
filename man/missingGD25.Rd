@@ -62,7 +62,6 @@ most probable a posteriori models and their associated probability}
 \item{imp.info}{List of arguments used for the imputation step and other information}
 \item{compress.imp.list}{Compressed list of imputed datasets and covariance
 matrices}
-\item{logprior.models}{Function used to compute the log-prior over the model space}
 \item{prior.models}{Argument chosen for \code{prior.models}}
 \item{method}{String "Full" denoting exhaustive model search}
 }
@@ -87,7 +86,7 @@ Pr(Mi | \code{data}) = Pr(Mi) * Bi / C,
 where Bi is the Bayes factor (BF) of Mi to M0 derived a the expected value of g'BF of
 García-Donato et al. (2025) for normal random regressors, Pr(Mi) is the prior
 probability of Mi and C is the normalizing constant. The g'BFs are computed
-with \code{\link[MissingBVS]{BF.miss.X}}, which resemble g-prior BFs (Zellner, 1986)
+with \code{\link[MissingBVS]{BF.GD25}}, which resemble g-prior BFs (Zellner, 1986)
 for random covariates, for each pair of imputed dataset and  variance-covariance
 matrix simulated. The integral of g'BF is approximated with a Monte Carlo scheme.
 
@@ -102,13 +101,15 @@ probability of the null model M0 and next p components correspond to the p prior
 probabilities of model sizes 1,...,p.
 }
 \examples{
-\dontrun{
+\donttest{
 #Daily air quality measurements in New York
 data("airquality")
 
-#Here we keep the 8 competing models:
+# The GD25 method is intended for numerical, approximately normal covariates.
 f <- Ozone ~ 1 + Wind + Temp + Solar.R
-airq.mBVS <- missingGD25(formula = f, data = airquality, n.keep = 8)
+airq.mBVS <- missingGD25(
+  formula = f, data = airquality, n.keep = 8, n.imp = 2, imp.seed = 1
+)
 
 #Show the results:
 airq.mBVS
@@ -119,6 +120,7 @@ summary(airq.mBVS)
 #A plot with the posterior inclusion probabilities for each competing variable
 #and the dimension probability of the true model:
 plot(airq.mBVS)
+airq.mBVS$inclprob
 }
 
 }
@@ -145,7 +147,7 @@ Heckerman, D., Smith, A. F. M., and West, M. (eds.), Proc. Valencia / ISBA 8th
 World Meeting on Bayesian statistics. Oxford university Press. MR2433206. 16
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingGibbsGD25}} for a heuristic
+Use \code{\link[MissingBVS]{missingGibbsGD25}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
 }
 \author{

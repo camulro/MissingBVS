@@ -24,7 +24,12 @@ This prior is derived by assigning an independent Bernouilli distribution with
 probability Beta(1,1) to the a priori inclusion probability of each competing variable.
 }
 \examples{
-logScottBerger(model = c(rep(1,4),rep(0,3))) # log((p + 1)^(-1) / choose(p, sum(model)))
+models <- list(
+  null = c(0, 0, 0, 0),
+  one = c(1, 0, 0, 0),
+  two = c(1, 1, 0, 0)
+)
+vapply(models, logScottBerger, numeric(1), p = 4)
 
 }
 \references{
@@ -33,7 +38,7 @@ multiplicity adjustment in the variable-selection problem. The Annals of
 Statistics. 38: 2587–2619.
 }
 \seealso{
-\code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+\code{\link[MissingBVS]{missingGibbsBVS.lm}},
 \code{\link[MissingBVS]{logConstant}}, \code{\link[MissingBVS]{logUser}}
 }
 \author{

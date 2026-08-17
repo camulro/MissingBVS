@@ -46,7 +46,7 @@ it is set to 5.}
 \code{\link[mice]{mice}} imputation. By default, performs parallelization if the
 number of imputations is big enough (\code{n.imp} > 120).}
 
-\item{n.core}{See \code{\link[mice]{futuremice}} for details.}
+\item{n.core}{Number of cores used by parallel imputation when enabled.}
 
 \item{time.test}{Logical to indicate whether to check time of performance with
 \code{n.imp = 30} or not.}
@@ -73,19 +73,19 @@ number of iterations for convergence of each imputed dataset can be set with \co
 
 A parallel computation version of \pkg{mice} can be performed through the
 \code{parallelmice} argument, which makes the imputation procedure a lot faster
-for a big number \code{n.imp} of imputations or huge datasets \code´{X}.
+for a big number \code{n.imp} of imputations or huge datasets \code{X}.
 }
 \examples{
-\dontrun{
+\donttest{
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 data("dataS97")
 
-XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
-f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
-imp.S97 <- mice.imputation(X = XS97, formula = f)
+imp.S97 <- mice.imputation(X = dataS97[, c("lifee060", "gdpsh60l", "p60")],
+                           formula = gr56092 ~ 1 + lifee060 + gdpsh60l + p60,
+                           n.imp = 2, seed = 1, parallel = FALSE)
 
-#Plot the results:
-plot.MissingBVS.imputation(X = dataS97, imputation = imp.S97, formula = f)
+dim(imp.S97$imputation.array)
+imp.S97$logEvents
 }
 
 }
@@ -95,14 +95,12 @@ Multivariate Imputation by Chained Equations in R. Journal of Statistical
 Software. 45(3): 1–67.
 
 Volker, T.B. and Vink, G. (2022). futuremice: The future starts today.
-\link{https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html}
+<https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html>
 }
 \seealso{
-Use \code{\link[MissingBVS]{lBF.approx}} for computing the logarithm
-of the average Bayes factor among the \code{n.imp} imputed datasets.
-Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 of the model posterior distribution in the VS problem (recommended when p<20)
-in linear models and \code{\link[MissingBVS]{MissingBvs.glm}} for generalized
+in linear models and \code{\link[MissingBVS]{missingBVS.glm}} for generalized
 linear models.
 }
 \author{

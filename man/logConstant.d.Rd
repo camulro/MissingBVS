@@ -27,11 +27,13 @@ probability 0.5 to the a priori inclusion probability of each competing
 dummy variable and assumming independence between different factors.
 }
 \examples{
-logConstant.d(c(F,rep(T,3)), c(3,2,4,3))
+tau <- c(FALSE, TRUE, TRUE)
+levels <- c(3, 2, 4)
+logConstant.d(tau = tau, l = levels)
 
 }
 \seealso{
-\code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+\code{\link[MissingBVS]{missingGibbsBVS.lm}},
 \code{\link[MissingBVS]{logScottBerger.d}}.
 }
 \author{

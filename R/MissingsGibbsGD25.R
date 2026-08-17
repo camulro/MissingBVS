@@ -71,7 +71,7 @@
 #' @author Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{MissingGD25}} for an exact computation
+#' @seealso Use \code{\link[MissingBVS]{missingGD25}} for an exact computation
 #' of the model posterior distribution (recommended when p<20).
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
@@ -94,13 +94,16 @@
 #' Predictive Model Selection. The Annals of Statistics, 32, 870-897.
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' #Daily air quality measurements in New York
 #' data("airquality")
 #'
-#' #Here we keep the 8 competing models:
+#' # Use a short chain for the example; real analyses need more iterations.
 #' f <- Ozone ~ 1 + Wind + Temp + Solar.R
-#' airq.mGBVS <- missingGibbsGD25(formula = f, data = airquality)
+#' airq.mGBVS <- missingGibbsGD25(
+#'   formula = f, data = airquality, n.iter = 200, n.burnin = 50,
+#'   n.imp = 2, Gibbs.seed = 1, imp.seed = 1
+#' )
 #'
 #' #Show the results:
 #' airq.mGBVS
@@ -111,6 +114,7 @@
 #' #A plot with the posterior inclusion probabilities for each competing variable
 #' #and the dimension probability of the true model:
 #' plot(airq.mGBVS)
+#' airq.mGBVS$inclprobRB
 #' }
 #'
 missingGibbsGD25 <- function (formula,
@@ -149,8 +153,10 @@ missingGibbsGD25 <- function (formula,
   lprior.models <- checkforprior.models(prior.models, priorprobs, p)
 
   #Check arguments and compute init.model
-  init.model <- checkGibbsarguments(p, 1, "(Intercept)", c("(Intercept)", namesx),
-                                    init.model, FALSE, NULL, NULL, NULL, NULL)
+  init.model <- checkGibbsarguments(
+    p, 1, "(Intercept)", c("(Intercept)", namesx), init.model,
+    FALSE, NULL, NULL, NULL
+  )
 
   #Evaluate the null model:
   lmnull <- lm(formula = null.model, data, y = TRUE, x = TRUE)
@@ -161,11 +167,13 @@ missingGibbsGD25 <- function (formula,
   SS0 <- crossprod(lmnull$residuals) #SSE of the null model
 
   #check for missings
-  NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
+  checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
+  NAvars <- rep(TRUE, p); names(NAvars) <- namesx
 
   #BF function
-  BF.miss.aux <- function (X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
-                                                           y = y, SS0 = SS0, n = n, k)
+  lBF <- function (X.center, Sigma11, k) BF.GD25(
+    X.center, Sigma11, y = y, SS0 = SS0, n = n, k
+  )
 
   #Imputation of missing data
   if (p*n > 10000 | n.imp > 039E1) cat("Imputation step could take a while.\n",
@@ -179,13 +187,13 @@ missingGibbsGD25 <- function (formula,
   imputation.list$rX.imput <- imputation.list$rX.imput[obsnotNA, , , drop = FALSE]
   if (n.imp > 1) {
     #function to compute log(BFa0) for a given model with García-Donato's 2025 method
-    lBF.method <- function (model) lBF.miss(model,
-                                            imputation.list = imputation.list,
-                                            BF.miss.aux = BF.miss.aux,
-                                            n = n, nMC = n.imp)
-  } else lBF.method <- function (model) BF.miss.aux(X.center = imputation.list$rX.imput[,model,],
-                                                    Sigma11 = imputation.list$rSigma[model, model,],
-                                                    k = length(model))
+    lBF.method <- function (model) lBF.miss(
+      model, imputation.list = imputation.list, lBF = lBF, n = n, nMC = n.imp
+    )
+  } else lBF.method <- function (model) lBF(
+    X.center = imputation.list$rX.imput[,model,],
+    Sigma11 = imputation.list$rSigma[model, model,], k = length(model)
+  )
 
   #Info:
   cat("Info. . .\n")
@@ -199,21 +207,24 @@ missingGibbsGD25 <- function (formula,
   cat("Then,", floor(n.iter / n.thin), "are kept and used to construct the summaries.\n")
 
   #George and McCulloch's Gibbs exploration
-  set.seed(Gibbs.seed)
-  gibbs.list <- GM97.Gibbs(1, X.full, p, namesx, namesx, lprior.models, lBF.method, BF.miss.aux,
-                           FALSE, NULL, init.model, n.iter, n.burnin, n.thin)
-  list2env(gibbs.list, envir = environment())
+  # set.seed(Gibbs.seed)
+  withr::with_seed(Gibbs.seed,
+    gibbs <- GM97.Gibbs(
+      1, X.full, p, NAvars, lprior.models, lBF.method, lBF,
+      FALSE, NULL, init.model, n.iter, n.burnin, n.thin
+    )
+  )
 
-  summ.Gibbs.list <- summ.Gibbs(cf.models.lBF, all.lBF.PM, inclprobRB, p, n.iter)
-  list2env(summ.Gibbs.list, envir = environment())
+  gibbs.summary <- summ.Gibbs(gibbs, p, n.iter)
 
-  if (!is.null(NAvars)) {#Pool results for imputed datasets
+  if (sum(NAvars) > 0) {#Pool results for imputed datasets
     #Evaluate lm of full model with missings using Rubin's rule
     fit <- list(); mt <- attr(framefull, "terms")
     for (i in 1:n.imp) {
       z <- lm.fit(x = cbind(1, imputation.list$rX.imput[,,i]), y = y)
       z$terms <- mt; class(z) <- "lm"; fit[[i]] <- z
     }
+
     lmfull <- mice::pool(fit)
     lmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read lmfull$call
   } else lmfull <- lm(formula, data, x = TRUE, y = TRUE)
@@ -230,22 +241,22 @@ missingGibbsGD25 <- function (formula,
   result$n <- n #number of observations
   result$p <- p #number of competing variables
   result$k <- 1 #number of fixed covariates
-  result$HPMbin <- hpm #The binary code for the HPM model and its BF.PM
-  result$MPMbin <- mpm #The binary code for the MPM model
+  result$HPMbin <- gibbs.summary$hpm
+  result$MPMbin <- gibbs.summary$mpm
   names(result$MPMbin) <- namesx
 
   #The binary code for all the visited models (after n.thin is applied) and the correspondent post
-  result$modelslogBF <- cf.models.lBF
+  result$modelslogBF <- gibbs$cf.models.lBF
 
-  result$inclprob <- inclprob #inclusion probability for each variable
-  result$inclprobRB <- inclprobRB[n.iter, ] #Rao-Blackwellized inclusion probability
+  result$inclprob <- gibbs.summary$inclprob
+  result$inclprobRB <- gibbs$inclprobRB[n.iter, ]
   names(result$inclprobRB) <- namesx
 
-  result$postprobdim <- probdim #vector with the estimated posterior dimension probability
+  result$postprobdim <- gibbs.summary$probdim
   names(result$postprobdim) <- 0:p + 1 #dimension of the true model
-  result$C <- C #estimated normilizing constant
+  result$C <- gibbs.summary$C
   #Estimation of posterior probabilities based on C
-  result$postprobs <- post
+  result$postprobs <- gibbs.summary$post
 
   result$call <- match.call()
 

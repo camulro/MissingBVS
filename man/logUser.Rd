@@ -31,8 +31,10 @@ so on. Models of a given size receive the same amount of probability, such
 as Scott and Berger (2010)'s prior.
 }
 \examples{
-logUser(7, c(rep(1,4),rep(0,3)), c(0.3,rep(0.2,3),rep(0.1,4)))
-# log(priorprobs[sum(model) + 1]/sum(priorprobs) / choose(p, sum(model)))
+priorprobs <- c(0.3, 0.2, 0.2, 0.2, 0.1)
+model <- c(1, 0, 1, 0)
+logUser(p = 4, model = model, priorprobs = priorprobs)
+exp(logUser(p = 4, model = model, priorprobs = priorprobs))
 
 }
 \references{
@@ -41,7 +43,7 @@ multiplicity adjustment in the variable-selection problem. The Annals of
 Statistics. 38: 2587–2619.
 }
 \seealso{
-\code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+\code{\link[MissingBVS]{missingGibbsBVS.lm}},
 \code{\link[MissingBVS]{logScottBerger}}, \code{\link[MissingBVS]{logConstant}}
 }
 \author{

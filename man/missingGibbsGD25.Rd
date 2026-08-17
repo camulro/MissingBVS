@@ -100,13 +100,16 @@ visits provides very reliable results.
 \code{\link[MissingBVS]{missingGD25}}. See the later for common details.
 }
 \examples{
-\dontrun{
+\donttest{
 #Daily air quality measurements in New York
 data("airquality")
 
-#Here we keep the 8 competing models:
+# Use a short chain for the example; real analyses need more iterations.
 f <- Ozone ~ 1 + Wind + Temp + Solar.R
-airq.mGBVS <- missingGibbsGD25(formula = f, data = airquality)
+airq.mGBVS <- missingGibbsGD25(
+  formula = f, data = airquality, n.iter = 200, n.burnin = 50,
+  n.imp = 2, Gibbs.seed = 1, imp.seed = 1
+)
 
 #Show the results:
 airq.mGBVS
@@ -117,6 +120,7 @@ summary(airq.mGBVS)
 #A plot with the posterior inclusion probabilities for each competing variable
 #and the dimension probability of the true model:
 plot(airq.mGBVS)
+airq.mGBVS$inclprobRB
 }
 
 }
@@ -141,7 +145,7 @@ Barbieri, M and Berger, J (2004)<DOI:10.1214/009053604000000238> Optimal
 Predictive Model Selection. The Annals of Statistics, 32, 870-897.
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingGD25}} for an exact computation
+Use \code{\link[MissingBVS]{missingGD25}} for an exact computation
 of the model posterior distribution (recommended when p<20).
 }
 \author{

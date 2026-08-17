@@ -22,11 +22,12 @@ This prior is derived by assigning an independent Bernouilli distribution with f
 probability 0.5 to the a priori inclusion probability of each competing variable.
 }
 \examples{
-logConstant(7) # log(1 / (2^p))
+logConstant(p = 4)
+exp(logConstant(p = 4))
 
 }
 \seealso{
-\code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+\code{\link[MissingBVS]{missingGibbsBVS.lm}},
 \code{\link[MissingBVS]{logScottBerger}}, \code{\link[MissingBVS]{logUser}}
 }
 \author{

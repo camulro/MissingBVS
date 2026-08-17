@@ -8,8 +8,8 @@ missingBVS.lm(
   formula,
   data,
   null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
-  BF.approx.method = "gprior",
-  prior.betas = "Robust",
+  BF.method = "BIC",
+  prior.betas = NULL,
   prior.models = "ScottBerger",
   prior.models.dummies = "ScottBerger",
   marginal.factors = TRUE,
@@ -35,7 +35,7 @@ analysis. See details.}
 the full one with possible fixed variables. By default, it is defined to be the one
 with just the intercept.}
 
-\item{BF.approx.method}{Method used to compute or approximate data-driven Bayes factors
+\item{BF.method}{Method used to compute or approximate data-driven Bayes factors
 (to be literally specified). Possible choices include "BIC", "TBF" and "gprior"
 (see details).}
 
@@ -63,7 +63,7 @@ space or a numeric for the exact number of the most probable models to keep.
 By default it is set to 10 and automatically adjusted if 10 is greater than
 the total number of models.}
 
-\item{imp.mice.method}{Method for \pck{mice}'s imputation. Can be either a string
+\item{imp.mice.method}{Method for \pkg{mice}'s imputation. Can be either a string
 or a vector of strings of length the number of variables in data, except the response.}
 
 \item{imp.predict.mat}{Matrix with \code{formula}'s competing variables in rows
@@ -74,7 +74,7 @@ define the most important predictors for each variable based on correlations.}
 
 \item{n.imp}{Number of imputed datasets for model posterior computation.}
 
-\item{maxit}{Number of iterations for \pck{mice}'s imputation. By default, it is 5.}
+\item{maxit}{Number of iterations for \pkg{mice}'s imputation. By default, it is 5.}
 
 \item{parallelmice}{Logical to indicate whether or not to use parallelization on
 \code{\link[mice]{mice}}'s imputation. By default, automatically performs it if the
@@ -120,10 +120,8 @@ most probable a posteriori models and their associated probability}
 \item{imp.info}{List of arguments used for the imputation step and other information
 (when relevant)}
 \item{compress.imp.array}{Compressed array of imputed datasets (when relevant)}
-\item{BF.approx.method}{Function used to compute data-driven Bayes factors}
+\item{BF.method}{Method used to compute data-driven Bayes factors}
 \item{prior.betas}{Chosen \code{prior.betas} argument}
-\item{logprior.models}{Function used to compute the log-prior over the model space
-defined by covariates and/or factors}
 \item{prior.models}{Two-dimensional vector with \code{prior.models} and
 \code{prior.models.dummies} chosen. If there are no factors or \code{marginal.factors}
 is set to FALSE, it saves the only argument used, \code{prior.models}}
@@ -146,7 +144,7 @@ intercept term is present in all models. The simplest one M0, the \code{null.mod
 nested in the rest, contains the fixed variables, if given, and only the intercept by default.
 In order to implement BIA, \code{\link[MissingBVS]{missingBVS.lm}} can, either perform
 \code{n.imp} imputations designed by \code{imp.predict.mat} and \code{imp.mice.method}
-with the \pck{mice} package, or use user-given imputated datasets by the
+with the \pkg{mice} package, or use user-given imputated datasets by the
 \code{imp.datasets} argument. Hence, the posterior distribution over the model space
 is given through Bayes' theorem:
 
@@ -161,15 +159,16 @@ AvBi = 1/\code{n.imp} * (Bi(1) + ... + Bi(\code{n.imp})),
 
 where Bi(j) corresponds to the BF for model Mi to M0 under the jth imputed dataset.
 Data-driven BF can be either computed using popular g-prior choices or approximated
-with the BIC (Schwarz, 1978) or the test-based BF (Held, Gravestock and Sabanés, 2015)
-with the \code{BF.approx.method} argument.
+with the BIC (Schwarz, 1978), and the default choice, or the test-based BF
+(Held, Gravestock and Sabanés, 2015) with the \code{BF.method} argument.
 
 If the BF computation method chosen is \code{"gprior"}, data-driven BFs depend on
 the prior assigned for the model-specific parameters given by \code{prior.betas}
-and are computed using \pck{BayesVarSel}. The choices currently available are:
--"Robust" is the default option and denotes the criteria-based prior of Bayarri,
-Berger, Forte and Garcia-Donato (2012).
--"gZellner" corresponds to the prior in Zellner (1986) with g=n fixed.
+and are computed using \pkg{BayesVarSel}. The choices currently available are:
+-"Robust" denotes the criteria-based prior of Bayarri, Berger, Forte and
+Garcia-Donato (2012).
+-"gZellner" is the default option and corresponds to the prior in Zellner (1986)
+with g=n fixed.
 -"Liangetal" prior is the hyper-g/n of Liang et al (2008) with a=3.
 -"ZellnerSiow" is the multivariate Cauchy prior by Zellner and Siow (1980, 1984).
 -"FLS" corresponds to the prior in Zellner (1986) with g=max(n, p*p) fixed, the
@@ -207,13 +206,15 @@ directly over dummies. A non-treatment of factors can be performed through \code
 }
 \examples{
 
-\dontrun{
+\donttest{
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 data("dataS97")
 
-#Here we keep the 8 competing models:
+# Keep the eight models generated by three candidate covariates:
 f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
-dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+dataS97.mBVS <- missingBVS.lm(
+  formula = f, data = dataS97, n.keep = 8, n.imp = 2, imp.seed = 1
+)
 
 #Show the results:
 dataS97.mBVS
@@ -224,6 +225,8 @@ summary(dataS97.mBVS)
 #A plot with the posterior inclusion probabilities for each competing variable
 #and the dimension probability of the true model:
 plot(dataS97.mBVS)
+dataS97.mBVS$inclprob
+dataS97.mBVS$postprobdim
 }
 
 }
@@ -268,7 +271,7 @@ van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingGibbsBvs.lm}} for a heuristic
+Use \code{\link[MissingBVS]{missingGibbsBVS.lm}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
 
 Consider \code{\link[MissingBVS]{plot.MissingBvs}} for graphical summaries of the

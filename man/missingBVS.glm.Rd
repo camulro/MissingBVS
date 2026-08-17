@@ -9,8 +9,8 @@ missingBVS.glm(
   data,
   family = binomial(link = "logit"),
   null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
-  BF.approx.method = "BIC",
-  prior.betas = "gZellner",
+  BF.method = "BIC",
+  prior.betas = NULL,
   prior.models = "ScottBerger",
   prior.models.dummies = "ScottBerger",
   marginal.factors = TRUE,
@@ -46,7 +46,7 @@ a faster version using \pkg{BAS} log-marginal computation is performed.}
 the full one with possible fixed variables. By default, it is defined to be the one
 with just the intercept.}
 
-\item{BF.approx.method}{Method used to compute or approximate data-driven Bayes factors
+\item{BF.method}{Method used to compute or approximate data-driven Bayes factors
 (to be literally specified). Possible choices include "BIC", "TBF" and "gprior"
 (see details).}
 
@@ -74,7 +74,7 @@ space or a numeric for the exact number of the most probable models to keep.
 By default it is set to 10 and automatically adjusted if 10 is greater than
 the total number of models.}
 
-\item{imp.mice.method}{Method for \pck{mice}'s imputation. Can be either a string
+\item{imp.mice.method}{Method for \pkg{mice}'s imputation. Can be either a string
 or a vector of strings of length the number of variables in data, except the response.}
 
 \item{imp.predict.mat}{Matrix with \code{formula}'s competing variables in rows
@@ -85,7 +85,7 @@ define the most important predictors for each variable based on correlations.}
 
 \item{n.imp}{Number of imputed datasets for model posterior computation.}
 
-\item{maxit}{Number of iterations for \pck{mice}'s imputation. By default, it is 5.}
+\item{maxit}{Number of iterations for \pkg{mice}'s imputation. By default, it is 5.}
 
 \item{parallelmice}{Logical to indicate whether or not to use parallelization on
 \code{\link[mice]{mice}}'s imputation. By default, automatically performs it if the
@@ -147,10 +147,8 @@ information (when relevant)}
 the error distribution and link function to be used in the model}
 \item{weights}{Weights vector used in the glm fitting process}
 \item{offset}{Offset vector used in the glm fitting process}
-\item{BF.approx.method}{Function used to compute data-driven Bayes factors}
+\item{BF.method}{Method used to compute data-driven Bayes factors}
 \item{prior.betas}{Chosen \code{prior.betas} argument}
-\item{logprior.models}{Function used to compute the log-prior over the model space
-defined by covariates and/or factors}
 \item{prior.models}{Two-dimensional vector with \code{prior.models} and
 \code{prior.models.dummies} chosen. If there are no factors or \code{marginal.factors}
 is set to FALSE, it saves the only argument used, \code{prior.models}}
@@ -174,7 +172,7 @@ intercept term is present in all models. The simplest one M0, the \code{null.mod
 nested in the rest, contains the fixed variables, if given, and only the intercept by default.
 In order to implement BIA, \code{\link[MissingBVS]{missingBVS.glm}} can, either perform
 \code{n.imp} imputations designed by \code{imp.predict.mat} and \code{imp.mice.method}
-with the \pck{mice} package, or use user-given imputated datasets by the
+with the \pkg{mice} package, or use user-given imputated datasets by the
 \code{imp.datasets} argument. Hence, the posterior distribution over the model space
 is given through Bayes' theorem:
 
@@ -189,10 +187,11 @@ AvBi = 1/\code{n.imp} * (Bi(1) + ... + Bi(\code{n.imp})),
 
 where Bi(j) corresponds to the BF for model Mi to M0 under the jth imputed dataset.
 Data-driven BF can be either computed using popular g-prior choices or approximated
-with the BIC (Schwarz, 1978) or the test-based BF (Held, Gravestock and Sabanés, 2015)
-with the \code{BF.approx.method} argument. Approximations can be done through the
-\pkg{BAS} faster computation if the \code{family} is one of the implemented there:
-\code{binomial(link = "logit")}, \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
+with the BIC (Schwarz, 1978), and the default choice, or the test-based BF
+(Held, Gravestock and Sabanés, 2015) with the \code{BF.method} argument.
+Approximations can be done through the \pkg{BAS} faster computation if the
+\code{family} is one of the implemented there: \code{binomial(link = "logit")},
+\code{poisson(link = "log")} and \code{Gamma(link = "log")}.
 
 If the BF computation method chosen is \code{"gprior"}, data-driven BFs depend on
 the prior assigned for the model-specific parameters given by \code{prior.betas}
@@ -237,23 +236,31 @@ of factors and numerical variables are 1/2, which does not happen when the selec
 directly over dummies. A non-treatment of factors can be performed through \code{marginal.factors}.
 }
 \examples{
-\dontrun{
-#Indian Prime Diabetes Data from VIM's package
+\donttest{
+# Build a small reproducible binary-response example from airquality.
+data("airquality")
+glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+  "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+glm_data$Wind[c(1, 10)] <- NA_real_
 
-#Here we keep the 32 competing models:
-f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
-diabetes.mBVS <- missingBVS.glm(formula = f, data = VIM::diabetes,
-  family = binomial(), n.keep = 32, n.imp = 100)
+f <- Outcome ~ Wind + Temp + Solar.R
+glm.mBVS <- missingBVS.glm(
+  formula = f, data = glm_data, family = binomial(), n.keep = 8,
+  n.imp = 2, imp.seed = 1
+)
 
 #Show the results:
-diabetes.mBVS
+glm.mBVS
 
 #Summ up the results:
-summary(diabetes.mBVS)
+summary(glm.mBVS)
 
 #A plot with the posterior inclusion probabilities for each competing variable
 #and the dimension probability of the true model:
-plot(diabetes.mBVS)
+plot(glm.mBVS)
+glm.mBVS$inclprob
 }
 
 }
@@ -289,7 +296,7 @@ van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingGibbsBvs.glm}} for a heuristic
+Use \code{\link[MissingBVS]{missingGibbsBVS.glm}} for a heuristic
 approximation based on Gibbs sampling (recommended when p>20).
 
 Consider \code{\link[MissingBVS]{plot.MissingBvs}} for graphical summaries of the

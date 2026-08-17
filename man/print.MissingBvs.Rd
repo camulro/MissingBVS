@@ -18,13 +18,15 @@ posterior probabilities (or an estimation if the object was created
 by a Gibbs function).
 }
 \examples{
-\dontrun{
+\donttest{
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 data("dataS97")
 
-#Here we keep the 8 competing models:
+# Use the same small model space as in the main example:
 f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
-dataS97.mBVS <- missingBVS.lm(formula = f, data = dataS97, n.keep = 8)
+dataS97.mBVS <- missingBVS.lm(
+  formula = f, data = dataS97, n.keep = 8, n.imp = 2, imp.seed = 1
+)
 
 #Show the results:
 print(dataS97.mBVS)
@@ -32,8 +34,8 @@ print(dataS97.mBVS)
 
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingBvs.lm}},
-\code{\link[MissingBVS]{MissingGD25}} or \code{\link[MissingBVS]{MissingBvs.glm}}
+Use \code{\link[MissingBVS]{missingBVS.lm}},
+\code{\link[MissingBVS]{missingGD25}} or \code{\link[MissingBVS]{missingBVS.glm}}
 and their Gibbs versions for creating objects of the class \code{MissingBvs}.
 }
 \author{

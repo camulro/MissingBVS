@@ -14,7 +14,7 @@
 #' nested in the rest, contains the fixed variables, if given, and only the intercept by default.
 #' In order to implement BIA, \code{\link[MissingBVS]{missingBVS.glm}} can, either perform
 #' \code{n.imp} imputations designed by \code{imp.predict.mat} and \code{imp.mice.method}
-#' with the \pck{mice} package, or use user-given imputated datasets by the
+#' with the \pkg{mice} package, or use user-given imputated datasets by the
 #' \code{imp.datasets} argument. Hence, the posterior distribution over the model space
 #' is given through Bayes' theorem:
 #'
@@ -29,10 +29,11 @@
 #'
 #' where Bi(j) corresponds to the BF for model Mi to M0 under the jth imputed dataset.
 #' Data-driven BF can be either computed using popular g-prior choices or approximated
-#' with the BIC (Schwarz, 1978) or the test-based BF (Held, Gravestock and Sabanés, 2015)
-#' with the \code{BF.approx.method} argument. Approximations can be done through the
-#' \pkg{BAS} faster computation if the \code{family} is one of the implemented there:
-#' \code{binomial(link = "logit")}, \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
+#' with the BIC (Schwarz, 1978), and the default choice, or the test-based BF
+#' (Held, Gravestock and Sabanés, 2015) with the \code{BF.method} argument.
+#' Approximations can be done through the \pkg{BAS} faster computation if the
+#' \code{family} is one of the implemented there: \code{binomial(link = "logit")},
+#' \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
 #'
 #' If the BF computation method chosen is \code{"gprior"}, data-driven BFs depend on
 #' the prior assigned for the model-specific parameters given by \code{prior.betas}
@@ -88,7 +89,7 @@
 #' @param null.model Formula defining which is the simplest (null) model, nested in
 #' the full one with possible fixed variables. By default, it is defined to be the one
 #' with just the intercept.
-#' @param BF.approx.method Method used to compute or approximate data-driven Bayes factors
+#' @param BF.method Method used to compute or approximate data-driven Bayes factors
 #' (to be literally specified). Possible choices include "BIC", "TBF" and "gprior"
 #' (see details).
 #' @param prior.betas Prior distribution for model coefficients if "gprior" method is
@@ -109,7 +110,7 @@
 #' space or a numeric for the exact number of the most probable models to keep.
 #' By default it is set to 10 and automatically adjusted if 10 is greater than
 #' the total number of models.
-#' @param imp.mice.method Method for \pck{mice}'s imputation. Can be either a string
+#' @param imp.mice.method Method for \pkg{mice}'s imputation. Can be either a string
 #' or a vector of strings of length the number of variables in data, except the response.
 #' @param imp.predict.mat Matrix with \code{formula}'s competing variables in rows
 #' and some \code{data}'s variables in columns. Each entry equals 1 if the column variable
@@ -117,7 +118,7 @@
 #' in columns defines the imputation visit sequence. By default, a shortcut is used to
 #' define the most important predictors for each variable based on correlations.
 #' @param n.imp Number of imputed datasets for model posterior computation.
-#' @param maxit Number of iterations for \pck{mice}'s imputation. By default, it is 5.
+#' @param maxit Number of iterations for \pkg{mice}'s imputation. By default, it is 5.
 #' @param parallelmice Logical to indicate whether or not to use parallelization on
 #' \code{\link[mice]{mice}}'s imputation. By default, automatically performs it if the
 #' number of imputations or competing variables given by \code{formula} are big enough.
@@ -170,10 +171,8 @@
 #' the error distribution and link function to be used in the model}
 #' \item{weights}{Weights vector used in the glm fitting process}
 #' \item{offset}{Offset vector used in the glm fitting process}
-#' \item{BF.approx.method}{Function used to compute data-driven Bayes factors}
+#' \item{BF.method}{Method used to compute data-driven Bayes factors}
 #' \item{prior.betas}{Chosen \code{prior.betas} argument}
-#' \item{logprior.models}{Function used to compute the log-prior over the model space
-#' defined by covariates and/or factors}
 #' \item{prior.models}{Two-dimensional vector with \code{prior.models} and
 #' \code{prior.models.dummies} chosen. If there are no factors or \code{marginal.factors}
 #' is set to FALSE, it saves the only argument used, \code{prior.models}}
@@ -184,7 +183,7 @@
 #' @author Carolina Mulet, Gonzalo Garcia-Donato and María Eugenia Castellanos
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{MissingGibbsBvs.glm}} for a heuristic
+#' @seealso Use \code{\link[MissingBVS]{missingGibbsBVS.glm}} for a heuristic
 #' approximation based on Gibbs sampling (recommended when p>20).
 #'
 #' Consider \code{\link[MissingBVS]{plot.MissingBvs}} for graphical summaries of the
@@ -221,23 +220,31 @@
 #' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 #'
 #' @examples
-#' \dontrun{
-#' #Indian Prime Diabetes Data from VIM's package
+#' \donttest{
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+#' glm_data$Wind[c(1, 10)] <- NA_real_
 #'
-#' #Here we keep the 32 competing models:
-#' f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
-#' diabetes.mBVS <- missingBVS.glm(formula = f, data = VIM::diabetes,
-#'   family = binomial(), n.keep = 32, n.imp = 100)
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' glm.mBVS <- missingBVS.glm(
+#'   formula = f, data = glm_data, family = binomial(), n.keep = 8,
+#'   n.imp = 2, imp.seed = 1
+#' )
 #'
 #' #Show the results:
-#' diabetes.mBVS
+#' glm.mBVS
 #'
 #' #Summ up the results:
-#' summary(diabetes.mBVS)
+#' summary(glm.mBVS)
 #'
 #' #A plot with the posterior inclusion probabilities for each competing variable
 #' #and the dimension probability of the true model:
-#' plot(diabetes.mBVS)
+#' plot(glm.mBVS)
+#' glm.mBVS$inclprob
 #' }
 #'
 
@@ -245,8 +252,8 @@ missingBVS.glm <- function (formula,
                             data,
                             family = binomial(link = "logit"),
                             null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
-                            BF.approx.method = "BIC",
-                            prior.betas = "gZellner",
+                            BF.method = "BIC",
+                            prior.betas = NULL,
                             prior.models = "ScottBerger",
                             prior.models.dummies = "ScottBerger",
                             marginal.factors = TRUE,
@@ -275,23 +282,30 @@ missingBVS.glm <- function (formula,
     stop("The response in the full and null model does not coincide.\n")
   }
 
-  #select environment to get glm arguments
-  environment(formula) <- environment(null.model) <- env <- environment()
-
   #Build matrices and objects needed later on
-  buildmatrices.list <- buildmatrices(formula, null.model, data, marginal.factors)
-  list2env(buildmatrices.list, envir = env)
+  matrices <- buildmatrices(formula, null.model, data, marginal.factors)
 
   #Check arguments and compute n.keep if needed
-  n.keep <- checkBvsarguments(p, p0, namesnull, namesx, n.keep, q)
+  n.keep <- checkBvsarguments(
+    matrices$p, matrices$p0, matrices$namesnull, matrices$namesx, n.keep, matrices$q
+  )
 
   #Check model priors chosen and define the function to be used
-  lprior.models <- checkforprior.models(prior.models, priorprobs, q)
+  lprior.models <- checkforprior.models(prior.models, priorprobs, matrices$q)
 
-  mF <- L > 0 & marginal.factors
+  mF <- matrices$L > 0 & marginal.factors
+  positionscov <- if (mF) {
+    matrices$positions[matrices$positionsx, , drop = FALSE]
+  } else NULL
+  positionsfac <- if (mF) matrices$positionsfac else NULL
+
+  satmodels.repr <- if (mF) matrices$satmodels.repr else NULL
+  l <- if (mF) matrices$l else NULL
   #Check if factors present and if marginalization of their probabilities. Define model prior
-  lp.model <- checkmarg.factorsprior(mF, prior.models.dummies, l, positions,
-                                     positionsfac, firstd, lprior.models)
+  lp.model <- checkmarg.factorsprior(
+    mF, prior.models.dummies, matrices$l,
+    positionscov, positionsfac, satmodels.repr, lprior.models
+  )
 
   #Evaluate the null model:
   glmnull <- glm(formula = null.model,
@@ -309,82 +323,114 @@ missingBVS.glm <- function (formula,
   n <- length(y) #observations without missings on the response
   y <- as.numeric(y); laplace <- as.integer(laplace) #for the C code
 
-  #check whether or not the family chosen is among the options provided by BAS
-  inBAS <- checkforfamily(family, BF.approx.method)
+  #check whether or not the family chosen is available for BF.method
+  checkforfamily(family, BF.method)
 
   #Check approx method and priors chosen and define the function to be used
-  BF.approx.method <- checkforprior.betas.glm(BF.approx.method, prior.betas, inBAS,
-                                              n, p, p0, y, glmnull,laplace)
+  lBF <- checkforprior.betas.glm(
+    BF.method, prior.betas, n, matrices$p, matrices$p0, y, glmnull, laplace
+  )
 
-  X.full <- X.full[obsnotNA,] #remove NA obs from null model
+  matrices$X.full <- matrices$X.full[obsnotNA,]
 
   #check for missings and define variables with NAs
-  NAvars <- checkformissings(y = framenull[,1], framenull[,-1], X.full)
+  NAvars <- checkformissings(
+    y = matrices$framenull[, 1], matrices$framenull[, -1], matrices$X.full
+  )
 
   #Define function to get binary expression for each model
-  num2bin.model.fun <- function (x) num2bin.model(x, p = p,
-                                                  namesxnotnull = namesxnotnull,
-                                                  NAvars = NAvars)
-  #Imputation step
-  if (anyNAvar <- !is.null(NAvars)) {
-    if (is.null(imp.datasets)) { #if there are no given imputations, build them
-      imputation.list <- buildimputation(NAvars, formula, data, imp.predict.mat, n.imp,
-                                         maxit, n, q, p0, imp.mice.method, imp.seed,
-                                         parallelmice, n.core, obsnotNA, ordvars)
+  num2bin.model.fun <- function(x) num2bin.model(x, matrices$p, NAvars)
 
-    } else imputation.list <- extimputation(formula, imp.datasets, n0 = dim(data)[1],
-                                            framefull, ordvars, obsnotNA, p0, NAvars)
-    list2env(imputation.list, envir = env)
+  #Imputation step
+  if (anyNAvar <- sum(NAvars) > 0) {
+    if (is.null(imp.datasets)) { #if there are no given imputations, build them
+      imputation <- buildimputation(
+        NAvars, formula, data, imp.predict.mat, n.imp, maxit, n, matrices$q,
+        matrices$p0, imp.mice.method, imp.seed, parallelmice, n.core,
+        obsnotNA, matrices$ordvars
+      )
+
+    } else {
+      imputation <- extimputation(
+        formula, imp.datasets, n0 = dim(data)[1], matrices$framefull,
+        matrices$ordvars, obsnotNA, matrices$p0, NAvars
+      )
+      n.imp <- imputation$n.imp
+    }
   }
 
-  if (n.imp > 1) {
+  if (anyNAvar && n.imp > 1) {
     #function to compute log(BFa0) for a given model as an average of BF computed
-    #by BF.approx.method over the imputed datasets
-    lBF.method <- function (model) lBF.approx(model,
-                                              imputation.array = imputation.array,
-                                              BF.approx.method = BF.approx.method,
-                                              p0 = p0, n.imp = n.imp)
-  } else lBF.method <- function (model) BF.approx.method(k = length(model),
-                                                         X = imputation.array[,c(1:p0, model+p0),])
+    #by BF.method over the imputed datasets
+
+    switch (as.character(BF.method == "gprior"),
+      `TRUE` = {lBF.method <- function(model) lBF.av(
+          model, imputation.array = imputation$imputation.array,
+          lBF = lBF, p0 = matrices$p0, n.imp = n.imp
+        )
+        lBFfitnull <- lBF
+      },
+      `FALSE` = {lBF.method <- function(model) lBF.av.glm.fit(
+          model, imputation.array = imputation$imputation.array,
+          lBF = lBF, p0 = matrices$p0, n.imp = n.imp, y = y, glmnull = glmnull
+        )
+        #for posterior computation, if no NAvars active we do not need fitstart
+        lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
+      }
+    )
+  } else {
+    # If n.imp == 1, we do not need fitstart argument
+    if (BF.method != "gprior") lBF <- function(k, X) lBF(k, X, fitstart = NULL)
+
+    lBF.method <- function(model) lBF(
+      k = length(model),
+      X = imputation$imputation.array[, c(seq_len(matrices$p0), model + matrices$p0), ]
+    )
+    lBFfitnull <- lBF
+  }
 
   #Info:
   cat("Info. . .\n")
   if (mF) {
-    cat("Most complex model has a total of", q + q0, "covariates and/or factors.\n")
-  } else cat("Most complex model has a total of", q + q0, "competing variables.\n")
-  if (q0 == 1) {
+    cat("Most complex model has a total of", matrices$q + matrices$q0,
+        "covariates and/or factors.\n")
+  } else cat("Most complex model has a total of", matrices$q + matrices$q0,
+             "competing variables.\n")
+  if (matrices$q0 == 1) {
     cat("From those 1 is fixed (the intercept) and we should select from the remaining",
-        q, ".\n")
-  } else cat("From those", q0, "are fixed and we should select from the remaining",
-                    q, ".\n")
+        matrices$q, ".\n")
+  } else cat("From those", matrices$q0, "are fixed and we should select from the remaining",
+             matrices$q, ".\n")
   if (mF) {
-    cat("  Numerical covariates:", depvars[positionsx], "\n")
-    cat(" Factors:", depvars[!positionsx], "\n")
-  } else  cat("  Competing variables:", depvars, "\n")
+    cat("  Numerical covariates:", matrices$depvars[matrices$positionsx], "\n")
+    cat("  Factors:", matrices$depvars[!matrices$positionsx], "\n")
+  } else cat("  Competing variables:", matrices$depvars, "\n")
 
-  cat("The problem has a total of", 2^q, "competing models.\n")
+  cat("The problem has a total of", 2^matrices$q, "competing models.\n")
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
   #Compute exact posterior distribution and normalizing constant
-  posterior.list <- exact.posterior.comput(p, num2bin.model.fun, lBF.method, lp.model,
-                                           X0, X.full, BF.approx.method)
-  list2env(posterior.list, envir = env)
+  posterior <- exact.posterior.comput(
+    matrices, num2bin.model.fun, lBF.method, lp.model, lBFfitnull
+  )
 
   #Summ up the posterior distribution
-  summ.posterior.list <- summ.posterior(all.models.PM, p, q, mF, positions, num2bin.model.fun)
-  list2env(summ.posterior.list, envir = env)
+  posterior.summary <- summ.posterior(posterior, matrices, mF)
 
   if (anyNAvar) {#Pool results for imputed datasets
-    imp.array <- imputation.array
-    #remove first dummy on each factor, first p0 vars are the fixed ones
-    if (L > 0) imp.array <- imp.array[,-c(indf + p0), , drop = FALSE]
+    imp.array <- imputation$imputation.array
+    #if marginal factor probs, remove first dummy on each factor, first p0 are the fixed ones
+    if (mF) {
+      imp.array <- imp.array[, -c(matrices$indf + matrices$p0), , drop = FALSE]
+    }
     #Evaluate glm of full model with missings using Rubin's rule
-    fit <- list(); mt <- attr(framefull, "terms")
+    fit <- list(); mt <- attr(matrices$framefull, "terms")
     for (i in 1:n.imp) {
       z <- glm.fit(x = imp.array[,,i], y = y, family = family,
                    weights = weights, offset = offset, control = control)
       z$terms <- mt; class(z) <- "glm"; fit[[i]] <- z
     }
+
     glmfull <- mice::pool(fit)
     glmfull$call <- NULL #otherwise, Rstudio returns a warning trying to read glmfull$call
   } else glmfull <- glm(formula,
@@ -403,61 +449,64 @@ missingBVS.glm <- function (formula,
   # Otherwise, glmfull is the glm object for the full model
   result$glmnull <- glmnull # The glm object for the null model (without NAs)
 
-  result$variables <- depvars #The name of the competing variables
+  result$variables <- matrices$depvars #The name of the competing variables
   result$n <- n #number of observations
-  result$p <- q #number of competing vars
-  result$k <- q0 #number of fixed vars
-  result$HPMbin <- hpm #The binary code for the HPM model
-  result$MPMbin <- mpm #The binary code for the MPM model
-  names(result$MPMbin) <- depvars
+  result$p <- matrices$q #number of competing vars
+  result$k <- matrices$q0 #number of fixed vars
+  result$HPMbin <- posterior.summary$hpm
+  result$MPMbin <- posterior.summary$mpm
+  names(result$MPMbin) <- matrices$depvars
 
   if (mF) {
     #matrix for the factors index
-    result$positions <- positionsfac
-    result$positionsx <- positionsx
-    result$modelsrankdefprob <- all.models.PM # rank deficient models and probs
+    result$positions <- matrices$positionsfac
+    result$positionsx <- matrices$positionsx
+    result$modelsrankdefprob <- posterior$all.models.PM
   }
 
   #The binary code for the n.keep best models and the correspondent post
-  result$modelsprob <- modelsprob[order(modelsprob[,q+1],
-                                        decreasing = TRUE)[seq_len(n.keep)],]
+  result$modelsprob <- posterior.summary$modelsprob[
+    order(posterior.summary$modelsprob[, matrices$q + 1], decreasing = TRUE)[seq_len(n.keep)],
+  ]
+  dimnames(result$modelsprob) <- list(seq_len(n.keep), c(matrices$depvars, "Post"))
 
-  result$inclprob <- inclprob #inclusion probability for each variable
-  names(result$inclprob) <- depvars
+  result$inclprob <- posterior.summary$inclprob
+  names(result$inclprob) <- matrices$depvars
 
-  result$postprobdim <- probdim #vector with the dimension probabilities.
-  names(result$postprobdim) <- 0:q + q0 #dimension of the true model
-  result$C <- C #normalizing constant
+  result$postprobdim <- posterior.summary$probdim
+  names(result$postprobdim) <- 0:matrices$q + matrices$q0
+  result$C <- posterior$C
 
   result$call <- match.call()
 
   if(!identical(lprior.models, logUser)){
-    priorprobs <- numeric(q+1)
-    priorprobs[1] <- exp(lprior.models(numeric(q))) #prior inclusion prob for dimension 0
-    for (i in seq_len(q)) {
+    priorprobs <- numeric(matrices$q + 1)
+    priorprobs[1] <- exp(lprior.models(numeric(matrices$q)))
+    for (i in seq_len(matrices$q)) {
       priorprobs[i+1] <-
-        exp(lprior.models(c(rep.int(1, i), rep.int(0, q - i))) + lchoose(q, i))
+        exp(lprior.models(c(rep.int(1, i), rep.int(0, matrices$q - i))) +
+          lchoose(matrices$q, i))
       #prior inclusion probability for each dimension
     }
   }
   result$priorprobs <- priorprobs
-  names(result$priorprobs) <- 0:q + q0 #prior dimension probability
+  names(result$priorprobs) <- 0:matrices$q + matrices$q0
 
   if (anyNAvar) {
     #arguments used for imputation
-    result$imp.info <- imp.info
+    result$imp.info <- imputation$imp.info
 
     #save the imputed datasets for BMA or sensitivity analysis
-    raw.imp.array <- serialize(imputation.array, NULL)
+    raw.imp.array <- serialize(imputation$imputation.array, NULL)
     result$compress.imp.array <- memCompress(raw.imp.array, type = "xz")
   }
 
   #glm arguments
   result$family <- family; result$weights <- weights; result$offset <- offset
 
-  result$BF.approx.method <- BF.approx.method #function used for BF computation
+  result$BF.method <- BF.method #method used for BF computation
+  if (is.null(prior.betas) & BF.method %in% c("gprior", "TBF")) prior.betas <- "gZellner"
   result$prior.betas <- prior.betas
-  result$logprior.models <- lp.model #function used for model prior
   if (mF) {
     result$prior.models <- c(prior.models, prior.models.dummies)
   } else result$prior.models <- prior.models
@@ -470,63 +519,57 @@ missingBVS.glm <- function (formula,
 }
 
 #' @keywords internal
-checkforfamily <- function (family, BF.approx.method) {
-  #Returns a logical indicating if BAS functions can be used to speed up the process
-  #if method is BIC or TBF-gfixed
+checkforfamily <- function (family, BF.method) {
+  #Checks if family is among the available ones
 
-  #families implemented in BAS logmarginal computation
-  if (family$family %notin% c("binomial", "poisson", "Gamma")) {
-    inBAS <- FALSE
-  } else {
-    if ((family$family == "binomial" & family$link != "logit") |
-        (family$family %in% c("poisson", "Gamma") & family$link != "log")) {
+  if (BF.method == "gprior") {
+    #families implemented in BAS logmarginal computation
+    if (family$family %notin% c("binomial", "poisson", "Gamma")) {
       inBAS <- FALSE
-    } else inBAS <- TRUE
+    } else {
+      if ((family$family == "binomial" & family$link != "logit") |
+          (family$family %in% c("poisson", "Gamma") & family$link != "log")) {
+        inBAS <- FALSE
+      } else inBAS <- TRUE
+    }
+
+    if (!inBAS) stop("family not implemented in BAS' marginal computation.\n",
+                     "Try with method 'BIC' or 'TBF' instead.\n")
   }
-
-  if (BF.approx.method == "gprior" & !inBAS) stop("family not implemented in BAS' marginal computation.\n",
-                                                  "Try with method 'BIC' or 'TBF' instead.\n")
-
-  return(inBAS)
 }
 
 #' @keywords internal
-checkforprior.betas.glm <- function (BF.approx.method, prior.betas, inBAS,
-                                     n, p, p0, y, glmnull, laplace) {
-  #checks that the Bayes factor computation method given by BF.approx.method and prior.betas
+checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
+                                     glmnull, laplace) {
+  #checks that the Bayes factor computation method given by BF.method and prior.betas
   #is implemented and returns the function to use for Bayes factor computation on glm
-  if (BF.approx.method %notin% c("BIC", "TBF", "gprior")) {
+  if (BF.method %notin% c("BIC", "TBF", "gprior")) {
     stop("Only BF approximations 'BIC', 'TBF' and 'gprior' supported.")
   }
 
+  if(is.null(prior.betas)) prior.betas <- "gZellner"
+
   devnull <- glmnull$deviance #deviance of the null model
 
-  #cannot perform g-random TBF with BAS
-  if (BF.approx.method == "TBF" & prior.betas %notin% c("gZellner", "FLS")) inBAS <- FALSE
-
-  #if possible, use faster computation of BAS
-  if (inBAS) {
+  #BAS logmarginal computation:
+  if (BF.method == "gprior") {
     c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute logmarginals
 
-    #Define the functions to be given to the BF function
-    switch(BF.approx.method,
-           TBF = {switch (prior.betas, # change the string for the corresponding BAS function
-            gZellner = {prior.betas <- BAS::testBF.prior(g = n)}, #fixed g=n
-            FLS = {prior.betas <- BAS::testBF.prior(g = max(n, p^2))} #fixed Benchmark prior: g=max(n, p*p)
-           )
-           prior.betas$hyper.parameters$loglik_null <- as.numeric(-0.5 * devnull)},
-
-           gprior = {switch (prior.betas, # change the string for the corresponding BAS function
-             gZellner = {prior.betas <- BAS::g.prior(g = n)}, #fixed g=n
-             Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
-             Liangetal = {prior.betas <- BAS::hyper.g.n(alpha = 3, n = n)}, #random g: hyper-g/n with a=3
-             `Zellner-Siow` = {prior.betas <- BAS::CCH(alpha = 0.5, beta = 2, s = (n+3)/2)}, #adapted Z-S by trG
-             FLS = {prior.betas <- BAS::g.prior(g = max(n, p^2))}, #fixed Benchmark prior: g=max(n, p*p)
-             `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))}, #intrinsic prior from Womack, Novelo and Casella (2014)
-             # IHG = {prior.betas <- "geointrinsicBF"} #intrinsic hyper-g prior, not available in BAS?
-             stop("Prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'Zellner-Siow',",
-                  "'FLS' or 'intrinsic.WNC' when using gprior method.\n")
-           )}
+    switch (prior.betas,
+       gZellner = {prior.betas <- BAS::g.prior(g = n)}, #fixed g=n
+       Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
+       Liangetal = {prior.betas <- BAS::hyper.g.n(alpha = 3, n = n)},
+       #random g: hyper-g/n with a=3
+       `Zellner-Siow` = {prior.betas <-
+         BAS::CCH(alpha = 0.5, beta = 2, s = (n+3)/2)}, #adapted Z-S by trG
+       FLS = {prior.betas <- BAS::g.prior(g = max(n, p^2))},
+       #fixed Benchmark prior: g=max(n, p*p)
+       `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))},
+       #intrinsic prior from Womack, Novelo and Casella (2014)
+       # IHG = {prior.betas <- "geointrinsicBF"}
+       #intrinsic hyper-g prior, not available in BAS?
+       stop("Prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'Zellner-Siow',",
+            "'FLS' or 'intrinsic.WNC' when using gprior method.\n")
     )
 
     #Compute log-marginal likelihood of null model
@@ -534,107 +577,72 @@ checkforprior.betas.glm <- function (BF.approx.method, prior.betas, inBAS,
       logLik <- as.numeric(-0.5 * devnull)
       logmargnull <- as.numeric(logLik + 0.5 * log(2*pi) -
                                 0.5 * log(1 / summary(glmnull)$cov.unscaled))
-    } else switch (BF.approx.method,
-      BIC = {logmargnull <- BF.approx.BIC.glm(y = y, X = glmnull$x,
-                                              family = glmnull$family,
-                                              logmargnull = 0,
-                                              n = n, k = ncol(glmnull$x), p0 = 0,
-                                              weights = glmnull$prior.weights,
-                                              offset = glmnull$offset,
-                                              control = glmnull$control,
-                                              laplace = laplace,
-                                              c_glm.marg = c_glm.marg)},
+    } else logmargnull <- BF.gprior.glm(y = y, X = glmnull$x,
+                                        family = glmnull$family,
+                                        prior.betas = prior.betas,
+                                        logmargnull = 0,
+                                        k = ncol(glmnull$x), p0 = 0,
+                                        weights = glmnull$prior.weights,
+                                        offset = glmnull$offset,
+                                        control = glmnull$control,
+                                        laplace = laplace,
+                                        c_glm.marg = c_glm.marg)
 
-      TBF = {logmargnull <- BF.approx.TBF.glm(y = y, X = glmnull$x,
-                                              family = glmnull$family,
-                                              prior.betas = prior.betas,
-                                              logmargnull = 0,
-                                              k = ncol(glmnull$x), p0 = 0,
-                                              weights = glmnull$prior.weights,
-                                              offset = glmnull$offset,
-                                              control = glmnull$control,
-                                              laplace = laplace,
-                                              c_glm.marg = c_glm.marg)},
+    BF.method.f <- function (k, X) BF.gprior.glm(y = y, X,
+                                                 family = glmnull$family,
+                                                 prior.betas = prior.betas,
+                                                 logmargnull = logmargnull,
+                                                 k, p0 = p0,
+                                                 weights = glmnull$prior.weights,
+                                                 offset = glmnull$offset,
+                                                 control = glmnull$control,
+                                                 laplace = laplace,
+                                                 c_glm.marg = c_glm.marg)
 
-      gprior = {logmargnull <- BF.approx.gprior.glm(y = y, X = glmnull$x,
-                                                    family = glmnull$family,
-                                                    prior.betas = prior.betas,
-                                                    logmargnull = 0,
-                                                    k = ncol(glmnull$x), p0 = 0,
-                                                    weights = glmnull$prior.weights,
-                                                    offset = glmnull$offset,
-                                                    control = glmnull$control,
-                                                    laplace = laplace,
-                                                    c_glm.marg = c_glm.marg)}
-    )
+  } else {
 
-    switch (BF.approx.method,
-            BIC = {BF.approx.method.f <- function (k, X) BF.approx.BIC.glm(y = y, X,
-                                                                          family = glmnull$family,
-                                                                          logmargnull = logmargnull,
-                                                                          n = n, k, p0 = p0,
-                                                                          weights = glmnull$prior.weights,
-                                                                          offset = glmnull$offset,
-                                                                          control = glmnull$control,
-                                                                          laplace = laplace,
-                                                                          c_glm.marg = c_glm.marg)},
+    switch (BF.method,
+            BIC = {BF.method.f <-
+              function (k, X, fitstart) {
+                BF.BIC.glm.fit(y = y, X,
+                               family = glmnull$family,
+                               devnull = devnull,
+                               n = n, k,
+                               weights = glmnull$prior.weights,
+                               offset = glmnull$offset,
+                               fitstart,
+                               control = glmnull$control)}
+            },
 
-            TBF = {BF.approx.method.f <- function (k, X) BF.approx.TBF.glm(y = y, X,
-                                                                          family = glmnull$family,
-                                                                          prior.betas = prior.betas,
-                                                                          logmargnull = logmargnull,
-                                                                          k, p0 = p0,
-                                                                          weights = glmnull$prior.weights,
-                                                                          offset = glmnull$offset,
-                                                                          control = glmnull$control,
-                                                                          laplace = laplace,
-                                                                          c_glm.marg = c_glm.marg)},
-
-            gprior = {BF.approx.method.f <- function (k, X) BF.approx.gprior.glm(y = y, X,
-                                                                                 family = glmnull$family,
-                                                                                 prior.betas = prior.betas,
-                                                                                 logmargnull = logmargnull,
-                                                                                 k, p0 = p0,
-                                                                                 weights = glmnull$prior.weights,
-                                                                                 offset = glmnull$offset,
-                                                                                 control = glmnull$control,
-                                                                                 laplace = laplace,
-                                                                                 c_glm.marg = c_glm.marg)}
-    )
-  } else { #use slower options that do not depend on BAS
-    # cat("Faster BAS computation cannot be used for chosen arguments.",
-    #     "Be aware that it can take a while.\n")
-
-    switch (BF.approx.method,
-            BIC = {BF.approx.method.f <-
-              function (k, X) BF.approx.BIC.glm.fit(y = y, X,
-                                                    family = glmnull$family,
-                                                    devnull = devnull,
-                                                    n = n, k,
-                                                    weights = glmnull$prior.weights,
-                                                    offset = glmnull$offset,
-                                                    control = glmnull$control)},
-
-            TBF = {switch (prior.betas, # build the function to compute log-TBF
-                gZellner = {lTBF <- function(k, dev) lTBF.gfixed(g = n, k, dev, devnull = devnull)}, #fixed g=n
+            TBF = {# build the function to compute log-TBF
+              switch (prior.betas,
+                gZellner = {lTBF.method <-
+                  function(k, dev) lTBF.gfixed(g = n, k, dev, devnull = devnull)}, #fixed g=n
                 # Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
-                Liangetal = {lTBF <- function(k, dev) lTBF.hyperg(k, dev, devnull = devnull)}, #random g: hyper-g/n with a=3
-                `Zellner-Siow` = {lTBF <- function(k, dev) lTBF.grandom(a = .5, b = (n+3)/2, k, dev, devnull = devnull)}, #adapted Z-S by trG
-                FLS = {lTBF <- function(k, dev) lTBF.gfixed(g = max(n, p^2), k, dev, devnull = devnull)}, #fixed Benchmark prior: g=max(n, p*p)
-                # `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))}, #intrinsic prior from Womack, Novelo and Casella (2014)
-                # IHG = {prior.betas <- "geointrinsicBF"} #intrinsic hyper-g prior, not available in BAS?
+                Liangetal = {lTBF.method <- #random g: hyper-g/n with a=3
+                  function(k, dev) lTBF.hyperg(k, dev, devnull = devnull)},
+                `Zellner-Siow` = {lTBF.method <- #adapted Z-S by trG
+                  function(k, dev) lTBF.grandom(a = .5, b = (n+3)/2, k, dev, devnull = devnull)},
+                FLS = {lTBF.method <- #fixed Benchmark prior: g=max(n, p*p)
+                  function(k, dev) lTBF.gfixed(g = max(n, p^2), k, dev, devnull = devnull)},
+                # `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))},
+                #intrinsic prior from Womack, Novelo and Casella (2014)
+                # IHG = {prior.betas <- "geointrinsicBF"}
+                #intrinsic hyper-g prior, not available in BAS?
                 stop("Prior.betas must be one of 'gZellner', 'Liangetal', 'Zellner-Siow' or 'FLS'",
                      "when using TBF method.\n")
               )
-              BF.approx.method.f <- function (k, X) BF.approx.TBF.glm.fit(y = y, X,
-                                                                          family = glmnull$family,
-                                                                          n = n, k, lTBF = lTBF,
-                                                                          weights = glmnull$prior.weights,
-                                                                          offset = glmnull$offset,
-                                                                          control = glmnull$control)}
+              BF.method.f <- function (k, X, fitstart) {
+                BF.TBF.glm.fit(y = y, X,
+                               family = glmnull$family,
+                               n = n, k, lTBF.method = lTBF.method,
+                               weights = glmnull$prior.weights,
+                               offset = glmnull$offset,
+                               fitstart,
+                               control = glmnull$control)}
+            }
     )
   }
 
-  return(BF.approx.method.f)
+  return(BF.method.f)
 }
-

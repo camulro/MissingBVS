@@ -15,7 +15,7 @@
 #'
 #' @author Carolina Mulet
 #'
-#' @seealso \code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+#' @seealso \code{\link[MissingBVS]{missingGibbsBVS.lm}},
 #' \code{\link[MissingBVS]{logConstant}}, \code{\link[MissingBVS]{logUser}}
 #'
 #' @references Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes
@@ -23,7 +23,12 @@
 #' Statistics. 38: 2587–2619.
 #'
 #' @examples
-#' logScottBerger(model = c(rep(1,4),rep(0,3))) # log((p + 1)^(-1) / choose(p, sum(model)))
+#' models <- list(
+#'   null = c(0, 0, 0, 0),
+#'   one = c(1, 0, 0, 0),
+#'   two = c(1, 1, 0, 0)
+#' )
+#' vapply(models, logScottBerger, numeric(1), p = 4)
 #'
 logScottBerger <- function(p = length(model), model) {
   # log((p + 1)^(-1) / choose(p, sum(model)))
@@ -46,11 +51,12 @@ logScottBerger <- function(p = length(model), model) {
 #'
 #' @author Carolina Mulet
 #'
-#' @seealso \code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+#' @seealso \code{\link[MissingBVS]{missingGibbsBVS.lm}},
 #' \code{\link[MissingBVS]{logScottBerger}}, \code{\link[MissingBVS]{logUser}}
 #'
 #' @examples
-#' logConstant(7) # log(1 / (2^p))
+#' logConstant(p = 4)
+#' exp(logConstant(p = 4))
 #'
 logConstant <- function(p) {
   # 1 / (2^p)
@@ -80,7 +86,7 @@ logConstant <- function(p) {
 #'
 #' @author Carolina Mulet
 #'
-#' @seealso \code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+#' @seealso \code{\link[MissingBVS]{missingGibbsBVS.lm}},
 #' \code{\link[MissingBVS]{logScottBerger}}, \code{\link[MissingBVS]{logConstant}}
 #'
 #' @references Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes
@@ -88,8 +94,10 @@ logConstant <- function(p) {
 #' Statistics. 38: 2587–2619.
 #'
 #' @examples
-#' logUser(7, c(rep(1,4),rep(0,3)), c(0.3,rep(0.2,3),rep(0.1,4)))
-#' # log(priorprobs[sum(model) + 1]/sum(priorprobs) / choose(p, sum(model)))
+#' priorprobs <- c(0.3, 0.2, 0.2, 0.2, 0.1)
+#' model <- c(1, 0, 1, 0)
+#' logUser(p = 4, model = model, priorprobs = priorprobs)
+#' exp(logUser(p = 4, model = model, priorprobs = priorprobs))
 #'
 logUser <- function(p = length(model), model, priorprobs) {
   # priorprobs[sum(model)]/sum(priorprobs) / choose(p, sum(model))
@@ -125,7 +133,7 @@ mylchoose <- function(n, k) {
 #'
 #' @author Carolina Mulet
 #'
-#' @seealso \code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+#' @seealso \code{\link[MissingBVS]{missingGibbsBVS.lm}},
 #' \code{\link[MissingBVS]{logConstant.d}}.
 #'
 #' @references Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes
@@ -137,7 +145,10 @@ mylchoose <- function(n, k) {
 #' Journal of the American Statistical Association. 117. 1-27.
 #'
 #' @examples
-#' logScottBerger.d(0:3, c(F,rep(T,3)), c(3,2,4,3))
+#' delta <- c(0, 1, 2)
+#' tau <- c(FALSE, TRUE, TRUE)
+#' levels <- c(3, 2, 4)
+#' logScottBerger.d(delta = delta, tau = tau, l = levels)
 #'
 logScottBerger.d <- function(delta, tau, l) {
   if (sum(tau) == 0) { #no active factor (and hence, dummy)
@@ -168,11 +179,13 @@ logScottBerger.d <- function(delta, tau, l) {
 #'
 #' @author Carolina Mulet
 #'
-#' @seealso \code{\link[MissingBVS]{MissingGibbsBvs.lm}},
+#' @seealso \code{\link[MissingBVS]{missingGibbsBVS.lm}},
 #' \code{\link[MissingBVS]{logScottBerger.d}}.
 #'
 #' @examples
-#' logConstant.d(c(F,rep(T,3)), c(3,2,4,3))
+#' tau <- c(FALSE, TRUE, TRUE)
+#' levels <- c(3, 2, 4)
+#' logConstant.d(tau = tau, l = levels)
 #'
 logConstant.d <- function(tau, l) {
   if (sum(tau) == 0) { #no active factor (and hence, dummy)

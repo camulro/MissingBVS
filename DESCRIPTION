@@ -16,17 +16,19 @@ Author: Carolina Mulet [aut, cre],
 Imports:
   BayesVarSel,
   BAS,
+  graphics,
+  grDevices,
   mice,
   LaplacesDemon,
   Matrix,
+  stats,
   utils,
-  vctrs (>= 0.7.1),
   digest,
-  mvtnorm
+  withr
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
-Config/roxygen2/version: 8.0.0
+Config/roxygen2/version: 8.1.0
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3

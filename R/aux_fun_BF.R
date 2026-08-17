@@ -5,15 +5,15 @@
 #'
 #' The Bayes factor approximation is via a MonteCarlo scheme given the imputed datasets
 #' and variance-covariance matrices simuled in a \code{MissingBVS.imputation} object.
-#' The g'BF is computed with the auxiliary function \code{BF.miss.aux}.
+#' The g'BF is computed with the auxiliary function \code{lBF}.
 #'
-#' @param model Vector of indexes in {1,2,...,p} denoting the active variables
+#' @param model Vector of indexes in \{1, 2, ..., p\} denoting the active variables
 #' for a given model with p competing covariates.
 #' @param imputation.list Object of class \code{MC.imputation} with the
 #' following elements: \code{rX.imput}Array of dimension \code{n}xpx\code{nMC}
 #' containing the imputed datasets; \code{rSigma}Array of dimension
 #' pxpx\code{nMC} containing the corresponding covariance matrices
-#' @param BF.miss.aux Auxiliary function with needed fixed parameters to compute
+#' @param lBF Auxiliary function with needed fixed parameters to compute
 #' the g'-Bayes factor over \code{imputation.list}.
 #' @param n Number of observations.
 #' @param nMC Number of samples used to approximate, by MonteCarlo, the integral
@@ -28,26 +28,27 @@
 #'
 #' @seealso Use \code{\link[MissingBVS]{MC.imputation}} for computing the
 #' \code{MissingBVS.imputation} object used in the MonteCarlo approximation and
-#' \code{\link[MissingBVS]{BF.miss.X}} for the Bayes factor for each MC step.
-#' Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+#' \code{\link[MissingBVS]{BF.GD25}} for the Bayes factor for each MC step.
+#' Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20).
 #'
-#' @examples
+#' @examplesIf interactive()
 #' #Daily air quality measurements in New York
 #' data("airquality")
 #' imp2 <- MC.imputation(X = airquality[,c("Ozone", "Wind", "Temp")], nMC = 2)
 #'
 #' lmnull <- lm(Solar.R ~ 1, data = airquality, y = T)
 #' imp2$rX.imput <- imp2$rX.imput[-lmnull$na.action,,]
-#' BF.fun <- function(X.center, Sigma11, k) BF.miss.X(X.center, Sigma11,
+#' BF.fun <- function(X.center, Sigma11, k) MissingBVS:::BF.GD25(X.center, Sigma11,
 #'   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
-#' lBF <- lBF.miss(1:3, imp2, BF.miss.aux = BF.fun)
+#' lBF <- MissingBVS:::lBF.miss(1:3, imp2, lBF = BF.fun)
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
 #' Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 #'
-lBF.miss <- function(model, imputation.list, BF.miss.aux,
+#' @keywords internal
+lBF.miss <- function(model, imputation.list, lBF,
                      n = dim(imputation.list$rX.imput)[1], nMC = dim(imputation.list$rSigma)[3]) {
   k <- length(model)
 
@@ -64,13 +65,10 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
     # mu <- imputation.list$rmu[,s]
     X.center <- imputation.list.model$rX.imput[,,s] #centered at imputation step
 
-    lBF.our[s] <- BF.miss.aux(X.center, Sigma11, k) #log(BFmodel0) for the sth imputation
+    lBF.our[s] <- lBF(X.center, Sigma11, k) #log(BFmodel0) for the sth imputation
   }
 
-  maxlBF.our <- max(lBF.our)
-  lBF.our <- lBF.our - maxlBF.our #to avoid infite Bayes factors at the average step
-
-  lBF.miss <- maxlBF.our + log(sum(exp(lBF.our))) - log(nMC) #log(mean(exp(lBF.our)))
+  lBF.miss <- logsumexp.stable(lBF.our) - log(nMC) #log(mean(exp(lBF.our)))
   return(lBF.miss)
 }
 
@@ -87,7 +85,7 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
 #' @param n Number of observations.
 #' @param k Number of model-specific coefficients.
 #'
-#' @return \code{BF.miss.X} returns, in logarithmic scale, the g'-Bayes factor
+#' @return \code{BF.GD25} returns, in logarithmic scale, the g'-Bayes factor
 #' of García-Donato et al (2025) for imputed data \code{X.center} and covariance
 #' matrix \code{Sigma11}.
 #'
@@ -96,23 +94,24 @@ lBF.miss <- function(model, imputation.list, BF.miss.aux,
 #'
 #' @seealso Use \code{\link[MissingBVS]{MC.imputation}} for computing the
 #' \code{MissingBVS.imputation} object containing the \code{X.center} and \code{Sigma11}
-#' matrices. Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+#' matrices. Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 #' of the model posterior distribution in the VS problem (recommended when p<20).
 #'
-#' @examples
+#' @examplesIf interactive()
 #' #Daily air quality measurements in New York
 #' data("airquality")
 #' imp1 <- MC.imputation(X = airquality[,c("Ozone", "Wind", "Temp")], nMC = 1)
 #'
 #' lmnull <- lm(Solar.R ~ 1, data = airquality, y = T)
-#' lBF.imp1 <- BF.miss.X(imp1$rX.imput[-lmnull$na.action,,], imp1$rSigma[,,1],
+#' lBF.imp1 <- MissingBVS:::BF.GD25(imp1$rX.imput[-lmnull$na.action,,], imp1$rSigma[,,1],
 #'   y = lmnull$y, SS0 = crossprod(lmnull$residuals))
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
 #' Perspective (with Discussion). Bayesian Analysis. 20: 1677–1778.
 #'
-BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.center)) {
+#' @keywords internal
+BF.GD25 <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.center)) {
   tX.center.X.center <- crossprod(X.center)
 
   lBFi0 <- -.5*(n-1)*log(1-t(y) %*% X.center %*% solve((tX.center.X.center + Sigma11)) %*% t(X.center) %*% y/SS0) -
@@ -128,18 +127,18 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 #'
 #' The AvBF is computed by averaging over the \code{n.imp} imputed datasets given by a
 #' \code{MissingBVS.imputation} object, the \code{n.imp} data-driven BF for each given
-#' imputation. These BFs are computed with the auxiliary function \code{BF.approx.method}.
+#' imputation. These BFs are computed with the auxiliary function \code{lBF}.
 #'
-#' @param model Vector of indexes in {1,2,...,p} denoting the active variables
+#' @param model Vector of indexes in \{1, 2, ..., p\} denoting the active variables
 #' for a given model with p competing covariates.
 #' @param imputation.array Array of dimension nx(p+\code{p0})x\code{n.imp}
 #' containing the imputed datasets, where n is the number of observations.
-#' @param BF.approx.method Auxiliary function with some parameters fixed to compute
+#' @param lBF Auxiliary function with some parameters fixed to compute
 #' the data-driven Bayes factor over each imputed datased in \code{imputation.list}.
 #' @param p0 Number of fixed covariates (including the intercept term).
 #' @param n.imp Number of imputed datasets.
 #'
-#' @return \code{lBF.approx} returns, in logarithmic scale, the Average Bayes
+#' @return \code{lBF.av} returns, in logarithmic scale, the Average Bayes
 #' factor over the \code{n.imp} imputed datasets in \code{imputation.array}.
 #'
 #' @author María Eugenia Castellanos and Carolina Mulet
@@ -147,12 +146,12 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 #'
 #' @seealso Use \code{\link[MissingBVS]{mice.imputation}} for computing the
 #' \code{MissingBVS.imputation} object used in the average. Use
-#' \code{\link[MissingBVS]{MissingBvs.lm}} with linear models or
-#' \code{\link[MissingBVS]{MissingBvs.glm}} with generalized linear models for
+#' \code{\link[MissingBVS]{missingBVS.lm}} with linear models or
+#' \code{\link[MissingBVS]{missingBVS.glm}} with generalized linear models for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
+#' @examplesIf interactive()
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
@@ -160,9 +159,8 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 #' imp2 <- mice.imputation(X = XS97, formula = f, n.imp = 2)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
-#' BF.fun <- function(X, k) BF.approx.BIC.lm(y = lmnull$y, X,
-#'   SS0 = crossprod(lmnull$residuals))
-#' lBF_f <- lBF.approx(1:3, imp2$imputation.array[-lmnull$na.action,,], BF.approx.method = BF.fun)
+#' BF.fun <- function(X, k) MissingBVS:::BF.BIC.lm(y = lmnull$y, X, SS0 = crossprod(lmnull$residuals))
+#' lBF <- MissingBVS:::lBF.av(1:3, imp2$imputation.array[-lmnull$na.action,,], lBF = BF.fun)
 #'
 #' @references García-Donato, G., Castellanos, M.E., Cabras, S., Quirós, A.
 #' and Forte, A. (2025) Model Uncertainty and Missing Data: An Objective Bayesian
@@ -171,22 +169,43 @@ BF.miss.X <- function(X.center, Sigma11, y, SS0, n = length(y), k = ncol(X.cente
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 #' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 #'
-lBF.approx <- function(model, imputation.array, BF.approx.method,
-                       p0 = 1, n.imp = dim(imputation.array)[3]) {
+#' @keywords internal
+lBF.av <- function(model, imputation.array, lBF, p0 = 1, n.imp = dim(imputation.array)[3]) {
   k <- length(model)
 
   lBF.aux <- numeric(n.imp)
   X1.array <- imputation.array[,c(1:p0, model+p0),] #first p0 columns are fixed
   for(s in 1:n.imp) {
-    lBF.aux[s] <- BF.approx.method(k = k, X = X1.array[,,s]) #BF function defined previously
+    lBF.aux[s] <- lBF(k = k, X = X1.array[,,s]) #BF function defined previously
   }
 
-  maxlBF.aux <- max(lBF.aux)
-  lBF.aux <- lBF.aux - maxlBF.aux #to avoid infite Bayes factors at the average step
+  lBF.av <- logsumexp.stable(lBF.aux) - log(n.imp) #log(mean(exp(lBF.aux)))
+  return(lBF.av)
+}
 
-  lBF.approx <- maxlBF.aux + log(sum(exp(lBF.aux))) - log(n.imp) #log(mean(exp(lBF.aux)))
+#' For BF.method.glm.fit functions
+#'
+#' @keywords internal
+lBF.av.glm.fit <- function(model, imputation.array, lBF, p0 = 1,
+                           n.imp = dim(imputation.array)[3], y, glmnull) {
+  k <- length(model)
 
-  return(lBF.approx)
+  #use first imputation to estimate coefficients to accelerate convergence
+  fit <- glm.fit(y = y,
+                 x = imputation.array[, c(1:p0, model+p0), 1],
+                 family = glmnull$family,
+                 weights = glmnull$prior.weights,
+                 offset = glmnull$offset,
+                 control = glmnull$control)
+
+  lBF.aux <- numeric(n.imp)
+  X1.array <- imputation.array[,c(1:p0, model+p0),] #first p0 columns are fixed
+  for(s in 1:n.imp) {
+    lBF.aux[s] <- lBF(k = k, X = X1.array[,,s], fit$coefficients) #BF function defined previously
+  }
+
+  lBF.av <- logsumexp.stable(lBF.aux) - log(n.imp) #log(mean(exp(lBF.aux)))
+  return(lBF.av)
 }
 
 #' Logarithm of the BIC approximation of the Bayes factor in lm
@@ -202,18 +221,18 @@ lBF.approx <- function(model, imputation.array, BF.approx.method,
 #' @param k Number of model-specific coefficients.
 #' @param p0 Number of fixed covariates (including the intercept).
 #'
-#' @return \code{BF.approx.BIC.lm} returns, in logarithmic scale, the BIC
+#' @return \code{BF.BIC.lm} returns, in logarithmic scale, the BIC
 #' approximation of the Bayes factor for a given model through \code{X}.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.lm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.lm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
+#' @examplesIf interactive()
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
@@ -221,18 +240,19 @@ lBF.approx <- function(model, imputation.array, BF.approx.method,
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
-#' lBF.imp1 <- BF.approx.BIC.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
+#' lBF <- MissingBVS:::BF.BIC.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
 #'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
 #' Annals of Statistics. 6(2): 461–464.
 #'
-BF.approx.BIC.lm <- function(y, X, SS0,
-                             n = length(y), k = ncol(X)-p0, p0 = 1L) {
+#' @keywords internal
+BF.BIC.lm <- function(y, X, SS0, n = length(y), k = ncol(X)-p0, p0 = 1L) {
+
   SSE.model <- crossprod(.lm.fit(y = y, x = X)$residuals)
 
   # BFi0 <- (SS0/SSE.model)^(n/2) / n^(k/2)
-  lBFi0 <- n/2*log(SS0/SSE.model) - k/2*log(n) #exp((BIC0 - BICi)/2)
+  lBFi0 <- n/2 * log(SS0/SSE.model) - k/2 * log(n) #exp((BIC0 - BICi)/2)
   return(lBFi0)
 }
 
@@ -245,24 +265,24 @@ BF.approx.BIC.lm <- function(y, X, SS0,
 #' @param X Full imputed covariance matrix for a particular model including
 #' the fixed terms and the intercept.
 #' @param SS0 Sum of squared error of the null model considered.
-#' @param lTBF Function to compute log-TBF, with the corresponding fixed parameters.
+#' @param lTBF.method Function to compute log-TBF, with the corresponding fixed parameters.
 #' @param n Number of observations.
 #' @param k Number of model-specific coefficients.
 #' @param p0 Number of fixed covariates (including the intercept).
 #'
-#' @return \code{BF.approx.TBF.lm} returns, in logarithmic scale, the TBF
+#' @return \code{BF.TBF.lm} returns, in logarithmic scale, the TBF
 #' approximation of the Bayes factor in linear models for a given model
 #' through \code{X}.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.lm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.lm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
+#' @examplesIf interactive()
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
@@ -270,22 +290,22 @@ BF.approx.BIC.lm <- function(y, X, SS0,
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
-#' lTBF <- function (k, dev) lTBF.gfixed(g = length(lmnull$y), k, dev, devnull = 0)
-#' lBF.imp1 <- BF.approx.TBF.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
-#'   SS0 = crossprod(lmnull$residuals), lTBF = lTBF)
+#' lTBF.method <- function (k, dev) MissingBVS:::lTBF.gfixed(g = length(lmnull$y), k, dev, devnull = 0)
+#' lBF <- MissingBVS:::BF.TBF.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
+#'   SS0 = crossprod(lmnull$residuals), lTBF.method = lTBF.method)
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
 #' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
 #' Deviance Statistic. Statistical Science, 30(2): 242–257.
 #'
-BF.approx.TBF.lm <- function(y, X, SS0, lTBF,
-                             n = length(y), k = ncol(X)-p0, p0 = 1L) {
+#' @keywords internal
+BF.TBF.lm <- function(y, X, SS0, lTBF.method, n = length(y), k = ncol(X)-p0, p0 = 1L) {
 
   R2j <- 1 - crossprod(.lm.fit(y = y, x = X)$residuals)/SS0
   minuszj <- n * log(1 - R2j) #for LM
 
   # lBFi0 <- -k/2 * log(g + 1) + g/(g+1) * zj/2 #fixed g
-  lBFi0 <- lTBF(k = k, dev = minuszj)
+  lBFi0 <- lTBF.method(k = k, dev = minuszj)
   return(lBFi0)
 }
 
@@ -301,24 +321,24 @@ BF.approx.TBF.lm <- function(y, X, SS0, lTBF,
 #' @param prior.betas Prior distribution for model-specific coefficients in the
 #' \pkg{BayesVarSel} codification. Options include "gBF", "RobustBF", "LiangBF",
 #' "ZSBF", "flsBF", "intrinsicBF" and "geointrinsicBF". See
-#' \code{\link[MissingBVS]{MissingBvs.lm}} for more details.
+#' \code{\link[MissingBVS]{missingBVS.lm}} for more details.
 #' @param n Number of observations.
 #' @param k Number of model-specific coefficients.
 #' @param p0 Number of fixed covariates (including the intercept).
 #'
-#' @return \code{BF.approx.gprior.lm} returns, in logarithmic scale, the exact
+#' @return \code{BF.gprior.lm} returns, in logarithmic scale, the exact
 #' value of the Bayes factor derived from assigning a chosen g-prior by
 #' \code{prior.betas} in linear models for a given model through \code{X}.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.lm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.lm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
+#' @examplesIf interactive()
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
@@ -326,7 +346,7 @@ BF.approx.TBF.lm <- function(y, X, SS0, lTBF,
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
-#' lBF.imp1 <- BF.approx.gprior.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
+#' lBF <- MissingBVS:::BF.gprior.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
 #'   SS0 = crossprod(lmnull$residuals))
 #'
 #' @references García-Donato, G. and Forte, A. (2018) Bayesian Testing,
@@ -361,8 +381,10 @@ BF.approx.TBF.lm <- function(y, X, SS0, lTBF,
 #' Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
 #' Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
 #'
-BF.approx.gprior.lm <- function(y, X, SS0, prior.betas = "RobustBF",
-                                n = length(y), k = as.integer(ncol(X)-p0), p0 = 1L) {
+#' @keywords internal
+BF.gprior.lm <- function(y, X, SS0, prior.betas = "gBF",
+                         n = length(y), k = as.integer(ncol(X)-p0), p0 = 1L) {
+
   SSE.model <- crossprod(.lm.fit(y = y, x = X)$residuals)
 
   BFi0 <- .C(prior.betas, n, k + p0, p0, as.double(SSE.model/SS0), 0.0,
@@ -383,20 +405,20 @@ BF.approx.gprior.lm <- function(y, X, SS0, prior.betas = "RobustBF",
 #' @param k Number of model-specific coefficients.
 #' @param p0 Number of fixed covariates (including the intercept).
 #'
-#' @return \code{BF.approx.FLS.lm} returns, in logarithmic scale, the exact
+#' @return \code{BF.FLS.lm} returns, in logarithmic scale, the exact
 #' value of the Bayes factor derived from assigning the FLS Benchmark g-prior
 #' in linear models for a given model through \code{X}. See
-#' \code{\link[MissingBVS]{MissingBvs.lm}} for more details.
+#' \code{\link[MissingBVS]{missingBVS.lm}} for more details.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.lm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.lm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
+#' @examplesIf interactive()
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #' XS97 = dataS97[,c("lifee060", "gdpsh60l", "p60")]
@@ -404,7 +426,7 @@ BF.approx.gprior.lm <- function(y, X, SS0, prior.betas = "RobustBF",
 #' imp1 <- mice.imputation(X = XS97, formula = f, n.imp = 1)
 #'
 #' lmnull <- lm(gr56092 ~ 1, data = dataS97, y = T)
-#' lBF.imp1 <- BF.approx.FLS.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
+#' lBF <- MissingBVS:::BF.FLS.lm(y = lmnull$y, X = imp1$imputation.array[-lmnull$na.action,,],
 #'   SS0 = crossprod(lmnull$residuals), dmax = ncol(XS97))
 #'
 #' @references García-Donato, G. and Forte, A. (2018) Bayesian Testing,
@@ -415,8 +437,10 @@ BF.approx.gprior.lm <- function(y, X, SS0, prior.betas = "RobustBF",
 #' (2001)<DOI:10.1016/s0304-4076(00)00076-2> Benchmark priors for Bayesian
 #' model averaging. Journal of Econometrics, 100, 381-427.
 #'
-BF.approx.FLS.lm <- function(y, X, SS0, dmax,
-                             n = length(y), k = as.integer(ncol(X)-p0), p0 = 1L) {
+#' @keywords internal
+BF.FLS.lm <- function(y, X, SS0, dmax,
+                      n = length(y), k = as.integer(ncol(X)-p0), p0 = 1L) {
+
   SSE.model <- crossprod(.lm.fit(y = y, x = X)$residuals)
 
   BFi0 <- .C("flsBF", dmax - p0, n, k + p0, p0, as.double(SSE.model/SS0), 0.0,
@@ -452,29 +476,35 @@ BF.approx.FLS.lm <- function(y, X, SS0, dmax,
 #' for more details.
 #' @param c_glm.marg Function to compute log-marginal.
 #'
-#' @return \code{BF.approx.BIC.glm} returns, in logarithmic scale, the BIC
+#' @return \code{BF.BIC.glm} returns, in logarithmic scale, the BIC
 #' approximation of the Bayes factor in generalized linear models for a given
 #' model through \code{X}.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.glm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
 #' an exact computation of the model posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
-#' #Indian Prime Diabetes Data from VIM's package
+#' @examplesIf interactive()
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
 #'
-#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
-#' f <- Outcome ~ Pregnancies + Glucose + Insulin
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
-#' c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS")
+#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
+#' Xdiab$Wind[c(1, 10)] <- NA_real_
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
+#'                         seed = 1, parallel = FALSE)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(), y = T)
-#' lBF.imp1 <- BF.approx.BIC.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
-#'   family = binomial(), logmargnull = 0, c_glm.marg = c_glm.marg) #returns the logmarginal
+#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' lBF <- MissingBVS:::BF.BIC.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   family = binomial(), logmargnull = 0) #returns the logmarginal
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
 #' Annals of Statistics. 6: 461–464.
@@ -483,14 +513,16 @@ BF.approx.FLS.lm <- function(y, X, SS0, dmax,
 #' Bayesian Adaptive Sampling. R package version 2.0.2
 #' <https://CRAN.R-project.org/package=BAS>.
 #'
-BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
-                              logmargnull,
-                              n = length(y), k = ncol(X)-p0, p0 = 1L,
-                              weights = rep(1, length(y)),
-                              offset = rep(0, length(y)),
-                              control = glm.control(),
-                              laplace = 0L,
-                              c_glm.marg) {
+#' @keywords internal
+BF.BIC.glm <- function(y, X, family = binomial(link = "logit"),
+                       logmargnull,
+                       n = length(y), k = ncol(X)-p0, p0 = 1L,
+                       weights = rep(1, length(y)),
+                       offset = rep(0, length(y)),
+                       control = glm.control(),
+                       laplace = 0L,
+                       c_glm.marg = utils::getFromNamespace("C_glm_deterministic", "BAS")) {
+
   initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
   fit1 <- .Call(c_glm.marg(), Y = y, X = X, Roffset = offset, Rweights = weights,
                 Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::uniform(),
@@ -519,42 +551,54 @@ BF.approx.BIC.glm <- function(y, X, family = binomial(link = "logit"),
 #' specify the weights to be used in the glm fitting process.
 #' @param offset NULL or a numeric vector of the same length as \code{y} to
 #' specify an a priori known component included in the glm fitting process.
+#' @param fitstart Optional starting values for the parameters in the linear
+#' predictor. By default, it is \code{NULL}.
 #' @param control List of parameters for controlling the glm fitting process.
 #' It is set to \code{[stats]{glm.control()}} by default.
 #'
-#' @return \code{BF.approx.BIC.glm.fit} returns, in logarithmic scale, the BIC
+#' @return \code{BF.BIC.glm.fit} returns, in logarithmic scale, the BIC
 #' approximation of the Bayes factor in generalized linear models for a given
 #' model through \code{X}.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.glm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
 #' an exact computation of the model posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
-#' #Indian Prime Diabetes Data from VIM's package
+#' @examplesIf interactive()
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
 #'
-#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
-#' f <- Outcome ~ Pregnancies + Glucose + Insulin
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
+#' Xdiab$Wind[c(1, 10)] <- NA_real_
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
+#'                         seed = 1, parallel = FALSE)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(), y = T)
-#' lBF.imp1 <- BF.approx.BIC.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
+#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' lBF <- MissingBVS:::BF.BIC.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
 #'   family = binomial(), devnull = glmnull$deviance)
 #'
 #' @references Schwarz, G. (1978) Estimating the dimension of a model. The
 #' Annals of Statistics. 6(2): 461–464.
 #'
-BF.approx.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
-                                  devnull,
-                                  n = length(y), k = ncol(X)-1,
-                                  weights = rep(1, n),
-                                  offset = rep(0, n),
-                                  control = glm.control()) {
-  fit1 <- glm.fit(y = y, x = X, family = family,
+#' @keywords internal
+BF.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
+                           devnull,
+                           n = length(y), k = ncol(X)-1,
+                           weights = rep(1, n),
+                           offset = rep(0, n),
+                           fitstart = NULL,
+                           control = glm.control()) {
+
+  fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
                   weights = weights, offset = offset, control = control)
 
   lBFi0 <- (devnull - fit1$deviance - k * log(n))/2
@@ -592,31 +636,37 @@ BF.approx.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
 #' for more details.
 #' @param c_glm.marg Function to compute log-marginal.
 #'
-#' @return \code{BF.approx.TBF.glm} returns, in logarithmic scale, the TBF
+#' @return \code{BF.TBF.glm} returns, in logarithmic scale, the TBF
 #' approximation of the Bayes factor in generalized linear models for a given
 #' model through \code{X}.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.glm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
-#' #Indian Prime Diabetes Data from VIM's package
+#' @examplesIf interactive()
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
 #'
-#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
-#' f <- Outcome ~ Pregnancies + Glucose + Insulin
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
-#' c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS")
+#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
+#' Xdiab$Wind[c(1, 10)] <- NA_real_
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
+#'                         seed = 1, parallel = FALSE)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(), y = T)
+#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
 #' prior.betas <- BAS::testBF.prior(g = length(glmnull$y))
 #' prior.betas$hyper.parameters$loglik_null <- as.numeric(-0.5 * glmnull$deviance)
-#' lBF.imp1 <- BF.approx.TBF.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
-#'   family = binomial(), prior.betas = prior.betas, logmargnull = 0, c_glm.marg = c_glm.marg)
+#' lBF <- MissingBVS:::BF.TBF.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   family = binomial(), prior.betas = prior.betas, logmargnull = 0)
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
 #' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
@@ -626,15 +676,17 @@ BF.approx.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
 #' Bayesian Adaptive Sampling. R package version 2.0.2
 #' <https://CRAN.R-project.org/package=BAS>.
 #'
-BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
-                              prior.betas,
-                              logmargnull,
-                              k = ncol(X)-p0, p0 = 1L,
-                              weights = rep(1, length(y)),
-                              offset = rep(0, length(y)),
-                              control = glm.control(),
-                              laplace = 0L,
-                              c_glm.marg) {
+#' @keywords internal
+BF.TBF.glm <- function(y, X, family = binomial(link = "logit"),
+                       prior.betas,
+                       logmargnull,
+                       k = ncol(X)-p0, p0 = 1L,
+                       weights = rep(1, length(y)),
+                       offset = rep(0, length(y)),
+                       control = glm.control(),
+                       laplace = 0L,
+                       c_glm.marg = function() utils::getFromNamespace("C_glm_deterministic", "BAS")) {
+
   initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
   fit1 <- .Call(c_glm.marg(), Y = y, X = X, Roffset = offset, Rweights = weights,
                 Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::uniform(),
@@ -658,53 +710,64 @@ BF.approx.TBF.glm <- function(y, X, family = binomial(link = "logit"),
 #' function to be used in the model.
 #' @param n Number of observations.
 #' @param k Number of model-specific coefficients.
-#' @param lTBF Function to compute log-TBF, with the corresponding fixed parameters.
+#' @param lTBF.method Function to compute log-TBF, with the corresponding fixed parameters.
 #' @param weights NULL or numeric vector of the same length as \code{y} to
 #' specify the weights to be used in the glm fitting process.
 #' @param offset NULL or a numeric vector of the same length as \code{y} to
 #' specify an a priori known component included in the glm fitting process.
+#' @param fitstart Optional starting values for the parameters in the linear
+#' predictor. By default, it is \code{NULL}.
 #' @param control List of parameters for controlling the glm fitting process.
 #' It is set to \code{[stats]{glm.control()}} by default.
 #'
-#' @return \code{BF.approx.TBF.glm.fit} returns, in logarithmic scale, the TBF
+#' @return \code{BF.TBF.glm.fit} returns, in logarithmic scale, the TBF
 #' approximation of the Bayes factor in generalized linear models for a given
 #' model through \code{X}.
 #'
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.glm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
-#' #Indian Prime Diabetes Data from VIM's package
+#' @examplesIf interactive()
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
 #'
-#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
-#' f <- Outcome ~ Pregnancies + Glucose + Insulin
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
+#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
+#' Xdiab$Wind[c(1, 10)] <- NA_real_
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
+#'                         seed = 1, parallel = FALSE)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(), y = T)
-#' lTBF <- function (k, dev) lTBF.gfixed(g = length(glmnull$y), k, dev, devnull = 0)
-#' lBF.imp1 <- BF.approx.TBF.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
-#'   family = binomial(), lTBF = lTBF)
+#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' lTBF.method <- function (k, dev) MissingBVS:::lTBF.gfixed(g = length(glmnull$y), k, dev, devnull = 0)
+#' lBF <- MissingBVS:::BF.TBF.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   family = binomial(), lTBF.method = lTBF.method)
 #'
 #' @references Held, L., Sabanés Bové, D. and Gravestock, I.
 #' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
 #' Deviance Statistic. Statistical Science, 30(2): 242–257.
 #'
-BF.approx.TBF.glm.fit <- function(y, X,
-                                  family = binomial(link = "logit"),
-                                  n = length(y), k = ncol(X) - 1,
-                                  lTBF,
-                                  weights = rep(1, length(y)),
-                                  offset = rep(0, length(y)),
-                                  control = glm.control()) {
-  fit1 <- glm.fit(y = y, x = X, family = family,
+#' @keywords internal
+BF.TBF.glm.fit <- function(y, X, family = binomial(link = "logit"),
+                           n = length(y), k = ncol(X) - 1,
+                           lTBF.method,
+                           weights = rep(1, length(y)),
+                           offset = rep(0, length(y)),
+                           fitstart = NULL,
+                           control = glm.control()) {
+
+  fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
                   weights = weights, offset = offset, control = control)
 
-  lBFi0 <- lTBF(k = k, dev = fit1$deviance)
+  lBFi0 <- lTBF.method(k = k, dev = fit1$deviance)
   return(lBFi0)
 }
 
@@ -764,7 +827,7 @@ lTBF.hyperg <- function (k, dev, devnull) {
 #' for more details.
 #' @param c_glm.marg Function to compute log-marginal.
 #'
-#' @return \code{BF.approx.gprior.glm} returns, in logarithmic scale, the exact
+#' @return \code{BF.gprior.glm} returns, in logarithmic scale, the exact
 #' value of the Bayes factor derived from assigning a chosen g-prior by
 #' \code{prior.betas} in generalized linear models for a given model through
 #' \code{X}.
@@ -772,22 +835,28 @@ lTBF.hyperg <- function (k, dev, devnull) {
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.approx}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{MissingBvs.glm}} for
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
-#' @examples
-#' #Indian Prime Diabetes Data from VIM's package
+#' @examplesIf interactive()
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
 #'
-#' Xdiab = VIM::diabetes[,c("Pregnancies", "Glucose", "Insulin")]
-#' f <- Outcome ~ Pregnancies + Glucose + Insulin
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1)
-#' c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS")
+#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
+#' Xdiab$Wind[c(1, 10)] <- NA_real_
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
+#'                         seed = 1, parallel = FALSE)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = VIM::diabetes, family = binomial(), y = T)
-#' lBF.imp1 <- BF.approx.gprior.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
-#'   family = binomial(), logmargnull = 0, c_glm.marg = c_glm.marg) #returns the logmarginal
+#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' lBF <- MissingBVS:::BF.gprior.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   family = binomial(), logmargnull = 0) #returns the logmarginal
 #'
 #' @references Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
 #' Bayesian Adaptive Sampling. R package version 2.0.2
@@ -798,15 +867,17 @@ lTBF.hyperg <- function (k, dev, devnull) {
 #' Association. 113: 1828-1845
 #'
 #'
-BF.approx.gprior.glm <- function(y, X, family = binomial(link = "logit"),
-                                 prior.betas = BAS::robust(as.numeric(length(y))),
-                                 logmargnull,
-                                 k = ncol(X)-p0, p0 = 1L,
-                                 weights = rep(1, length(y)),
-                                 offset = rep(0, length(y)),
-                                 control = glm.control(),
-                                 laplace = 0L,
-                                 c_glm.marg) {
+#' @keywords internal
+BF.gprior.glm <- function(y, X, family = binomial(link = "logit"),
+                          prior.betas = BAS::robust(as.numeric(length(y))),
+                          logmargnull,
+                          k = ncol(X)-p0, p0 = 1L,
+                          weights = rep(1, length(y)),
+                          offset = rep(0, length(y)),
+                          control = glm.control(),
+                          laplace = 0L,
+                          c_glm.marg = function() utils::getFromNamespace("C_glm_deterministic", "BAS")) {
+
   initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
   fit1 <- .Call(c_glm.marg(), Y = y, X = X, Roffset = offset, Rweights = weights,
                 Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::uniform(),

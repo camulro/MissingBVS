@@ -9,8 +9,8 @@ missingGibbsBVS.lm(
   formula,
   data,
   null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
-  BF.approx.method = "gprior",
-  prior.betas = "Robust",
+  BF.method = "BIC",
+  prior.betas = NULL,
   prior.models = "ScottBerger",
   prior.models.dummies = "ScottBerger",
   marginal.factors = TRUE,
@@ -40,7 +40,7 @@ analysis. See details.}
 the full one with possible fixed variables. By default, it is defined to be the one
 with just the intercept.}
 
-\item{BF.approx.method}{Method used to compute or approximate data-driven Bayes factors
+\item{BF.method}{Method used to compute or approximate data-driven Bayes factors
 (to be literally specified). Possible choices include "BIC", "TBF" and "gprior"
 (see details).}
 
@@ -76,7 +76,7 @@ and/or covariates to select from) zeros and ones defining a model.}
 is saved. Default is 1, larger values are suggested if needed less memory and computation
 but they can reduce accuracy because estimates are based on fewer simulations.}
 
-\item{imp.mice.method}{Method for \pck{mice}'s imputation. Can be either a string
+\item{imp.mice.method}{Method for \pkg{mice}'s imputation. Can be either a string
 or a vector of strings of length the number of variables in data, except the response.}
 
 \item{imp.predict.mat}{Matrix with \code{formula}'s competing variables in rows
@@ -87,7 +87,7 @@ define the most important predictors for each variable based on correlations.}
 
 \item{n.imp}{Number of imputed datasets for model posterior computation.}
 
-\item{maxit}{Number of iterations for \pck{mice}'s imputation. By default, it is 5.}
+\item{maxit}{Number of iterations for \pkg{mice}'s imputation. By default, it is 5.}
 
 \item{parallelmice}{Logical to indicate whether or not to use parallelization on
 \code{\link[mice]{mice}}'s imputation. By default, automatically performs it if the
@@ -137,10 +137,8 @@ the floor(\code{n.iter}/\code{n.thin}) visited models and their associated log-B
 \item{imp.info}{List of arguments used for the imputation step and other
 information (when relevant)}
 \item{compress.imp.array}{Compressed array of imputed datasets (when relevant)}
-\item{BF.approx.method}{Function used to compute data-driven Bayes factors}
+\item{BF.method}{Method used to compute data-driven Bayes factors}
 \item{prior.betas}{Chosen \code{prior.betas} argument}
-\item{logprior.models}{Function used to compute the log-prior over the model space
-defined by covariates and/or factors}
 \item{prior.models}{Two-dimensional vector with \code{prior.models} and
 \code{prior.models.dummies} chosen. If there are no factors or \code{marginal.factors}
 is set to FALSE, it saves the only argument used, \code{prior.models}}
@@ -163,18 +161,20 @@ proposed by  George and McCulloch (1997). Later, Garcia-Donato and Martinez-Bene
 shown that the sampling strategy in combination with estimates based on frequency of
 visits provides very reliable results.
 
-\code{\link[MissingBVS]{MissingGibbsBvs.lm}} is a heuristic approximation of
-\code{\link[MissingBVS]{MissingBvs.lm}}. See the later for common details.
+\code{\link[MissingBVS]{missingGibbsBVS.lm}} is a heuristic approximation of
+\code{\link[MissingBVS]{missingBVS.lm}}. See the latter for common details.
 }
 \examples{
-\dontrun{
+\donttest{
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 data("dataS97")
 
-#Default choices are: robust and ScottBerger priors, 10000 iterations with 500
-#of burn in period. Here, 100 imputations with mice's pmm method.
-dataS97.mGBVS <- missingGibbsBVS.lm(formula = gr56092 ~ ., data = dataS97,
-                                    n.iter = 1000, n.burnin = 50, n.imp = 10)
+# Use a short chain for the example; real analyses need more iterations.
+dataS97.mGBVS <- missingGibbsBVS.lm(
+  formula = gr56092 ~ 1 + lifee060 + gdpsh60l + p60,
+  data = dataS97, n.iter = 200, n.burnin = 50, n.imp = 2,
+  Gibbs.seed = 1, imp.seed = 1
+)
 
 #Show the results:
 dataS97.mGBVS
@@ -185,6 +185,7 @@ summary(dataS97.mGBVS)
 #A plot with the estimated posterior inclusion probabilities for each
 #competing variable and the dimension probability of the true model:
 plot(dataS97.mGBVS)
+dataS97.mGBVS$inclprobRB
 }
 
 }
@@ -232,7 +233,7 @@ van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
 }
 \seealso{
-Use \code{\link[MissingBVS]{MissingBvs.lm}} for an exact computation
+Use \code{\link[MissingBVS]{missingBVS.lm}} for an exact computation
 of the model posterior distribution (recommended when p<20).
 }
 \author{
