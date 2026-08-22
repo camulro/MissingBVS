@@ -165,37 +165,34 @@
 #'
 #' @examples
 #' \donttest{
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-#' glm_data$Wind[c(1, 10)] <- NA_real_
 #'
-#' # Use a short chain for the example; real analyses need more iterations.
-#' glm.mGBVS <- missingGibbsBVS.glm(
-#'   formula = Outcome ~ Wind + Temp + Solar.R, data = glm_data,
-#'   family = binomial(), n.iter = 200, n.burnin = 50, n.imp = 2,
-#'   Gibbs.seed = 1, imp.seed = 1
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' #Default choices are: BIC approximation and ScottBerger prior.
+#' #Use a short chain for the example; real analyses need more iterations.
+#' #Few imputations for simplicity, real analyses need more.
+#' diabetes.mGBVS <- missingGibbsBVS.glm(
+#'   formula = Outcome ~  ., data = diabetes, family = binomial(),
+#'   n.iter = 200, n.burnin = 50, n.imp = 2, Gibbs.seed = 1, imp.seed = 1
 #' )
 #'
 #' #Show the results:
-#' glm.mGBVS
+#' diabetes.mGBVS
 #'
 #' #Summ up the results:
-#' summary(glm.mGBVS)
+#' summary(diabetes.mGBVS)
 #'
 #' #A plot with the posterior inclusion probabilities for each competing variable
 #' #and the dimension probability of the true model:
-#' plot(glm.mGBVS)
-#' glm.mGBVS$inclprobRB
+#' plot(diabetes.mGBVS)
+#' diabetes.mGBVS$inclprobRB
+#'
 #' }
 #'
 missingGibbsBVS.glm <- function (formula,
                                  data,
                                  family = binomial(link = "logit"),
-                                 null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
+                                 null.model = update(as.formula(formula), . ~ 1),
                                  BF.method = "BIC",
                                  prior.betas = NULL,
                                  prior.models = "ScottBerger",
@@ -222,8 +219,8 @@ missingGibbsBVS.glm <- function (formula,
 
   time <- Sys.time()
 
-  formula <- as.formula(formula)
-  null.model <- as.formula(null.model)
+  formula <- as.formula(formula); environment(formula) <- environment()
+  null.model <- as.formula(null.model); environment(null.model) <- environment()
 
   #The response in the null model and in the full model must coincide
   if (formula[[2]] != null.model[[2]]){
@@ -252,8 +249,8 @@ missingGibbsBVS.glm <- function (formula,
 
   #Check if factors present and if marginalization of their probabilities. Define model prior
   lp.model <- checkmarg.factorsprior(
-    mF, prior.models.dummies, matrices$l, positionscov,
-    positionsfac, satmodels.repr, lprior.models
+    mF, prior.models.dummies, matrices$l,
+    positionscov, positionsfac, satmodels.repr, lprior.models
   )
 
   #Evaluate the null model:
@@ -270,9 +267,6 @@ missingGibbsBVS.glm <- function (formula,
   #The response variable
   y <- glmnull$y; obsnotNA <- names(y) #without missings
   n <- length(y) #observations without missings on the response
-  devnull <- glmnull$deviance #deviance of the null model
-  logmargnull <- as.numeric(-0.5 * devnull) #= log-marginal likelihood of null model - K, K constant
-
   y <- as.numeric(y); laplace <- as.integer(laplace) #for the C code
 
   #check whether or not the family chosen is available for BF.method
@@ -314,29 +308,26 @@ missingGibbsBVS.glm <- function (formula,
 
     switch (as.character(BF.method == "gprior"),
             `TRUE` = {lBF.method <- function(model) lBF.av(
-              model, imputation.array = imputation$imputation.array,
-              lBF = lBF, p0 = matrices$p0, n.imp = n.imp
-            )
-            lBFfitnull <- lBF
+                model, imputation.array = imputation$imputation.array,
+                lBF = lBF, p0 = matrices$p0, n.imp = n.imp
+              )
             },
             `FALSE` = {lBF.method <- function(model) lBF.av.glm.fit(
-              model, imputation.array = imputation$imputation.array,
-              lBF = lBF, p0 = matrices$p0, n.imp = n.imp, y = y, glmnull = glmnull
-            )
-            #for posterior computation, if no NAvars active we do not need fitstart
-            lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
+                model, imputation.array = imputation$imputation.array,
+                lBF = lBF, p0 = matrices$p0, n.imp = n.imp, y = y, glmnull = glmnull
+              )
             }
     )
   } else {
-    # If n.imp == 1, we do not need fitstart argument
-    if (BF.method != "gprior") lBF <- function(k, X) lBF(k, X, fitstart = NULL)
-
+    #When there are no missings, just compute the BF
     lBF.method <- function(model) lBF(
       k = length(model),
-      X = imputation$imputation.array[, c(seq_len(matrices$p0), model + matrices$p0), ]
+      X = imputation$imputation.array[, c(seq_len(matrices$p0), model + matrices$p0), ],
+      fitstart = NULL
     )
-    lBFfitnull <- lBF
   }
+  #for posterior computation, if no NAvars active we do not need fitstart
+  lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
 
   #Info:
   cat("Info. . .\n")

@@ -128,8 +128,7 @@ MC.imputation <- function(X, nMC = 039E1,
 #' for a big number \code{n.imp} of imputations or huge datasets \code{X}.
 #'
 #' @export
-#' @param X Matrix with missing values to impute.
-#' @param formula Formula defining the most complex (full) regression model.
+#' @param fulldataframe \code{data.frame} object with the predictor matrix.
 #' @param n.imp Number of imputed datasets to compute the Average Bayes factor.
 #' @param imp.predict.mat \code{matrix} with ncol(\code{X}) rows and columns,
 #' where the order is defined by \code{X}. Each entry equals 1 if the column variable
@@ -182,11 +181,11 @@ MC.imputation <- function(X, nMC = 039E1,
 #' Volker, T.B. and Vink, G. (2022). futuremice: The future starts today.
 #' <https://www.gerkovink.com/miceVignettes/futuremice/Vignette_futuremice.html>
 #'
-mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::quickpred(X),
+mice.imputation <- function(fulldataframe, n.imp = 039E1, imp.predict.mat = mice::quickpred(X),
                             imp.mice.method = "pmm", visit.seq = NULL, seed = runif(1,0,09011975),
                             maxit = 5, parallel = n.imp > 120, n.core = NULL, time.test = FALSE) {
-  formula <- paste(formula)
 
+  X <- fulldataframe[,-1]
   if (time.test) {time <- Sys.time(); n.imp <- 30} # to estimate imputation time
 
   imp.warnings <- list()
@@ -200,18 +199,21 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
                           printFlag = FALSE,
                           maxit = maxit,
                           seed = seed)
-     } else imput <- mice::futuremice(X,
-                                      meth = imp.mice.method,
-                                      m = n.imp,
-                                      predictorMatrix = imp.predict.mat,
-                                      visitSequence = visit.seq,
-                                      maxit = maxit,
-                                      parallelseed = seed,
-                                      n.core = n.core)
+     } else {
+       imput <- mice::futuremice(X,
+                                 meth = imp.mice.method,
+                                 m = n.imp,
+                                 predictorMatrix = imp.predict.mat,
+                                 visitSequence = visit.seq,
+                                 maxit = maxit,
+                                 parallelseed = seed,
+                                 n.core = n.core)
+     }
 
     imps <- mice::complete(imput, action = "all") #extracts all at once
   },
-    warning = function(w) {imp.warnings <<- c(imp.warnings, list(w)); invokeRestart("muffleWarning")}
+    warning = function(w) {imp.warnings <<- c(imp.warnings, list(w));
+      invokeRestart("muffleWarning")}
   )
 
   #Show unique warnings
@@ -222,14 +224,13 @@ mice.imputation <- function(X, formula, n.imp = 039E1, imp.predict.mat = mice::q
   }
 
   #Get final dim of full imputed datasets
-  X.formula <- as.formula(paste(formula[1], formula[3]))
-  aux <- model.matrix.rankdef(model.frame(X.formula, X, na.action = NULL))
+  aux <- model.matrix.rankdef(fulldataframe)
   q <- ncol(aux)
 
   imputation.array <- array(0, dim = c(nrow(X), q, n.imp), #an array with the matrices imputed
                             dimnames = list(rownames(X), colnames(aux), seq_len(n.imp)))
   for (s in seq_len(n.imp)) {
-    aux.imps <- model.frame(X.formula, imps[[s]], na.action = NULL)
+    aux.imps <- model.frame(as.formula("~."), imps[[s]], na.action = NULL)
     imputation.array[, , s] <- model.matrix.rankdef(aux.imps) #build the model matrix
   }
   if (time.test) return(time <- Sys.time() - time)

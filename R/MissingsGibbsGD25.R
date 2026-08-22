@@ -132,7 +132,7 @@ missingGibbsGD25 <- function (formula,
   time <- Sys.time()
 
   formula <- as.formula(formula)
-  null.model <- as.formula(paste(formula[[2]], " ~ 1", sep=""))
+  null.model <- update(formula, . ~ 1)
 
   #Check for numeric covariates
   aux <- model.frame(formula, data)

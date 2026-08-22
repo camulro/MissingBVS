@@ -148,17 +148,18 @@ missingBtestGD25 <- function (data,
     mt[[i]] <- temp$terms
   }
   nullmodel.pos <- which(covar.list == "(Intercept)")
-  response <- as.character(as.formula(models[[1]])[[2]])
 
   #Check if null model is one of the competing models:
   if (length(nullmodel.pos) > 0) {
     competing.models <- setdiff(seq_len(N), nullmodel.pos)
     #the null model has to be the one with the intercept
     null.model <- as.formula(models[[nullmodel.pos]])
+    response <- null.model[[2]]
   } else {
     competing.models <- seq_len(N) #null.model is not provided by user
     #the null model has to be the one with the intercept
-    null.model <- as.formula(paste(response, "~ 1"))
+    null.model <- update(as.formula(models[[1]]), . ~ 1)
+    response <- null.model[[2]]
     N <- N + 1
 
     nullmodel.pos <- N
@@ -169,7 +170,7 @@ missingBtestGD25 <- function (data,
   namesm <- names(models)
 
   #Full design matrix
-  formula <- as.formula(paste0(null.model[[2]], "~ ."))
+  formula <- update(null.model, . ~ .)
   framefull <- model.frame(formula, data, na.action = NULL)
   X.full <- framefull[,-1] #remove intercept
   namesx <- dimnames(X.full)[[2]]

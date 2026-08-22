@@ -51,7 +51,6 @@ plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
 
   #save previous adjustment
   oldpar <- par(no.readonly = TRUE)
-  on.exit(par(oldpar), add = TRUE)
 
   par(mar = c(5, 4, 4, 2) + 0.1, mfrow = c(plotdim + plotpip, 1))
   if (plotdim) {
@@ -82,7 +81,7 @@ plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
     abline(h = seq(0,1,0.2), col = "gray90", lty = "dotted")
 
     legend(
-      "topright",
+      "right",
       legend = c("Posterior", "Prior"),
       fill = c(rgb(0.3,0.3,0.3,0.8), rgb(0.8,0.8,0.8,0.8)),
       border = NA,
@@ -111,4 +110,6 @@ plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
     abline(h = 0.5, col = rgb(0.8,0.8,0.8,0.8), lty = 2, lwd = 2)
     abline(h = seq(0,1,0.2), col = "gray90", lty = "dotted")
   }
+
+  par(mar = oldpar$mar, mfrow = oldpar$mfrow) #return to original values
 }

@@ -9,7 +9,7 @@ missingGibbsBVS.glm(
   formula,
   data,
   family = binomial(link = "logit"),
-  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
+  null.model = update(as.formula(formula), . ~ 1),
   BF.method = "BIC",
   prior.betas = NULL,
   prior.models = "ScottBerger",
@@ -192,31 +192,28 @@ visits provides very reliable results.
 }
 \examples{
 \donttest{
-# Build a small reproducible binary-response example from airquality.
-data("airquality")
-glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-  "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-glm_data$Wind[c(1, 10)] <- NA_real_
 
-# Use a short chain for the example; real analyses need more iterations.
-glm.mGBVS <- missingGibbsBVS.glm(
-  formula = Outcome ~ Wind + Temp + Solar.R, data = glm_data,
-  family = binomial(), n.iter = 200, n.burnin = 50, n.imp = 2,
-  Gibbs.seed = 1, imp.seed = 1
+#Indian Prime Diabetes Data from VIM's package
+
+#Default choices are: BIC approximation and ScottBerger prior.
+#Use a short chain for the example; real analyses need more iterations.
+#Few imputations for simplicity, real analyses need more.
+diabetes.mGBVS <- missingGibbsBVS.glm(
+  formula = Outcome ~  ., data = diabetes, family = binomial(),
+  n.iter = 200, n.burnin = 50, n.imp = 2, Gibbs.seed = 1, imp.seed = 1
 )
 
 #Show the results:
-glm.mGBVS
+diabetes.mGBVS
 
 #Summ up the results:
-summary(glm.mGBVS)
+summary(diabetes.mGBVS)
 
 #A plot with the posterior inclusion probabilities for each competing variable
 #and the dimension probability of the true model:
-plot(glm.mGBVS)
-glm.mGBVS$inclprobRB
+plot(diabetes.mGBVS)
+diabetes.mGBVS$inclprobRB
+
 }
 
 }

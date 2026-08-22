@@ -125,6 +125,22 @@
 #' #and the dimension probability of the true model:
 #' plot(airq.mBVS)
 #' airq.mBVS$inclprob
+#'
+#' #Pool of estimates for model given by formula:
+#' airq.mBVS$glmfull
+#'
+#' f <- Ozone ~ 1 + Wind + Temp + Solar.R
+#'
+#' #User given prior probs for model size:
+#' airq.mBVS.userprobs <- missingGD25(
+#'   formula = f, data = airquality, prior.models = "User",
+#'   priorprobs = c(0.3, 0.3, 0.25, 0.15), #more mass probability over small models
+#'   n.imp = 2, imp.seed = 1
+#' )
+#'
+#' #Other summaries of the posterior distribution:
+#' airq.mBVS.userprobs$HPMbin #Highest posterior Probability model
+#' airq.mBVS.userprobs$MPMbin #Median Probability model
 #' }
 #'
 missingGD25 <- function (formula,
@@ -138,7 +154,7 @@ missingGD25 <- function (formula,
   time <- Sys.time()
 
   formula <- as.formula(formula)
-  null.model <- as.formula(paste(formula[[2]], " ~ 1", sep=""))
+  null.model <- update(formula, . ~ 1)
 
   #Check for numeric covariates
   aux <- model.frame(formula, data)
@@ -175,7 +191,7 @@ missingGD25 <- function (formula,
   NAvars <- checkformissings(y = framefull[,1], X.full = X.full[obsnotNA,])
 
   #Define function to get binary expression for each model
-  num2bin.model.fun <- function (x) num2bin.model(x, matrices$p, NAvars)
+  num2bin.model.fun <- function (x) num2bin.model(x, p, NAvars)
 
   #BF function
   lBF <- function (X.center, Sigma11, k) BF.GD25(

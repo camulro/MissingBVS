@@ -210,32 +210,30 @@ which is the recommended. A non-treatment of factors can be performed through
 }
 \examples{
 \donttest{
-# Build a small reproducible binary-response example from airquality.
-data("airquality")
-glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-  "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-glm_data$Wind[c(1, 10)] <- NA_real_
 
-models.list <- list(
+#Indian Prime Diabetes Data from VIM's package
+
+#Build the list of competing models:
+models.list = list(
   M0 = Outcome ~ 1,
-  M1 = Outcome ~ Wind,
-  M2 = Outcome ~ Temp,
-  M3 = Outcome ~ Solar.R,
-  M4 = Outcome ~ Wind + Temp,
-  M5 = Outcome ~ Wind + Solar.R,
-  M6 = Outcome ~ Wind + Temp + Solar.R
+  M1 = Outcome ~ Pregnancies,
+  M2 = Outcome ~ Glucose,
+  M3 = Outcome ~ Insulin,
+  M4 = Outcome ~ Pregnancies + Glucose,
+  M5 = Outcome ~ Pregnancies + Insulin,
+  M6 = Outcome ~ Pregnancies + Glucose + Insulin
 )
 
-glm.mtest <- missingBtest.glm(
-  data = glm_data, models = models.list, family = binomial(),
+#Default choices are: BIC approximation and Constant prior.
+#Few imputations for simplicity, real analyses need more.
+diabetes.mtest <- missingBtest.glm(
+  data = diabetes, models = models.list, family = binomial(),
   n.imp = 2, imp.seed = 1
 )
 
 #Show the results:
-glm.mtest
-glm.mtest$PostProbi
+diabetes.mtest
+diabetes.mtest$PostProbi
 }
 
 }

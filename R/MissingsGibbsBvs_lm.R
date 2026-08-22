@@ -164,7 +164,8 @@
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #'
-#' # Use a short chain for the example; real analyses need more iterations.
+#' #Use a short chain for the example; real analyses need more iterations.
+#' #Few imputations for simplicity, real analyses need more.
 #' dataS97.mGBVS <- missingGibbsBVS.lm(
 #'   formula = gr56092 ~ 1 + lifee060 + gdpsh60l + p60,
 #'   data = dataS97, n.iter = 200, n.burnin = 50, n.imp = 2,
@@ -185,7 +186,7 @@
 #'
 missingGibbsBVS.lm <- function (formula,
                                 data,
-                                null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
+                                null.model = update(as.formula(formula), . ~ 1),
                                 BF.method = "BIC",
                                 prior.betas = NULL,
                                 prior.models = "ScottBerger",
@@ -452,7 +453,7 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
   visited.models$models <- digest::digest(current.model)
   visited.models$lBF <- lBFcurrent;  visited.models$lBF.PM <- lBF.PMcurrent
   for (i in seq_len(n.iter + n.burnin)){
-    setTxtProgressBar(pb, i)
+
     for (j in seq_len(p)){
       proposal.model <- current.model; proposal.model[j] <- 1 - current.model[j]
 
@@ -502,6 +503,8 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
 
     all.models.lBF[i,] <-  c(current.model, lBFcurrent)
     all.lBF.PM[i] <- lBF.PMcurrent
+
+    setTxtProgressBar(pb, i)
   }
   cat("\n")
   for(j in seq_len(p)) inclprobRB[,j] <- inclprobRB[,j] / seq(1,(n.iter + n.burnin))

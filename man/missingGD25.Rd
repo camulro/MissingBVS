@@ -121,6 +121,22 @@ summary(airq.mBVS)
 #and the dimension probability of the true model:
 plot(airq.mBVS)
 airq.mBVS$inclprob
+
+#Pool of estimates for model given by formula:
+airq.mBVS$glmfull
+
+f <- Ozone ~ 1 + Wind + Temp + Solar.R
+
+#User given prior probs for model size:
+airq.mBVS.userprobs <- missingGD25(
+  formula = f, data = airquality, prior.models = "User",
+  priorprobs = c(0.3, 0.3, 0.25, 0.15), #more mass probability over small models
+  n.imp = 2, imp.seed = 1
+)
+
+#Other summaries of the posterior distribution:
+airq.mBVS.userprobs$HPMbin #Highest posterior Probability model
+airq.mBVS.userprobs$MPMbin #Median Probability model
 }
 
 }

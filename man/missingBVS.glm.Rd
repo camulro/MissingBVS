@@ -8,7 +8,7 @@ missingBVS.glm(
   formula,
   data,
   family = binomial(link = "logit"),
-  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
+  null.model = update(as.formula(formula), . ~ 1),
   BF.method = "BIC",
   prior.betas = NULL,
   prior.models = "ScottBerger",
@@ -237,30 +237,45 @@ directly over dummies. A non-treatment of factors can be performed through \code
 }
 \examples{
 \donttest{
-# Build a small reproducible binary-response example from airquality.
-data("airquality")
-glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-  "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-glm_data$Wind[c(1, 10)] <- NA_real_
+#Indian Prime Diabetes Data
 
-f <- Outcome ~ Wind + Temp + Solar.R
-glm.mBVS <- missingBVS.glm(
-  formula = f, data = glm_data, family = binomial(), n.keep = 8,
-  n.imp = 2, imp.seed = 1
+f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
+#Keep the 32 competing models from five candidate variabeles.
+#Few imputations for simplicity, real analyses need more.
+
+diabetes.mBVS <- missingBVS.glm(
+  formula = f, data = diabetes, family = binomial(), n.keep = 32,
+  n.imp = 10, imp.seed = 1
 )
 
 #Show the results:
-glm.mBVS
+diabetes.mBVS
 
 #Summ up the results:
-summary(glm.mBVS)
+summary(diabetes.mBVS)
 
 #A plot with the posterior inclusion probabilities for each competing variable
 #and the dimension probability of the true model:
-plot(glm.mBVS)
-glm.mBVS$inclprob
+plot(diabetes.mBVS)
+diabetes.mBVS$inclprob
+
+#Pool of estimates for model given by formula:
+diabetes.mBVS$glmfull
+
+f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
+
+#User given prior probs for model size and Robust g-prior for BFs:
+diabetes.mBVS.Robust.userprobs <- missingBVS.glm(
+  formula = f, data = diabetes, family = binomial(),
+  prior.models = "User", priorprobs = c(0.3, 0.2, 0.2, 0.1, 0.1, 0.1),
+  #more mass probability over small models
+  BF.method = "gprior", prior.betas = "Robust",
+  n.imp = 2, imp.seed = 1
+)
+
+#Other summaries of the posterior distribution:
+diabetes.mBVS.Robust.userprobs$HPMbin #Highest posterior Probability model
+diabetes.mBVS.Robust.userprobs$MPMbin #Median Probability model
 }
 
 }

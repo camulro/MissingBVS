@@ -198,32 +198,30 @@
 #'
 #' @examples
 #' \donttest{
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-#' glm_data$Wind[c(1, 10)] <- NA_real_
 #'
-#' models.list <- list(
+#' #Indian Prime Diabetes Data from VIM's package
+#'
+#' #Build the list of competing models:
+#' models.list = list(
 #'   M0 = Outcome ~ 1,
-#'   M1 = Outcome ~ Wind,
-#'   M2 = Outcome ~ Temp,
-#'   M3 = Outcome ~ Solar.R,
-#'   M4 = Outcome ~ Wind + Temp,
-#'   M5 = Outcome ~ Wind + Solar.R,
-#'   M6 = Outcome ~ Wind + Temp + Solar.R
+#'   M1 = Outcome ~ Pregnancies,
+#'   M2 = Outcome ~ Glucose,
+#'   M3 = Outcome ~ Insulin,
+#'   M4 = Outcome ~ Pregnancies + Glucose,
+#'   M5 = Outcome ~ Pregnancies + Insulin,
+#'   M6 = Outcome ~ Pregnancies + Glucose + Insulin
 #' )
 #'
-#' glm.mtest <- missingBtest.glm(
-#'   data = glm_data, models = models.list, family = binomial(),
+#' #Default choices are: BIC approximation and Constant prior.
+#' #Few imputations for simplicity, real analyses need more.
+#' diabetes.mtest <- missingBtest.glm(
+#'   data = diabetes, models = models.list, family = binomial(),
 #'   n.imp = 2, imp.seed = 1
 #' )
 #'
 #' #Show the results:
-#' glm.mtest
-#' glm.mtest$PostProbi
+#' diabetes.mtest
+#' diabetes.mtest$PostProbi
 #' }
 #'
 missingBtest.glm <- function (data,
@@ -304,13 +302,16 @@ missingBtest.glm <- function (data,
   }
   #change the string for the formula and specify models to compute BF
   null.model <- as.formula(btest.args$models[[nullmodel.pos]])
-  competing.models <- seq_len(N)[-nullmodel.pos]
+  environment(null.model) <- environment()
 
+  competing.models <- seq_len(N)[-nullmodel.pos]
   model.context$competing.models <- competing.models
 
   #Competing vars full formula:
-  full.formula <- as.formula(paste0(null.model[[2]], " ~ ",
-                                    paste(unique(compvars), collapse = " + ")))
+  # full.formula <- as.formula(paste0(null.model[[2]], " ~ ",
+  #                                   paste(unique(compvars), collapse = " + ")))
+  full.formula <- update(null.model, paste0(". ~ ",
+                                            paste(unique(compvars), collapse = " + ")))
 
   #Build matrices and objects needed later on
   matrices <- buildmatrices(full.formula, null.model, data, marginal.factors)
@@ -335,7 +336,6 @@ missingBtest.glm <- function (data,
   y <- glmnull$y; obsnotNA <- names(y) #without missings
   n <- length(y) #observations without missings on the response
   y <- as.numeric(y); laplace <- as.integer(laplace) #for the C code
-  devnull <- glmnull$deviance
 
   #check whether or not the family chosen is available for BF.method
   checkforfamily(family, BF.method)
@@ -377,33 +377,34 @@ missingBtest.glm <- function (data,
     #function to compute log(BFa0) for a given model as an average of BF computed
     #by BF.method over the imputed datasets
         switch (as.character(BF.method == "gprior"),
-            `TRUE` = {lBF.method <- function(model) lBF.av(
-              model, imputation.array = imputation$imputation.array,
-              lBF = lBF, p0 = matrices$p0, n.imp = n.imp
-            )
-            lBFfitnull <- lBF
-            },
-            `FALSE` = {lBF.method <- function(model) lBF.av.glm.fit(
-              model, imputation.array = imputation$imputation.array,
-              lBF = lBF, p0 = matrices$p0, n.imp = n.imp, y = y, glmnull = glmnull
-            )
-            #for posterior computation, if no NAvars active we do not need fitstart
-            lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
-            }
+                `TRUE` = {lBF.method <- function(model) lBF.av(
+                    model, imputation.array = imputation$imputation.array,
+                    lBF = lBF, p0 = matrices$p0, n.imp = n.imp
+                  )
+                },
+                `FALSE` = {lBF.method <- function(model) lBF.av.glm.fit(
+                    model, imputation.array = imputation$imputation.array,
+                    lBF = lBF, p0 = matrices$p0, n.imp = n.imp, y = y, glmnull = glmnull
+                  )
+                }
         )
-  } else { # If n.imp == 0 or 1, we do not need fitstart argument
-    if (BF.method != "gprior") lBF <- function(k, X) lBF(k, X, fitstart = NULL)
+  } else {
+    # If n.imp == 0 or 1, we do not need fitstart argument
     if (anyNAvar) {
       lBF.method <- function(model) lBF(
         k = length(model),
-        X = imputation$imputation.array[, c(seq_len(matrices$p0), model + matrices$p0), ]
+        X = imputation$imputation.array[, c(seq_len(matrices$p0), model + matrices$p0), ],
+        fitstart = NULL
       )
     } else lBF.method <- function(model) lBF(
       k = length(model),
-      X = cbind(matrices$X0, matrices$X.full[, model, drop = FALSE])
+      X = cbind(matrices$X0, matrices$X.full[, model, drop = FALSE]),
+      fitstart = NULL
     )
-    lBFfitnull <- lBF
   }
+  #for posterior computation, if no NAvars active we do not need fitstart
+  lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
+
 
   mF <- matrices$L > 0 && marginal.factors
   positionsfac <- if (mF) matrices$positionsfac else NULL

@@ -191,6 +191,7 @@ models.list <- list(
   M7 = gr56092 ~ lifee060 + gdpsh60l + p60
 )
 
+#Few imputations for simplicity, real analyses need more.
 dataS97.mtest <- missingBtest.lm(
   data = dataS97, models = models.list, n.imp = 2, imp.seed = 1
 )

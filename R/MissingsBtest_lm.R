@@ -190,6 +190,7 @@
 #'   M7 = gr56092 ~ lifee060 + gdpsh60l + p60
 #' )
 #'
+#' #Few imputations for simplicity, real analyses need more.
 #' dataS97.mtest <- missingBtest.lm(
 #'   data = dataS97, models = models.list, n.imp = 2, imp.seed = 1
 #' )
@@ -270,8 +271,10 @@ missingBtest.lm <- function (data,
   model.context$competing.models <- competing.models
 
   #Competing vars full formula:
-  full.formula <- as.formula(paste0(null.model[[2]], " ~ ",
-                                    paste(unique(compvars), collapse = " + ")))
+  # full.formula <- as.formula(paste0(null.model[[2]], " ~ ",
+  #                                   paste(unique(compvars), collapse = " + ")))
+  full.formula <- update(null.model, paste0(". ~ ",
+                                     paste(unique(compvars), collapse = " + ")))
 
   #Build matrices and objects needed later on
   matrices <- buildmatrices(full.formula, null.model, data, marginal.factors)

@@ -5,7 +5,7 @@
 \alias{dataS97}
 \title{Sala-i-Martin 97 data}
 \format{
-A data frame with 140 observations and 63 variables
+A data frame with 140 observations and 63 variables.
 \describe{ \item{\code{gr56092}}{Growth rate of GDP per capita between 1960
 and 1992. Response variable.}
 \item{\code{Mining}}{Fraction of GDP in mining.}

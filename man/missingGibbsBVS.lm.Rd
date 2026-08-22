@@ -8,7 +8,7 @@ linear regression models using Gibbs sampling}
 missingGibbsBVS.lm(
   formula,
   data,
-  null.model = paste(as.formula(formula)[[2]], " ~ 1", sep = ""),
+  null.model = update(as.formula(formula), . ~ 1),
   BF.method = "BIC",
   prior.betas = NULL,
   prior.models = "ScottBerger",
@@ -169,7 +169,8 @@ visits provides very reliable results.
 #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 data("dataS97")
 
-# Use a short chain for the example; real analyses need more iterations.
+#Use a short chain for the example; real analyses need more iterations.
+#Few imputations for simplicity, real analyses need more.
 dataS97.mGBVS <- missingGibbsBVS.lm(
   formula = gr56092 ~ 1 + lifee060 + gdpsh60l + p60,
   data = dataS97, n.iter = 200, n.burnin = 50, n.imp = 2,

@@ -221,37 +221,52 @@
 #'
 #' @examples
 #' \donttest{
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-#' glm_data$Wind[c(1, 10)] <- NA_real_
+#' #Indian Prime Diabetes Data
 #'
-#' f <- Outcome ~ Wind + Temp + Solar.R
-#' glm.mBVS <- missingBVS.glm(
-#'   formula = f, data = glm_data, family = binomial(), n.keep = 8,
-#'   n.imp = 2, imp.seed = 1
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
+#' #Keep the 32 competing models from five candidate variabeles.
+#' #Few imputations for simplicity, real analyses need more.
+#'
+#' diabetes.mBVS <- missingBVS.glm(
+#'   formula = f, data = diabetes, family = binomial(), n.keep = 32,
+#'   n.imp = 10, imp.seed = 1
 #' )
 #'
 #' #Show the results:
-#' glm.mBVS
+#' diabetes.mBVS
 #'
 #' #Summ up the results:
-#' summary(glm.mBVS)
+#' summary(diabetes.mBVS)
 #'
 #' #A plot with the posterior inclusion probabilities for each competing variable
 #' #and the dimension probability of the true model:
-#' plot(glm.mBVS)
-#' glm.mBVS$inclprob
+#' plot(diabetes.mBVS)
+#' diabetes.mBVS$inclprob
+#'
+#' #Pool of estimates for model given by formula:
+#' diabetes.mBVS$glmfull
+#'
+#' f <- Outcome ~ Pregnancies + Glucose + Insulin + BMI + Age
+#'
+#' #User given prior probs for model size and Robust g-prior for BFs:
+#' diabetes.mBVS.Robust.userprobs <- missingBVS.glm(
+#'   formula = f, data = diabetes, family = binomial(),
+#'   prior.models = "User", priorprobs = c(0.3, 0.2, 0.2, 0.1, 0.1, 0.1),
+#'   #more mass probability over small models
+#'   BF.method = "gprior", prior.betas = "Robust",
+#'   n.imp = 2, imp.seed = 1
+#' )
+#'
+#' #Other summaries of the posterior distribution:
+#' diabetes.mBVS.Robust.userprobs$HPMbin #Highest posterior Probability model
+#' diabetes.mBVS.Robust.userprobs$MPMbin #Median Probability model
 #' }
 #'
 
 missingBVS.glm <- function (formula,
                             data,
                             family = binomial(link = "logit"),
-                            null.model = paste(as.formula(formula)[[2]], " ~ 1", sep=""),
+                            null.model = update(as.formula(formula), . ~ 1),
                             BF.method = "BIC",
                             prior.betas = NULL,
                             prior.models = "ScottBerger",
@@ -274,8 +289,8 @@ missingBVS.glm <- function (formula,
 
   time <- Sys.time()
 
-  formula <- as.formula(formula)
-  null.model <- as.formula(null.model)
+  formula <- as.formula(formula); environment(formula) <- environment()
+  null.model <- as.formula(null.model); environment(null.model) <- environment()
 
   #Response in the null model and full model must coincide
   if (formula[[2]] != null.model[[2]]){
@@ -364,30 +379,27 @@ missingBVS.glm <- function (formula,
     #by BF.method over the imputed datasets
 
     switch (as.character(BF.method == "gprior"),
-      `TRUE` = {lBF.method <- function(model) lBF.av(
-          model, imputation.array = imputation$imputation.array,
-          lBF = lBF, p0 = matrices$p0, n.imp = n.imp
-        )
-        lBFfitnull <- lBF
-      },
-      `FALSE` = {lBF.method <- function(model) lBF.av.glm.fit(
-          model, imputation.array = imputation$imputation.array,
-          lBF = lBF, p0 = matrices$p0, n.imp = n.imp, y = y, glmnull = glmnull
-        )
-        #for posterior computation, if no NAvars active we do not need fitstart
-        lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
-      }
+            `TRUE` = {lBF.method <- function(model) lBF.av(
+                model, imputation.array = imputation$imputation.array,
+                lBF = lBF, p0 = matrices$p0, n.imp = n.imp
+              )
+            },
+            `FALSE` = {lBF.method <- function(model) lBF.av.glm.fit(
+                model, imputation.array = imputation$imputation.array,
+                lBF = lBF, p0 = matrices$p0, n.imp = n.imp, y = y, glmnull = glmnull
+              )
+            }
     )
   } else {
-    # If n.imp == 1, we do not need fitstart argument
-    if (BF.method != "gprior") lBF <- function(k, X) lBF(k, X, fitstart = NULL)
-
+    #When there are no missings, just compute the BF
     lBF.method <- function(model) lBF(
       k = length(model),
-      X = imputation$imputation.array[, c(seq_len(matrices$p0), model + matrices$p0), ]
+      X = imputation$imputation.array[, c(seq_len(matrices$p0), model + matrices$p0), ],
+      fitstart = NULL
     )
-    lBFfitnull <- lBF
   }
+  #for posterior computation, if no NAvars active we do not need fitstart
+  lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
 
   #Info:
   cat("Info. . .\n")
@@ -556,9 +568,9 @@ checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
     c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute logmarginals
 
     switch (prior.betas,
-       gZellner = {prior.betas <- BAS::g.prior(g = n)}, #fixed g=n
+       gZellner = {prior.betas <- BAS::g.prior(g = as.numeric(n))}, #fixed g=n
        Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
-       Liangetal = {prior.betas <- BAS::hyper.g.n(alpha = 3, n = n)},
+       Liangetal = {prior.betas <- BAS::hyper.g.n(alpha = 3, n = as.numeric(n))},
        #random g: hyper-g/n with a=3
        `Zellner-Siow` = {prior.betas <-
          BAS::CCH(alpha = 0.5, beta = 2, s = (n+3)/2)}, #adapted Z-S by trG

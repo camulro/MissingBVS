@@ -144,6 +144,7 @@ in the study. It contains 155 variables.
 This is a case and control study with 437 cases (obese) and 751 controls
 (not obese). Purposedly the dataset is distributed without any post-processing
 and therefore, many variables contain missing observations coded in different way.
+Data were taken from \pkg{BayesVarSel}.
 }
 \examples{
 data(OBICE)
