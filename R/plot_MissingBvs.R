@@ -81,7 +81,7 @@ plot.MissingBvs <- function(mbvs.object, plotdim = TRUE, plotpip = TRUE,...) {
     abline(h = seq(0,1,0.2), col = "gray90", lty = "dotted")
 
     legend(
-      "right",
+      "topright",
       legend = c("Posterior", "Prior"),
       fill = c(rgb(0.3,0.3,0.3,0.8), rgb(0.8,0.8,0.8,0.8)),
       border = NA,

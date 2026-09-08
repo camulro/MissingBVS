@@ -1,9 +1,9 @@
-#' Bayesian Imputation Averaging for Variable Selection with Missing data in
+#' Bayes Factor Averaging for Variable Selection with Missing data in
 #' generalized linear models using Gibbs sampling
 #'
 #' Approximate computation of summaries of the posterior model distribution using a
 #' Gibbs sampling algorithm to explore the model space. Each posterior model probability is computed following the
-#' Bayesian Imputation Averaging (BIA) framework, using standard priors for model coefficients
+#' Bayes Factor Averaging (BFA) framework, using standard priors for model coefficients
 #' and the hierarchical approach of García-Donato and Paulo (2022) with factors.
 #'
 #' Gibbs sampling search algorithm to avoid exhaustive enumeration of model space
@@ -148,9 +148,8 @@
 #' Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 #' Statistics. 6(2): 461–464.
 #'
-#' Held, L., Sabanés Bové, D. and Gravestock, I.
-#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
-#' Deviance Statistic. Statistical Science, 30(2): 242–257.
+#' Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+#' Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 #'
 #' Li, Y. and Clyde, M. (2018)<DOI:10.1080/01621459.2018.1469992> Mixtures
 #' of g-Priors in Generalized Linear Models. Journal of the American

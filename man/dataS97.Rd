@@ -92,9 +92,10 @@ fraction of GDP.}
 dataS97
 }
 \description{
-Data set contains 63 variables potentially related with economic Growth (GDP).
+Data set contains 62 variables potentially related with economic Growth (GDP).
 The dataset is in its original shape with many variables containing missing
-observations coded as NA. The number of countries gathered is n=140.
+observations coded as NA. The number of countries gathered is n=140 and among
+regressors there are both numerical covariates and factors.
 }
 \details{
 It was firstly used in Sala-i-Martin (1997) and later analized by Fernández,

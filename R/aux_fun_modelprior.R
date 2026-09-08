@@ -107,7 +107,7 @@ logUser <- function(p = length(model), model, priorprobs) {
 
 #' @keywords internal
 # auxiliar function for lprior.model.dummies computation returns the number of different
-# models given an active factor i.e., lchoose(n, k) if k < n -1 and 1 otherwise (k <= n)
+# models given an active factor i.e., lchoose(n, k) if k < n -1 and 0 otherwise (k <= n)
 mylchoose <- function(n, k) {
   ifelse(k < (n - 1), lchoose(n, k), 0)
 }

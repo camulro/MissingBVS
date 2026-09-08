@@ -5,8 +5,7 @@
 \title{\pkg{mice}'s imputation for Bayesian Imputation Averaging in variable selection}
 \usage{
 mice.imputation(
-  X,
-  formula,
+  fulldataframe,
   n.imp = 390,
   imp.predict.mat = mice::quickpred(X),
   imp.mice.method = "pmm",
@@ -19,9 +18,7 @@ mice.imputation(
 )
 }
 \arguments{
-\item{X}{Matrix with missing values to impute.}
-
-\item{formula}{Formula defining the most complex (full) regression model.}
+\item{fulldataframe}{\code{data.frame} object with the predictor matrix.}
 
 \item{n.imp}{Number of imputed datasets to compute the Average Bayes factor.}
 

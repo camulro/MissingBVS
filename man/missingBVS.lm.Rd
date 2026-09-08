@@ -2,7 +2,7 @@
 % Please edit documentation in R/MissingsBvs_lm.R
 \name{missingBVS.lm}
 \alias{missingBVS.lm}
-\title{Bayesian Imputation Averaging for Variable Selection with Missing data in linear regression models}
+\title{Bayes Factor Averaging for Variable Selection with Missing data in linear regression models}
 \usage{
 missingBVS.lm(
   formula,
@@ -133,7 +133,7 @@ model space probabilities such as García-Donato and Paulo (2022)}
 Computation and summaries of posterior distribution over the model space in problems
 of small to moderate size in the presence of (possible) missing data and/or categorical
 variables in linear models. Each posterior model probability is computed following the
-Bayesian Imputation Averaging (BIA) framework, using standard priors for model coefficients
+Bayes Factor Averaging (BFA) framework, using standard priors for model coefficients
 and the hierarchical approach of García-Donato and Paulo (2022) with factors.
 }
 \details{
@@ -142,7 +142,7 @@ specified by \code{formula}: Mi for i in 1,...,2^p, being p the number of potent
 (non-fixed) regressors in the variable selection problem. It is assumed that the
 intercept term is present in all models. The simplest one M0, the \code{null.model}
 nested in the rest, contains the fixed variables, if given, and only the intercept by default.
-In order to implement BIA, \code{\link[MissingBVS]{missingBVS.lm}} can, either perform
+In order to implement BFA, \code{\link[MissingBVS]{missingBVS.lm}} can, either perform
 \code{n.imp} imputations designed by \code{imp.predict.mat} and \code{imp.mice.method}
 with the \pkg{mice} package, or use user-given imputated datasets by the
 \code{imp.datasets} argument. Hence, the posterior distribution over the model space
@@ -265,6 +265,18 @@ Bayarri, M.J., Berger, J.O., Forte, A. and Garcia-Donato, G.
 (2012)<DOI:10.1214/12-aos1013> Criteria for Bayesian Model choice with
 Application to Variable Selection. The Annals of Statistics. 40: 1550-1557.
 
+Fernandez, C., Ley, E. and Steel, M.F.J.
+(2001)<DOI:10.1016/s0304-4076(00)00076-2> Benchmark priors for Bayesian
+model averaging. Journal of Econometrics, 100, 381-427.
+
+Liang, F., Paulo, R., Molina, G., Clyde, M. A. and Berger, J. O. (2008).
+Mixtures of g Priors for Bayesian Variable Selection. Journal of the
+American Statistical Association, 103(481), 410–423.
+
+Moreno, E., Giron, J. and Casella, G. (2015) Posterior model consistency
+in variable selection as the model dimension grows. Statistical Science. 30:
+228-241.
+
 Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes multiplicity
 adjustment in the variable-selection problem. The Annals of Statistics.
 38: 2587–2619.
@@ -277,13 +289,15 @@ Bayesian Regression Analysis with g-prior Distributions. In Bayesian
 Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
 Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
 
+Zellner A, Siow A (1980). Posterior Odds for Selected Regression Hypotheses.
+In JM Bernardo, MH DeGroot, DV Lindley, AFM Smith (eds.), Bayesian Statistics,
+pp. 585–603. Valencia University Press.
+
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 Statistics. 6: 461–464.
 
-Held, L., Gravestock, I. and Sabanés Bové, D.
-(2015)<DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection
-for generalized linear models using test-based Bayes factors. Journal of the
-American Statistical Association, 110, 1157–1168.
+Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45: 1–67.

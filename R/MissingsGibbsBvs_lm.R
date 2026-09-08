@@ -1,9 +1,9 @@
-#' Bayesian Imputation Averaging for Variable Selection with Missing data in
+#' Bayes Factor Averaging for Variable Selection with Missing data in
 #' linear regression models using Gibbs sampling
 #'
 #' Approximate computation of summaries of the posterior model distribution using a
 #' Gibbs sampling algorithm to explore the model space. Each posterior model probability
-#' is computed following the Bayesian Imputation Averaging (BIA) framework, using
+#' is computed following the Bayes Factor Averaging (BFA) framework, using
 #' standard priors for model coefficients and the hierarchical approach of
 #' García-Donato and Paulo (2022) with factors.
 #'
@@ -152,9 +152,8 @@
 #' Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 #' Statistics. 6(2): 461–464.
 #'
-#' Held, L., Sabanés Bové, D. and Gravestock, I.
-#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
-#' Deviance Statistic. Statistical Science, 30(2): 242–257.
+#' Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+#' Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 #'
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 #' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
@@ -423,7 +422,7 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
   #Gibbs sampling algorithm, originally proposed by George and McCulloch (1997)
   #and further studied by Garcia-Donato and Martinez-Beneito (2013), to explore
   #the model space and approximate the model posterior distribution progress bar for loop
-  pb <- txtProgressBar(min = 0, max = 2^p, style = 3, width = 50, char = "=")
+  pb <- txtProgressBar(min = 0, max = n.iter + n.burnin, style = 3, width = 50, char = "=")
 
   all.models.lBF <- matrix(0, nr = n.iter + n.burnin, nc = p+1) #last column is log(BF_a0)
   all.lBF.PM <- numeric(n.iter + n.burnin) #log(BF_a0*Pr(M))
@@ -453,6 +452,7 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
   visited.models$models <- digest::digest(current.model)
   visited.models$lBF <- lBFcurrent;  visited.models$lBF.PM <- lBF.PMcurrent
   for (i in seq_len(n.iter + n.burnin)){
+    setTxtProgressBar(pb, i)
 
     for (j in seq_len(p)){
       proposal.model <- current.model; proposal.model[j] <- 1 - current.model[j]
@@ -503,8 +503,6 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
 
     all.models.lBF[i,] <-  c(current.model, lBFcurrent)
     all.lBF.PM[i] <- lBF.PMcurrent
-
-    setTxtProgressBar(pb, i)
   }
   cat("\n")
   for(j in seq_len(p)) inclprobRB[,j] <- inclprobRB[,j] / seq(1,(n.iter + n.burnin))

@@ -2,7 +2,7 @@
 % Please edit documentation in R/MissingsGibbsBvs_lm.R
 \name{missingGibbsBVS.lm}
 \alias{missingGibbsBVS.lm}
-\title{Bayesian Imputation Averaging for Variable Selection with Missing data in
+\title{Bayes Factor Averaging for Variable Selection with Missing data in
 linear regression models using Gibbs sampling}
 \usage{
 missingGibbsBVS.lm(
@@ -149,7 +149,7 @@ model space probabilities such as García-Donato and Paulo (2022)}
 \description{
 Approximate computation of summaries of the posterior model distribution using a
 Gibbs sampling algorithm to explore the model space. Each posterior model probability
-is computed following the Bayesian Imputation Averaging (BIA) framework, using
+is computed following the Bayes Factor Averaging (BFA) framework, using
 standard priors for model coefficients and the hierarchical approach of
 García-Donato and Paulo (2022) with factors.
 }
@@ -226,9 +226,8 @@ Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 Statistics. 6(2): 461–464.
 
-Held, L., Sabanés Bové, D. and Gravestock, I.
-(2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
-Deviance Statistic. Statistical Science, 30(2): 242–257.
+Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.

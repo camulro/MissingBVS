@@ -135,9 +135,10 @@
 
 #' Sala-i-Martin 97 data
 #'
-#' Data set contains 63 variables potentially related with economic Growth (GDP).
+#' Data set contains 62 variables potentially related with economic Growth (GDP).
 #' The dataset is in its original shape with many variables containing missing
-#' observations coded as NA. The number of countries gathered is n=140.
+#' observations coded as NA. The number of countries gathered is n=140 and among
+#' regressors there are both numerical covariates and factors.
 #'
 #' It was firstly used in Sala-i-Martin (1997) and later analized by Fernández,
 #' Ley and Steel (2001) through a BVS perspective deleting missing obeservations.
@@ -245,14 +246,14 @@
 
 #' Pima Indians Diabetes Data
 #'
-#' Test results collected by the the US National Institute of Diabetes and
+#' Test results collected by the US National Institute of Diabetes and
 #' Digestive and Kidney Diseases. The dataset contains 8 medical variables and
 #' the response of interest, presence of diabetes, over 768 women older than 20
-#' years old with Pima Indian heritage. Data were taken from \pkg{VIM}.
+#' years old with Pima Indian heritage. Data were taken from \pkg{VIM} package.
 #'
 #' For variables Pregancies, Glucose, Bloodpressure, SkinThickness, Insulin and
-#' BMI, there is a percentage of missingness of 14 %, 0.65 %,0.04 %, 0.30 %,
-#' 0.49 % and 1.43 %, respectively.
+#' BMI, there is a percentage of missingness of 14.45 \%, 0.65 \%, 4.56 \%, 29.56 \%,
+#' 48.70 \% and 1.43 \%, respectively.
 #'
 #' @name diabetes
 #' @docType data

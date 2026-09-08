@@ -1,14 +1,14 @@
-#' Bayes factors and posterior probabilities via Bayesian Imputation Averaging for
+#' Bayes factors and posterior probabilities via Bayes Factor Averaging for
 #' generalized linear models
 #'
 #' The model space is build from a list of linear regression models proposed to explain
 #' a common response. It returns the Bayes factors and posterior probabilities computed
-#' through Bayesian Imputation Averaging (BIA) for generalized linear models in the
+#' through Bayes Factor Averaging (BFA) for generalized linear models in the
 #' presence of missing data.
 #'
 #' Given a list of competing models, the model space is made up by them, assuming that the
 #' intercept term is present in every model. The simplest one M0, can be specified (\code{null.model})
-#' and must be nested in the rest. In order to implement BIA, \code{\link[MissingBVS]{missingBtest.glm}}
+#' and must be nested in the rest. In order to implement BFA, \code{\link[MissingBVS]{missingBtest.glm}}
 #' can, either perform \code{n.imp} imputations designed by \code{imp.predict.mat} and
 #' \code{imp.mice.method} with the \pkg{mice} package, or use user-given imputated datasets
 #' by the \code{imp.datasets} argument. Hence, the posterior distribution over the model space
@@ -189,9 +189,8 @@
 #' Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 #' Statistics. 6(2): 461–464.
 #'
-#' Held, L., Sabanés Bové, D. and Gravestock, I.
-#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
-#' Deviance Statistic. Statistical Science, 30(2): 242–257.
+#' Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+#' Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 #'
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 #' by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.
@@ -405,7 +404,6 @@ missingBtest.glm <- function (data,
   #for posterior computation, if no NAvars active we do not need fitstart
   lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
 
-
   mF <- matrices$L > 0 && marginal.factors
   positionsfac <- if (mF) matrices$positionsfac else NULL
   indf <- if (mF) matrices$indf else NULL
@@ -439,8 +437,11 @@ missingBtest.glm <- function (data,
       }
       modelspool[[j]] <- mice::pool(fit)
       modelspool[[j]]$call <- NULL #otherwise, Rstudio returns a warning trying to read modelspool[[j]]$call
-    } else modelspool[[j]] <- glm(btest.args$models[[j]], data, family = family,
-                                  weights = weights, offset = offset, control = control)
+    } else {
+      fj <- as.formula(btest.args$models[[j]]); environment(fj) <- environment()
+      modelspool[[j]] <- glm(fj, data, family = family,
+                             weights = weights, offset = offset, control = control)
+    }
   }
   modelspool[[nullmodel.pos]] <- glm(null.model, data, family = family,
                                      weights = weights, offset = offset, control = control)
@@ -459,7 +460,7 @@ missingBtest.glm <- function (data,
     result$positionsx <- matrices$positionsx
   }
 
-  if (!is.null(NAvars)) {
+  if (anyNAvar) {
     #arguments used for imputation
     result$imp.info <- imputation$imp.info
 

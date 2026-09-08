@@ -1,9 +1,9 @@
-#' Bayesian Imputation Averaging for Variable Selection with Missing data in linear regression models
+#' Bayes Factor Averaging for Variable Selection with Missing data in linear regression models
 #'
 #' Computation and summaries of posterior distribution over the model space in problems
 #' of small to moderate size in the presence of (possible) missing data and/or categorical
 #' variables in linear models. Each posterior model probability is computed following the
-#' Bayesian Imputation Averaging (BIA) framework, using standard priors for model coefficients
+#' Bayes Factor Averaging (BFA) framework, using standard priors for model coefficients
 #' and the hierarchical approach of García-Donato and Paulo (2022) with factors.
 #'
 #' The set of competing models is made up by all the possible subsets of regressors
@@ -11,7 +11,7 @@
 #' (non-fixed) regressors in the variable selection problem. It is assumed that the
 #' intercept term is present in all models. The simplest one M0, the \code{null.model}
 #' nested in the rest, contains the fixed variables, if given, and only the intercept by default.
-#' In order to implement BIA, \code{\link[MissingBVS]{missingBVS.lm}} can, either perform
+#' In order to implement BFA, \code{\link[MissingBVS]{missingBVS.lm}} can, either perform
 #' \code{n.imp} imputations designed by \code{imp.predict.mat} and \code{imp.mice.method}
 #' with the \pkg{mice} package, or use user-given imputated datasets by the
 #' \code{imp.datasets} argument. Hence, the posterior distribution over the model space
@@ -184,6 +184,18 @@
 #' (2012)<DOI:10.1214/12-aos1013> Criteria for Bayesian Model choice with
 #' Application to Variable Selection. The Annals of Statistics. 40: 1550-1557.
 #'
+#' Fernandez, C., Ley, E. and Steel, M.F.J.
+#' (2001)<DOI:10.1016/s0304-4076(00)00076-2> Benchmark priors for Bayesian
+#' model averaging. Journal of Econometrics, 100, 381-427.
+#'
+#' Liang, F., Paulo, R., Molina, G., Clyde, M. A. and Berger, J. O. (2008).
+#' Mixtures of g Priors for Bayesian Variable Selection. Journal of the
+#' American Statistical Association, 103(481), 410–423.
+#'
+#' Moreno, E., Giron, J. and Casella, G. (2015) Posterior model consistency
+#' in variable selection as the model dimension grows. Statistical Science. 30:
+#' 228-241.
+#'
 #' Scott, J.G. and Berger, J.O. (2010) Bayes and empirical-Bayes multiplicity
 #' adjustment in the variable-selection problem. The Annals of Statistics.
 #' 38: 2587–2619.
@@ -196,13 +208,15 @@
 #' Inference and Decision techniques: Essays in Honor of Bruno de Finetti (A.
 #' Zellner, ed.) 389-399. Edward Elgar Publishing Limited.
 #'
+#' Zellner A, Siow A (1980). Posterior Odds for Selected Regression Hypotheses.
+#' In JM Bernardo, MH DeGroot, DV Lindley, AFM Smith (eds.), Bayesian Statistics,
+#' pp. 585–603. Valencia University Press.
+#'
 #' Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 #' Statistics. 6: 461–464.
 #'
-#' Held, L., Gravestock, I. and Sabanés Bové, D.
-#' (2015)<DOI:10.1080/01621459.2014.993077> Objective Bayesian model selection
-#' for generalized linear models using test-based Bayes factors. Journal of the
-#' American Statistical Association, 110, 1157–1168.
+#' Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+#' Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 #'
 #' van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 #' by Chained Equations in R. Journal of Statistical Software. 45: 1–67.
@@ -605,6 +619,8 @@ buildmatrices <- function (formula, null.model, data, marginal.factors) {
     #Only the non-fixed vars
     namesxnotnull <- setdiff(namesx, dimnames(X0rdf)[[2]])
   } else {
+    X0rdf <- X0
+
     X.full <- model.matrix(formula, framefull)
     namesx <- dimnames(X.full)[[2]]
     #Only the non-fixed vars
@@ -622,13 +638,31 @@ buildmatrices <- function (formula, null.model, data, marginal.factors) {
     depvars <- setdiff(attr(terms(framefull), "term.labels"),
                        attr(terms(framenull), "term.labels"))
 
+    factorsfull <- attr(terms(framefull), "factors")
+    orderfactorsfull <- colSums(factorsfull)
+
     #positions has number of rows equal to the number of regressors and p columns.
     #A 1 in a row denotes the position in X of a regressor (several positions for
     #the dummies of a factor).
     positions <- t(sapply(depvars, function(var) {
-      if(is.factor(data[[var]])) {
-        levs <- levels(data[[var]])
-        ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
+
+      ##OLD: does not select interactions of factors
+      # if(is.factor(data[[var]])) {
+      #   levs <- levels(data[[var]])
+      #   ind <- which(namesxnotnull %in% paste0(var,levs)) #1 if the namelevel matches
+      # } else ind <- which(namesxnotnull == var) #1 if the name matches
+
+      if (orderfactorsfull[var] > 0) { #is a factor
+
+        f <- names(which(factorsfull[,var] > 0)) #variable names
+        levs <- lapply(f, FUN = function (j) paste0(j, levels(data[[j]])))
+        gridlevs <- as.matrix(expand.grid(levs))
+
+        levelnames <- sapply(seq_len(nrow(gridlevs)), FUN = function (x) {
+          paste0(gridlevs[x,], collapse = ":")
+        })
+        ind <- which(namesxnotnull %in% levelnames)
+
       } else ind <- which(namesxnotnull == var) #1 if the name matches
 
       posi <- numeric(p); posi[ind] <- 1; posi
@@ -656,7 +690,7 @@ buildmatrices <- function (formula, null.model, data, marginal.factors) {
       q <- p - sum(l) + L #Number of factors and covariates to select from
       #q = p if there are no factors
 
-      return(list(q0 = q0, p0 = p0, X0 = X0, namesnull = namesnull, framenull = framenull,
+      return(list(q0 = q0, p0 = p0, X0 = X0, namesnull = dimnames(X0rdf)[[2]], framenull = framenull,
                   q = q, p = p, X.full = X.full, namesxnotnull = namesxnotnull, namesx = namesx,
                   framefull = framefull, ordvars = ordvars, depvars = depvars,
                   positions = positions, positionsx = positionsx, positionsfac = positionsfac,
@@ -870,12 +904,10 @@ checkformissings <- function (y, X0 = NULL, X.full) {
                                "We are going to omit these observations.\n")
 
   ##on the regressors
-  # if (sum(is.na(X.full)) > 0) {
   O <- 1*(!is.na(X.full))
   #zeros where missing observations on the data without missings on the response
   # NAvars <- names(which(colSums(O) < dim(X.full)[1])) #columns with missings
   NAvars <- colSums(O) < dim(X.full)[1] #logical: columns with missings or not
-  # } else NAvars <- NULL
 
   return(NAvars)
 }

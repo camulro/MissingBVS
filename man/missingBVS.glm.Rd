@@ -2,7 +2,7 @@
 % Please edit documentation in R/MissingsBvs_glm.R
 \name{missingBVS.glm}
 \alias{missingBVS.glm}
-\title{Bayesian Imputation Averaging for Variable Selection with Missing data in generalized linear models}
+\title{Bayes Factor Averaging for Variable Selection with Missing data in generalized linear models}
 \usage{
 missingBVS.glm(
   formula,
@@ -160,7 +160,7 @@ model space probabilities such as García-Donato and Paulo (2022)}
 Computation and summaries of posterior distribution over the model space in problems
 of small to moderate size in the presence of (possible) missing data and/or categorical
 variables in generalized linear models. Each posterior model probability is computed
-following the Bayesian Imputation Averaging (BIA) framework, using standard priors
+following the Bayes Factor Averaging (BFA) framework, using standard priors
 for model coefficients and the hierarchical approach of García-Donato and Paulo (2022)
 with factors.
 }
@@ -170,7 +170,7 @@ specified by \code{formula}: Mi for i in 1,...,2^p, being p the number of potent
 (non-fixed) regressors in the variable selection problem. It is assumed that the
 intercept term is present in all models. The simplest one M0, the \code{null.model}
 nested in the rest, contains the fixed variables, if given, and only the intercept by default.
-In order to implement BIA, \code{\link[MissingBVS]{missingBVS.glm}} can, either perform
+In order to implement BFA, \code{\link[MissingBVS]{missingBVS.glm}} can, either perform
 \code{n.imp} imputations designed by \code{imp.predict.mat} and \code{imp.mice.method}
 with the \pkg{mice} package, or use user-given imputated datasets by the
 \code{imp.datasets} argument. Hence, the posterior distribution over the model space
@@ -295,9 +295,8 @@ adjustment in the variable-selection problem. The Annals of Statistics.
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 Statistics. 6(2): 461–464.
 
-Held, L., Sabanés Bové, D. and Gravestock, I.
-(2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
-Deviance Statistic. Statistical Science, 30(2): 242–257.
+Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 
 Li, Y. and Clyde, M. (2018)<DOI:10.1080/01621459.2018.1469992> Mixtures
 of g-Priors in Generalized Linear Models. Journal of the American

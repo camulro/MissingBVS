@@ -2,7 +2,7 @@
 % Please edit documentation in R/MissingsBtest_glm.R
 \name{missingBtest.glm}
 \alias{missingBtest.glm}
-\title{Bayes factors and posterior probabilities via Bayesian Imputation Averaging for
+\title{Bayes factors and posterior probabilities via Bayes Factor Averaging for
 generalized linear models}
 \usage{
 missingBtest.glm(
@@ -142,13 +142,13 @@ probabilities such as García-Donato and Paulo (2022)}
 \description{
 The model space is build from a list of linear regression models proposed to explain
 a common response. It returns the Bayes factors and posterior probabilities computed
-through Bayesian Imputation Averaging (BIA) for generalized linear models in the
+through Bayes Factor Averaging (BFA) for generalized linear models in the
 presence of missing data.
 }
 \details{
 Given a list of competing models, the model space is made up by them, assuming that the
 intercept term is present in every model. The simplest one M0, can be specified (\code{null.model})
-and must be nested in the rest. In order to implement BIA, \code{\link[MissingBVS]{missingBtest.glm}}
+and must be nested in the rest. In order to implement BFA, \code{\link[MissingBVS]{missingBtest.glm}}
 can, either perform \code{n.imp} imputations designed by \code{imp.predict.mat} and
 \code{imp.mice.method} with the \pkg{mice} package, or use user-given imputated datasets
 by the \code{imp.datasets} argument. Hence, the posterior distribution over the model space
@@ -266,9 +266,8 @@ Bayesian Adaptive Sampling. R package version 2.0.2
 Schwarz, G. (1978) Estimating the dimension of a model. The Annals of
 Statistics. 6(2): 461–464.
 
-Held, L., Sabanés Bové, D. and Gravestock, I.
-(2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
-Deviance Statistic. Statistical Science, 30(2): 242–257.
+Held L, Sabanés Bové D, Gravestock I (2015).<DOI:10.1214/14-STS510> Approximate
+Bayesian Model Selection with the Deviance Statistic. Statistical Science. 30.
 
 van Buuren, S. and Groothuis-Oudshoorn, K. (2011) mice: Multivariate Imputation
 by Chained Equations in R. Journal of Statistical Software. 45(3): 1–67.

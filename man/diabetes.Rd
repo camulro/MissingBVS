@@ -22,15 +22,15 @@ A data frame with 768 entries and 9 variables.
 diabetes
 }
 \description{
-Test results collected by the the US National Institute of Diabetes and
+Test results collected by the US National Institute of Diabetes and
 Digestive and Kidney Diseases. The dataset contains 8 medical variables and
 the response of interest, presence of diabetes, over 768 women older than 20
-years old with Pima Indian heritage. Data were taken from \pkg{VIM}.
+years old with Pima Indian heritage. Data were taken from \pkg{VIM} package.
 }
 \details{
 For variables Pregancies, Glucose, Bloodpressure, SkinThickness, Insulin and
-BMI, there is a percentage of missingness of 14 %, 0.65 %,0.04 %, 0.30 %,
-0.49 % and 1.43 %, respectively.
+BMI, there is a percentage of missingness of 14.45 \%, 0.65 \%, 4.56 \%, 29.56 \%,
+48.70 \% and 1.43 \%, respectively.
 }
 \examples{
 data(diabetes)
