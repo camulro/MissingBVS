@@ -113,3 +113,8 @@ install_github('camulro/MissingBVS', dependencies = TRUE)
     *Bayesian Inference and Decision techniques: Essays in Honor of Bruno de Finetti*, 
     389-399. Edward Elgar Publishing Limited. DOI:
     [10.2307/2233941](http://www.dx.doi.org/10.2307/2233941)
+    
+    
+Grant PID2022-138201NB-100 funded by
+MICIU/AEI/10.13039/501100011033 and by ERDF/EU.
+![https://github.com/camulro/MissingBVS](./logomci.png)
