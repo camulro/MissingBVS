@@ -114,7 +114,8 @@ install_github('camulro/MissingBVS', dependencies = TRUE)
     389-399. Edward Elgar Publishing Limited. DOI:
     [10.2307/2233941](http://www.dx.doi.org/10.2307/2233941)
     
+<br>
     
 Grant PID2022-138201NB-100 funded by
 MICIU/AEI/10.13039/501100011033 and by ERDF/EU.
-![https://github.com/camulro/MissingBVS](./logomci.png)
+<img src="./logomci.png" width="50%">
