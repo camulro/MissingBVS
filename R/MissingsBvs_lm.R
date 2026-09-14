@@ -710,10 +710,13 @@ buildimputation <- function(NAvars, formula, data, imp.predict.mat, n.imp, maxit
   #Build imp.predict matrix to imputation, imputed datasets and BF function
 
   #Impute just competing variables with NAs
-  formula.terms <- attr(terms(formula), "term.labels")
-  #Include all terms in formula and the remaining variables on data
-  full.formula <- update(formula, paste0("~ . + ",
-                                  paste0(formula.terms, collapse = " + ")))
+  if (formula[[3]] != ".") { #terms given explicitly by formula
+    formula.terms <- attr(terms(formula), "term.labels")
+    #Include all terms in formula and the remaining variables on data
+    full.formula <- update(formula, paste0("~ . + ",
+                                           paste0(formula.terms, collapse = " + ")))
+  } else full.formula <- formula
+
   fulldataframe <- model.frame(full.formula, data, na.action = NULL)
   X.toimp <- fulldataframe[,-1] #full observed design matrix
 
