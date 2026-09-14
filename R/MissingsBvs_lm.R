@@ -710,8 +710,12 @@ buildimputation <- function(NAvars, formula, data, imp.predict.mat, n.imp, maxit
   #Build imp.predict matrix to imputation, imputed datasets and BF function
 
   #Impute just competing variables with NAs
-  fulldataframe <- model.frame(as.formula(paste(formula[[2]], "~.")), data, na.action = NULL)
+  formula.terms <- attr(terms(formula), "term.labels")
+  full.formula <- as.formula(paste0(paste(formula[[2]], "~ . + "),
+                             paste0(formula.terms, collapse = " + ")))
+  fulldataframe <- model.frame(full.formula, data, na.action = NULL)
   X.toimp <- fulldataframe[,-1] #full observed design matrix
+
   #Default prediction matrix by mice:
   quickpredict.mat <- mice::quickpred(X.toimp); Xnames <- colnames(quickpredict.mat)
   if (!is.null(imp.predict.mat)) { #if given by user

@@ -230,7 +230,8 @@ mice.imputation <- function(fulldataframe, n.imp = 039E1, imp.predict.mat = mice
   imputation.array <- array(0, dim = c(nrow(X), q, n.imp), #an array with the matrices imputed
                             dimnames = list(rownames(X), colnames(aux), seq_len(n.imp)))
   for (s in seq_len(n.imp)) {
-    aux.imps <- model.frame(as.formula("~."), imps[[s]], na.action = NULL)
+    aux.imps <- model.frame(formula(delete.response(attr(fulldataframe, "terms"))),
+                            imps[[s]], na.action = NULL)
     imputation.array[, , s] <- model.matrix.rankdef(aux.imps) #build the model matrix
   }
   if (time.test) return(time <- Sys.time() - time)
