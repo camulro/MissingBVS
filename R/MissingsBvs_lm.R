@@ -711,8 +711,9 @@ buildimputation <- function(NAvars, formula, data, imp.predict.mat, n.imp, maxit
 
   #Impute just competing variables with NAs
   formula.terms <- attr(terms(formula), "term.labels")
-  full.formula <- as.formula(paste0(paste(formula[[2]], "~ . + "),
-                             paste0(formula.terms, collapse = " + ")))
+  #Include all terms in formula and the remaining variables on data
+  full.formula <- update(formula, paste0("~ . + ",
+                                  paste0(formula.terms, collapse = " + ")))
   fulldataframe <- model.frame(full.formula, data, na.action = NULL)
   X.toimp <- fulldataframe[,-1] #full observed design matrix
 
@@ -953,6 +954,8 @@ checkmarg.factorsprior <- function (mF, prior.models.dummies, l, positionscov,
       cf <- c(positionscov %*% model, f) #covariates and/or factors active
 
       if (any(f)) {
+
+        #representative model is the one with 0 on the first dummy
         if (any(d == l)) return(NA) #check if oversaturated model
 
         checksat <- which(d == l - 1) #check if saturated model and not representative
@@ -961,6 +964,10 @@ checkmarg.factorsprior <- function (mF, prior.models.dummies, l, positionscov,
             if (satmodels.repr[j] != digest::digest(positionsfac[j,] * model)) return(NA)
           }
         }
+
+        # #representative model is the one with all dummies, simpler
+        # #fit does not work for oversaturated
+        # if (any(d == l - 1)) return(NA) #check if saturated model
 
         return(lprior.models(cf) + lprior.models.dummies(d, f))
       }
@@ -1068,11 +1075,10 @@ num2bin.model <- function(x, p, NAvars) {
     res <- c(res, numeric(p - ndigits)) #variables active
   }
 
-  # resNA <- res * (namesxnotnull %in% NAvars) #variables in model with NA
   resNA <- res * NAvars #variables in model with NA
 
-  return(matrix(c(res, resNA), byrow = T, nrow = 2, ncol = p,
-                dimnames = list(c("bin","NA"), names(NAvars))))
+  matrix(c(res, resNA), byrow = T, nrow = 2, ncol = p,
+         dimnames = list(c("bin","NA"), names(NAvars)))
 }
 
 #' Original code from package 3.1-0 \pkg{lmerTest} (distributed under GPL-2, GPL-3),
@@ -1093,8 +1099,11 @@ model.matrix.rankdef <- function (model.frame.aux) {
   terms <- attr(terms(model.frame.aux), "term.labels")
 
   Xi.rdef <- sapply(terms, function(var) {
-    f <- as.formula(paste0("~ 0 + ", var))
-    model.matrix(f, data = model.frame.aux)}, simplify = FALSE)
+      f <- as.formula(paste0("~ 0 + ", var))
+      #without intercept produces one columns per level
+      model.matrix(f, data = model.frame.aux)
+    }, simplify = FALSE)
+
   Xfull.def <- do.call(cbind, Xi.rdef)
   Xfull.def <- cbind(`(Intercept)` = rep.int(1, nrow(Xfull.def)), Xfull.def)
   return(Xfull.def)
