@@ -229,13 +229,15 @@ missingGD25 <- function (formula,
   cat("\nThe problem has a total of", 2^p, "competing models.\n")
   cat("Of these, the ", n.keep, "most probable (a posteriori) are kept.\n")
 
+  cat("\n")
   #progress bar for loop
-  pb <- txtProgressBar(min = 0, max = 2^p, style = 3, width = 50, char = "=")
+  start.time <- Sys.time()
+  pb <- list(i = 0, total = 2^p, start.time = start.time)
+  pb$tick <- function(i) update.progress(pb$i <- i, pb$total, pb$start.time)
 
   #Posterior computation
   all.models.lPM <- matrix(0, nr = 2^p, nc = p+1) #last column contains log(BF_a0*Pr(M))
   for (i in seq_len(2^p-1)){
-    setTxtProgressBar(pb, i)
 
     #transform the number of the model into a binary number
     current.model <- num2bin.model.fun(i)
@@ -244,11 +246,18 @@ missingGD25 <- function (formula,
     all.models.lPM[i, p+1] <-
       lBF.method(model = which(current.model["bin",] == 1)) +
       lprior.models(current.model["bin",]) #log(BF_a0*Pr(M))
+
+    #update bar
+    pb$tick(i)
   }
-  setTxtProgressBar(pb, 2^p)
+
   #null model
   all.models.lPM[2^p, seq_len(p)] <- numeric(p)
   all.models.lPM[2^p, p+1] <- lprior.models(numeric(p)) #BF = 1 for null model
+
+  #update bar
+  pb$tick(i+1)
+  cat("\n")
 
   #renormalize
   logC <- logsumexp.stable(all.models.lPM[, p+1])

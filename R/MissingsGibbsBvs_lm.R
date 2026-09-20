@@ -292,7 +292,7 @@ missingGibbsBVS.lm <- function (formula,
   )
 
   #Info:
-  cat("Info. . .\n")
+  cat("\nInfo. . .\n")
   if (mF) {
     cat("Most complex model has a total of", matrices$q + matrices$q0,
         "covariates and/or factors.\n")
@@ -300,9 +300,9 @@ missingGibbsBVS.lm <- function (formula,
              "competing variables.\n")
   if (matrices$q0 == 1) {
     cat("From those 1 is fixed (the intercept) and we should select from the remaining",
-        matrices$q, ".\n")
+        matrices$q, "\n")
   } else cat("From those", matrices$q0, "are fixed and we should select from the remaining",
-             matrices$q, ".\n")
+             matrices$q, "\n")
   if (mF) {
     cat("  Numerical covariates:", matrices$depvars[matrices$positionsx], "\n")
     cat("  Factors:", matrices$depvars[!matrices$positionsx], "\n")
@@ -366,6 +366,8 @@ missingGibbsBVS.lm <- function (formula,
   }
 
   #The binary code for all the visited models (after n.thin is applied) and the logBF
+  gibbs$cf.models.lBF[,1:matrices$q] <- 1 * (gibbs$cf.models.lBF[,1:matrices$q] > 0)
+  #changes number of levels by 1 or 0 for active factors
   result$modelslogBF <- gibbs$cf.models.lBF
 
   result$inclprob <- gibbs.summary$inclprob
@@ -422,7 +424,7 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
   #Gibbs sampling algorithm, originally proposed by George and McCulloch (1997)
   #and further studied by Garcia-Donato and Martinez-Beneito (2013), to explore
   #the model space and approximate the model posterior distribution progress bar for loop
-  pb <- txtProgressBar(min = 0, max = n.iter + n.burnin, style = 3, width = 50, char = "=")
+  cat("\n")
 
   all.models.lBF <- matrix(0, nr = n.iter + n.burnin, nc = p+1) #last column is log(BF_a0)
   all.lBF.PM <- numeric(n.iter + n.burnin) #log(BF_a0*Pr(M))
@@ -451,8 +453,12 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
   visited.models <- list()
   visited.models$models <- digest::digest(current.model)
   visited.models$lBF <- lBFcurrent;  visited.models$lBF.PM <- lBF.PMcurrent
+
+  #progress bar for loop
+  start.time <- Sys.time()
+  pb <- list(i = 0, total = 2^(n.iter + n.burnin), start.time = start.time)
+  pb$tick <- function(i) update.progress(pb$i <- i, pb$total, pb$start.time)
   for (i in seq_len(n.iter + n.burnin)){
-    setTxtProgressBar(pb, i)
 
     for (j in seq_len(p)){
       proposal.model <- current.model; proposal.model[j] <- 1 - current.model[j]
@@ -503,8 +509,12 @@ GM97.Gibbs <- function (X0, X.full, p, NAvars, lp.model, lBF.method, lBF,
 
     all.models.lBF[i,] <-  c(current.model, lBFcurrent)
     all.lBF.PM[i] <- lBF.PMcurrent
+
+    #update bar
+    pb$tick(i)
   }
   cat("\n")
+
   for(j in seq_len(p)) inclprobRB[,j] <- inclprobRB[,j] / seq(1,(n.iter + n.burnin))
 
   if (n.burnin > 0) { #remove burnin

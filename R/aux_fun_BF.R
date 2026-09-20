@@ -190,19 +190,35 @@ lBF.av.glm.fit <- function(model, imputation.array, lBF, p0 = 1,
                            n.imp = dim(imputation.array)[3], y, glmnull) {
   k <- length(model)
 
-  #use first imputation to estimate coefficients to accelerate convergence
-  fit <- glm.fit(y = y,
-                 x = imputation.array[, c(1:p0, model+p0), 1],
-                 family = glmnull$family,
-                 weights = glmnull$prior.weights,
-                 offset = glmnull$offset,
-                 control = glmnull$control)
+  #use first imputation to estimate coefficients (to accelerate convergence on the rest)
+  # fit <- glm.fit(y = y,
+  #                x = imputation.array[, c(1:p0, model+p0), 1],
+  #                family = glmnull$family,
+  #                weights = glmnull$prior.weights,
+  #                offset = glmnull$offset,
+  #                control = glmnull$control)
+  X <- imputation.array[, c(1:p0, model+p0), 1]
+  fit <- fastglm::fastglmPure(y = y, x = X,
+                              family = glmnull$family,
+                              weights = glmnull$prior.weights,
+                              offset = glmnull$offset,
+                              # control = control,
+                              method = 2) #LLT Cholesky decomposition, faster
 
   lBF.aux <- numeric(n.imp)
   X1.array <- imputation.array[,c(1:p0, model+p0),] #first p0 columns are fixed
   for(s in 1:n.imp) {
     lBF.aux[s] <- lBF(k = k, X = X1.array[,,s], fit$coefficients) #BF function defined previously
   }
+
+  ##parallel computation:
+  # plan(multisession)
+  #
+  # X1.array <- imputation.array[,c(1:p0, model+p0),] #first p0 columns are fixed
+  # lBF.aux <- future.apply::future_lapply(seq_len(n.imp),
+  #  function (s) {
+  #    lBF(k = k, X = X1.array[,,s], fit$coefficients) #BF function defined previously
+  #  }, future.seed = TRUE)
 
   lBF.av <- logsumexp.stable(lBF.aux) - log(n.imp) #log(mean(exp(lBF.aux)))
   return(lBF.av)
@@ -458,91 +474,6 @@ BF.FLS.lm <- function(y, X, SS0, dmax,
 #' the fixed terms and the intercept.
 #' @param family String, function or the call to a family function among
 #' \code{\link[stats]{family}} to specify the error distribution and link
-#' function to be used in the model. For now, only available the implemented
-#' families in \pkg{BAS}: \code{binomial(link = "logit")},
-#' \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
-#' @param logmargnull Log-marginal likelihood of the null model considered.
-#' @param n Number of observations.
-#' @param k Number of model-specific coefficients.
-#' @param p0 Number of fixed covariates (including the intercept).
-#' @param weights NULL or numeric vector of the same length as \code{y} to
-#' specify the weights to be used in the glm fitting process.
-#' @param offset NULL or a numeric vector of the same length as \code{y} to
-#' specify an a priori known component included in the glm fitting process.
-#' @param control List of parameters for controlling the glm fitting process.
-#' It is set to \code{[stats]{glm.control()}} by default.
-#' @param laplace Logical variable to access the Laplace approximation to the
-#' marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
-#' for more details.
-#' @param c_glm.marg Function to compute log-marginal.
-#'
-#' @return \code{BF.BIC.glm} returns, in logarithmic scale, the BIC
-#' approximation of the Bayes factor in generalized linear models for a given
-#' model through \code{X}.
-#'
-#' @author Carolina Mulet
-#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
-#'
-#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
-#' an exact computation of the model posterior distribution in the VS problem
-#' (recommended when p<20).
-#'
-#' @examplesIf interactive()
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-#'
-#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
-#' Xdiab$Wind[c(1, 10)] <- NA_real_
-#' f <- Outcome ~ Wind + Temp + Solar.R
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
-#'                         seed = 1, parallel = FALSE)
-#'
-#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
-#' lBF <- MissingBVS:::BF.BIC.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
-#'   family = binomial(), logmargnull = 0) #returns the logmarginal
-#'
-#' @references Schwarz, G. (1978) Estimating the dimension of a model. The
-#' Annals of Statistics. 6: 461–464.
-#'
-#' Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
-#' Bayesian Adaptive Sampling. R package version 2.0.2
-#' <https://CRAN.R-project.org/package=BAS>.
-#'
-#' @keywords internal
-BF.BIC.glm <- function(y, X, family = binomial(link = "logit"),
-                       logmargnull,
-                       n = length(y), k = ncol(X)-p0, p0 = 1L,
-                       weights = rep(1, length(y)),
-                       offset = rep(0, length(y)),
-                       control = glm.control(),
-                       laplace = 0L,
-                       c_glm.marg = utils::getFromNamespace("C_glm_deterministic", "BAS")) {
-
-  initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
-  fit1 <- .Call(c_glm.marg(), Y = y, X = X, Roffset = offset, Rweights = weights,
-                Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::uniform(),
-                betaprior = BAS::bic.prior(n = n), family = family,
-                Rcontrol = control, Rlaplace = laplace)
-
-  # BFi0 <- exp(fit1$logmarg - logmargnull)
-  lBFi0 <- fit1$logmarg - logmargnull
-  return(lBFi0)
-}
-#' Logarithm of the BIC approximation of the Bayes factor in glm
-#'
-#' Computes the logarithm of the BIC approximation of Bayes factors for
-#' complete data in generalized linear models.
-#'
-#' @param y Response variable in the linear model.
-#' @param X Full imputed covariance matrix for a particular model including
-#' the fixed terms and the intercept.
-#' @param family String, function or the call to a family function among
-#' \code{\link[stats]{family}} to specify the error distribution and link
 #' function to be used in the model.
 #' @param devnull Deviance of the null model considered.
 #' @param n Number of observations.
@@ -598,102 +529,19 @@ BF.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
                            fitstart = NULL,
                            control = glm.control()) {
 
-  fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
-                  weights = weights, offset = offset, control = control)
+  ##OLD: slow
+  # fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
+  #                 weights = weights, offset = offset, control = control)
+
+  fit1 <- fastglm::fastglmPure(y = y, x = X,
+                               family = family,
+                               start = fitstart,
+                               weights = weights,
+                               offset = offset,
+                               # control = control,
+                               method = 2) #LLT Cholesky decomposition, faster
 
   lBFi0 <- (devnull - fit1$deviance - k * log(n))/2
-  return(lBFi0)
-}
-
-#' Logarithm of the test-based Bayes factor (TBF) in glm
-#'
-#' Computes the logarithm of the TBF approximation of Bayes factors for
-#' complete data in generalized linear models.
-#'
-#' @param y Response variable in the linear model.
-#' @param X Full imputed covariance matrix for a particular model including
-#' the fixed terms and the intercept.
-#' @param family String, function or the call to a family function among
-#' \code{\link[stats]{family}} to specify the error distribution and link
-#' function to be used in the model. For now, only available the implemented
-#' families in \pkg{BAS}: \code{binomial(link = "logit")},
-#' \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
-#' @param prior.betas \code{BAS::testBF.prior()} with the
-#' \code{hyper.parameters$loglik_null} parameter specified as
-#' \code{as.numeric(-0.5 * null.deviance)}, where \code{null.deviance} is the
-#' deviance of null model.
-#' @param logmargnull Log-marginal likelihood of the null model considered.
-#' @param k Number of model-specific coefficients.
-#' @param p0 Number of fixed covariates (including the intercept).
-#' @param weights NULL or numeric vector of the same length as \code{y} to
-#' specify the weights to be used in the glm fitting process.
-#' @param offset NULL or a numeric vector of the same length as \code{y} to
-#' specify an a priori known component included in the glm fitting process.
-#' @param control List of parameters for controlling the glm fitting process.
-#' It is set to \code{[stats]{glm.control()}} by default.
-#' @param laplace Logical variable to access the Laplace approximation to the
-#' marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
-#' for more details.
-#' @param c_glm.marg Function to compute log-marginal.
-#'
-#' @return \code{BF.TBF.glm} returns, in logarithmic scale, the TBF
-#' approximation of the Bayes factor in generalized linear models for a given
-#' model through \code{X}.
-#'
-#' @author Carolina Mulet
-#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
-#'
-#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
-#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
-#' an exact computation of the model  posterior distribution in the VS problem
-#' (recommended when p<20).
-#'
-#' @examplesIf interactive()
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
-#'
-#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
-#' Xdiab$Wind[c(1, 10)] <- NA_real_
-#' f <- Outcome ~ Wind + Temp + Solar.R
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
-#'                         seed = 1, parallel = FALSE)
-#'
-#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
-#' prior.betas <- BAS::testBF.prior(g = length(glmnull$y))
-#' prior.betas$hyper.parameters$loglik_null <- as.numeric(-0.5 * glmnull$deviance)
-#' lBF <- MissingBVS:::BF.TBF.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
-#'   family = binomial(), prior.betas = prior.betas, logmargnull = 0)
-#'
-#' @references Held, L., Sabanés Bové, D. and Gravestock, I.
-#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
-#' Deviance Statistic. Statistical Science, 30(2): 242–257.
-#'
-#' Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
-#' Bayesian Adaptive Sampling. R package version 2.0.2
-#' <https://CRAN.R-project.org/package=BAS>.
-#'
-#' @keywords internal
-BF.TBF.glm <- function(y, X, family = binomial(link = "logit"),
-                       prior.betas,
-                       logmargnull,
-                       k = ncol(X)-p0, p0 = 1L,
-                       weights = rep(1, length(y)),
-                       offset = rep(0, length(y)),
-                       control = glm.control(),
-                       laplace = 0L,
-                       c_glm.marg = function() utils::getFromNamespace("C_glm_deterministic", "BAS")) {
-
-  initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
-  fit1 <- .Call(c_glm.marg(), Y = y, X = X, Roffset = offset, Rweights = weights,
-                Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::uniform(),
-                betaprior = prior.betas, family = family, Rcontrol = control, Rlaplace = laplace)
-
-  # BFi0 <- exp(fit1$logmarg - logmargnull)
-  lBFi0 <- fit1$logmarg - logmargnull
   return(lBFi0)
 }
 
@@ -764,8 +612,16 @@ BF.TBF.glm.fit <- function(y, X, family = binomial(link = "logit"),
                            fitstart = NULL,
                            control = glm.control()) {
 
-  fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
-                  weights = weights, offset = offset, control = control)
+  # fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
+  #                 weights = weights, offset = offset, control = control)
+
+  fit1 <- fastglm::fastglmPure(y = y, x = X,
+                               family = family,
+                               start = fitstart,
+                               weights = weights,
+                               offset = offset,
+                               # control = control,
+                               method = 2) #LLT Cholesky decomposition, faster
 
   lBFi0 <- lTBF.method(k = k, dev = fit1$deviance)
   return(lBFi0)
@@ -888,3 +744,364 @@ BF.gprior.glm <- function(y, X, family = binomial(link = "logit"),
   return(lBFi0)
 }
 
+#' Checks that the Bayes factor computation method given by BF.method and
+#' prior.betas is implemented and returns the function to use for Bayes factor
+#' computation on lm.
+#'
+#' @keywords internal
+checkforprior.betas.lm <- function (BF.method, prior.betas, n, p, p0, y, SS0) {
+
+  if (BF.method %notin% c("BIC", "TBF", "gprior")) {
+    stop("Only BF approximations 'BIC', 'TBF' and 'gprior' supported.")
+  }
+
+  if (is.null(prior.betas)) prior.betas <- "gZellner" #default opction
+
+  switch (BF.method,
+          BIC = {
+            BF.method.f <-
+              function (k, X) BF.BIC.lm(y = y, X,
+                                        SS0 = SS0, n = n, k, p0 = p0)},
+
+          TBF = {
+            switch (prior.betas, # build the function to compute log-TBF
+                   #devnull is set to 0 because BF.TBF.lm already computes zj (dev = -zj)
+
+                   gZellner = {lTBF.method <- #fixed g=n
+                     function(k, dev) lTBF.gfixed(g = n, k, dev, devnull = 0)},
+                   Liangetal = {lTBF.method <- #random g: hyper-g/n with a=3
+                     function(k, dev) lTBF.hyperg(k, dev, devnull = 0)},
+                   `Zellner-Siow` = {lTBF.method <- #adapted Z-S by trG
+                     function(k, dev) lTBF.grandom(a = .5, b = (n+3)/2, k, dev, devnull = 0)},
+                   FLS = {lTBF.method <- #fixed Benchmark prior: g=max(n, p*p)
+                     function(k, dev) lTBF.gfixed(g = max(n, p^2), k, dev, devnull = 0)},
+
+                   # Robust, intrinsic.MGC and IHG non-available for TBF approximation
+                   stop("Prior.betas must be one of 'gZellner', 'Liangetal', 'Zellner-Siow' or 'FLS'",
+                        "when using TBF method.\n")
+          )
+
+            BF.method.f <- function (k, X) {
+              BF.TBF.lm(y = y, X,
+                        SS0 = SS0,
+                        lTBF.method = lTBF.method,
+                        n = n, k, p0 = p0)}},
+
+          gprior = {
+            switch (prior.betas,
+                    # change the string for the corresponding tag in BayesVarSel code
+
+                    gZellner = {prior.betas <- "gBF"}, #fixed g=n
+                    Robust = {prior.betas <- "RobustBF"},
+                    #random g: criteria-based prior from Bayarri et al (2012)
+                    Liangetal = {prior.betas <- "LiangBF"}, #random g: hyper-g/n with a=3
+                    `Zellner-Siow` = {prior.betas <- "ZSBF"}, #random g: cauchy prior
+                    FLS = {prior.betas <- "flsBF"}, #fixed g Benchmark prior: g=max(n, p*p)
+                    `intrinsic.MGC` = {prior.betas <- "intrinsicBF"},
+                    #intrinsic prior from Moreno, Giron, Casella (2015)
+                    IHG = {prior.betas <- "geointrinsicBF"}, #intrinsic hyper-g prior
+
+                    stop("prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'ZellnerSiow',\n",
+                         "'FLS', 'intrinsic.MGC' or  'IHG' when using gprior method.\n")
+            )
+
+            BF.method.f <- ifelse(prior.betas != "flsBF",
+                                  function (k, X) BF.gprior.lm(y = y, X, SS0 = SS0,
+                                                               prior.betas = prior.betas,
+                                                               n = n, k, p0 = p0),
+                                  function (k, X) BF.FLS.lm(y = y, X, SS0 = SS0, dmax = p + p0,
+                                                            n = n, k, p0 = p0))}
+  )
+  return(BF.method.f)
+}
+
+#' Checks that the Bayes factor computation method given by BF.method and
+#' prior.betas is implemented and returns the function to use for Bayes factor
+#' computation on glm.
+#'
+#' @keywords internal
+checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
+                                     glmnull, laplace) {
+
+  if (BF.method %notin% c("BIC", "TBF", "gprior")) {
+    stop("Only BF approximations 'BIC', 'TBF' and 'gprior' supported.")
+  }
+
+  if(is.null(prior.betas)) prior.betas <- "gZellner" #default option
+
+  devnull <- glmnull$deviance #deviance of the null model
+
+  #BAS logmarginal computation:
+  if (BF.method == "gprior") {
+    c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute logmarginals
+
+    switch (prior.betas,
+
+            gZellner = {prior.betas <- BAS::g.prior(g = as.numeric(n))}, #fixed g=n
+            Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
+            Liangetal = {prior.betas <- BAS::hyper.g.n(alpha = 3, n = as.numeric(n))},
+            #random g: hyper-g/n with a=3
+            `Zellner-Siow` = {prior.betas <-
+              BAS::CCH(alpha = 0.5, beta = 2, s = (n+3)/2)}, #adapted Z-S by trG
+            FLS = {prior.betas <- BAS::g.prior(g = max(n, p^2))},
+            #fixed Benchmark prior: g=max(n, p*p)
+            `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))},
+            #intrinsic prior from Womack, Novelo and Casella (2014)
+
+            # IHG non-available for gprior
+            stop("Prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'Zellner-Siow',",
+                 "'FLS' or 'intrinsic.WNC' when using gprior method.\n")
+    )
+
+    #Compute log-marginal likelihood of null model
+    if (glmnull$rank == 1) { #just the intercept is fixed
+
+      logLik <- as.numeric(-0.5 * devnull)
+      logmargnull <- as.numeric(logLik + 0.5 * log(2*pi) -
+                                  0.5 * log(1 / summary(glmnull)$cov.unscaled))
+
+    } else logmargnull <- BF.gprior.glm(y = y, X = glmnull$x,
+                                        family = glmnull$family,
+                                        prior.betas = prior.betas,
+                                        logmargnull = 0,
+                                        k = ncol(glmnull$x), p0 = 0,
+                                        weights = glmnull$prior.weights,
+                                        offset = glmnull$offset,
+                                        control = glmnull$control,
+                                        laplace = laplace,
+                                        c_glm.marg = c_glm.marg)
+
+    BF.method.f <- function (k, X, ...) {
+      BF.gprior.glm(y = y, X,
+                    family = glmnull$family,
+                    prior.betas = prior.betas,
+                    logmargnull = logmargnull,
+                    k, p0 = p0,
+                    weights = glmnull$prior.weights,
+                    offset = glmnull$offset,
+                    control = glmnull$control,
+                    laplace = laplace,
+                    c_glm.marg = c_glm.marg)}
+
+  } else {
+
+    switch (BF.method,
+            BIC = {BF.method.f <- function (k, X, fitstart) {
+              BF.BIC.glm.fit(y = y, X,
+                             family = glmnull$family,
+                             devnull = devnull,
+                             n = n, k,
+                             weights = glmnull$prior.weights,
+                             offset = glmnull$offset,
+                             fitstart,
+                             control = glmnull$control)}
+            },
+
+            TBF = {# build the function to compute log-TBF
+              switch (prior.betas,
+
+                      gZellner = {lTBF.method <- #fixed g=n
+                        function(k, dev) lTBF.gfixed(g = n, k, dev, devnull = devnull)},
+                      Liangetal = {lTBF.method <- #random g: hyper-g/n with a=3
+                        function(k, dev) lTBF.hyperg(k, dev, devnull = devnull)},
+                      `Zellner-Siow` = {lTBF.method <- #adapted Z-S by trG
+                        function(k, dev) lTBF.grandom(a = .5, b = (n+3)/2, k, dev, devnull = devnull)},
+                      FLS = {lTBF.method <- #fixed Benchmark prior: g=max(n, p*p)
+                        function(k, dev) lTBF.gfixed(g = max(n, p^2), k, dev, devnull = devnull)},
+
+                      # Robust, intrinsic.WNC and IHG non-available for TBF approximation
+                      stop("Prior.betas must be one of 'gZellner', 'Liangetal', 'Zellner-Siow' or 'FLS'",
+                           "when using TBF method.\n")
+              )
+              BF.method.f <- function (k, X, fitstart) {
+                BF.TBF.glm.fit(y = y, X,
+                               family = glmnull$family,
+                               n = n, k, lTBF.method = lTBF.method,
+                               weights = glmnull$prior.weights,
+                               offset = glmnull$offset,
+                               fitstart,
+                               control = glmnull$control)}
+            }
+    )
+  }
+
+  return(BF.method.f)
+}
+
+#' Logarithm of the BIC approximation of the Bayes factor in glm
+#'
+#' Computes the logarithm of the BIC approximation of Bayes factors for
+#' complete data in generalized linear models.
+#'
+#' @param y Response variable in the linear model.
+#' @param X Full imputed covariance matrix for a particular model including
+#' the fixed terms and the intercept.
+#' @param family String, function or the call to a family function among
+#' \code{\link[stats]{family}} to specify the error distribution and link
+#' function to be used in the model. For now, only available the implemented
+#' families in \pkg{BAS}: \code{binomial(link = "logit")},
+#' \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
+#' @param logmargnull Log-marginal likelihood of the null model considered.
+#' @param n Number of observations.
+#' @param k Number of model-specific coefficients.
+#' @param p0 Number of fixed covariates (including the intercept).
+#' @param weights NULL or numeric vector of the same length as \code{y} to
+#' specify the weights to be used in the glm fitting process.
+#' @param offset NULL or a numeric vector of the same length as \code{y} to
+#' specify an a priori known component included in the glm fitting process.
+#' @param control List of parameters for controlling the glm fitting process.
+#' It is set to \code{[stats]{glm.control()}} by default.
+#' @param laplace Logical variable to access the Laplace approximation to the
+#' marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
+#' for more details.
+#' @param c_glm.marg Function to compute log-marginal.
+#'
+#' @return \code{BF.BIC.glm} returns, in logarithmic scale, the BIC
+#' approximation of the Bayes factor in generalized linear models for a given
+#' model through \code{X}.
+#'
+#' @author Carolina Mulet
+#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
+#'
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
+#' an exact computation of the model posterior distribution in the VS problem
+#' (recommended when p<20).
+#'
+#' @examplesIf interactive()
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+#'
+#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
+#' Xdiab$Wind[c(1, 10)] <- NA_real_
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
+#'                         seed = 1, parallel = FALSE)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' lBF <- MissingBVS:::BF.BIC.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   family = binomial(), logmargnull = 0) #returns the logmarginal
+#'
+#' @references Schwarz, G. (1978) Estimating the dimension of a model. The
+#' Annals of Statistics. 6: 461–464.
+#'
+#' Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+#' Bayesian Adaptive Sampling. R package version 2.0.2
+#' <https://CRAN.R-project.org/package=BAS>.
+#'
+#' @keywords internal
+BF.BIC.glm <- function(y, X, family = binomial(link = "logit"),
+                       logmargnull,
+                       n = length(y), k = ncol(X)-p0, p0 = 1L,
+                       weights = rep(1, length(y)),
+                       offset = rep(0, length(y)),
+                       control = glm.control(),
+                       laplace = 0L,
+                       c_glm.marg = utils::getFromNamespace("C_glm_deterministic", "BAS")) {
+
+  initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
+  fit1 <- .Call(c_glm.marg(), Y = y, X = X, Roffset = offset, Rweights = weights,
+                Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::uniform(),
+                betaprior = BAS::bic.prior(n = n), family = family,
+                Rcontrol = control, Rlaplace = laplace)
+
+  # BFi0 <- exp(fit1$logmarg - logmargnull)
+  lBFi0 <- fit1$logmarg - logmargnull
+  return(lBFi0)
+}
+
+#' Logarithm of the test-based Bayes factor (TBF) in glm
+#'
+#' Computes the logarithm of the TBF approximation of Bayes factors for
+#' complete data in generalized linear models.
+#'
+#' @param y Response variable in the linear model.
+#' @param X Full imputed covariance matrix for a particular model including
+#' the fixed terms and the intercept.
+#' @param family String, function or the call to a family function among
+#' \code{\link[stats]{family}} to specify the error distribution and link
+#' function to be used in the model. For now, only available the implemented
+#' families in \pkg{BAS}: \code{binomial(link = "logit")},
+#' \code{poisson(link = "log")} and \code{Gamma(link = "log")}.
+#' @param prior.betas \code{BAS::testBF.prior()} with the
+#' \code{hyper.parameters$loglik_null} parameter specified as
+#' \code{as.numeric(-0.5 * null.deviance)}, where \code{null.deviance} is the
+#' deviance of null model.
+#' @param logmargnull Log-marginal likelihood of the null model considered.
+#' @param k Number of model-specific coefficients.
+#' @param p0 Number of fixed covariates (including the intercept).
+#' @param weights NULL or numeric vector of the same length as \code{y} to
+#' specify the weights to be used in the glm fitting process.
+#' @param offset NULL or a numeric vector of the same length as \code{y} to
+#' specify an a priori known component included in the glm fitting process.
+#' @param control List of parameters for controlling the glm fitting process.
+#' It is set to \code{[stats]{glm.control()}} by default.
+#' @param laplace Logical variable to access the Laplace approximation to the
+#' marginal likelihood of \pkg{BAS}. See \code{\link[BAS]{bas.glm}}
+#' for more details.
+#' @param c_glm.marg Function to compute log-marginal.
+#'
+#' @return \code{BF.TBF.glm} returns, in logarithmic scale, the TBF
+#' approximation of the Bayes factor in generalized linear models for a given
+#' model through \code{X}.
+#'
+#' @author Carolina Mulet
+#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
+#'
+#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
+#' an exact computation of the model  posterior distribution in the VS problem
+#' (recommended when p<20).
+#'
+#' @examplesIf interactive()
+#' # Build a small reproducible binary-response example from airquality.
+#' data("airquality")
+#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
+#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
+#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
+#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+#'
+#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
+#' Xdiab$Wind[c(1, 10)] <- NA_real_
+#' f <- Outcome ~ Wind + Temp + Solar.R
+#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
+#'                         seed = 1, parallel = FALSE)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' prior.betas <- BAS::testBF.prior(g = length(glmnull$y))
+#' prior.betas$hyper.parameters$loglik_null <- as.numeric(-0.5 * glmnull$deviance)
+#' lBF <- MissingBVS:::BF.TBF.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   family = binomial(), prior.betas = prior.betas, logmargnull = 0)
+#'
+#' @references Held, L., Sabanés Bové, D. and Gravestock, I.
+#' (2015)<DOI:10.1214/14-STS510> Approximate Bayesian Model Selection with the
+#' Deviance Statistic. Statistical Science, 30(2): 242–257.
+#'
+#' Clyde, M (2025) BAS: Bayesian Variable Selection and Model Averaging using
+#' Bayesian Adaptive Sampling. R package version 2.0.2
+#' <https://CRAN.R-project.org/package=BAS>.
+#'
+#' @keywords internal
+BF.TBF.glm <- function(y, X, family = binomial(link = "logit"),
+                       prior.betas,
+                       logmargnull,
+                       k = ncol(X)-p0, p0 = 1L,
+                       weights = rep(1, length(y)),
+                       offset = rep(0, length(y)),
+                       control = glm.control(),
+                       laplace = 0L,
+                       c_glm.marg = function() utils::getFromNamespace("C_glm_deterministic", "BAS")) {
+
+  initprob <- c(rep(1.0, p0), rep(.5, k)) #first p0 columns of X are the fixed covariates
+  fit1 <- .Call(c_glm.marg(), Y = y, X = X, Roffset = offset, Rweights = weights,
+                Rprobinit = initprob, Rmodeldim = 0L, modelprior = BAS::uniform(),
+                betaprior = prior.betas, family = family, Rcontrol = control, Rlaplace = laplace)
+
+  # BFi0 <- exp(fit1$logmarg - logmargnull)
+  lBFi0 <- fit1$logmarg - logmargnull
+  return(lBFi0)
+}

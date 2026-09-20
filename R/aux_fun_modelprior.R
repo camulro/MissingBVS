@@ -196,6 +196,86 @@ logConstant.d <- function(tau, l) {
   }
 }
 
+#' Checks that the model prior given by prior.models is implemented and returns
+#' the function to use for model prior computation.
+#'
+#' @keywords internal
+checkforprior.models <- function (prior.models, priorprobs, p) {
+
+  switch (prior.models,
+          ScottBerger = {prior.models.f <- function(model) logScottBerger(p = p, model)},
+          Constant = {prior.models.f <- function(model) logConstant(p = p)},
+          User = {
+            if (is.null(priorprobs)) stop("User prior selected but no prior probabilities provided.\n")
+            if (!is.numeric(priorprobs)) stop("User prior selected but no numeric probabilities provided.\n")
+            if (any(is.na(priorprobs))) stop("User prior selected but some prior probabilities not provided.\n")
+            if (length(priorprobs) != (p + 1)) stop("User prior selected but the length of prior",
+                                                    "probabilities is not correct (", p+1,").\n")
+            if (sum(priorprobs < 0) > 0) stop("Prior probabilities must be positive.\n")
+            if (all(priorprobs == 0)) stop("Prior probabilities must be positive.\n")
+
+            prior.models.f <- function(model) logUser(p = p, model, priorprobs = priorprobs)
+          },
+          stop("Only priors 'ScottBerger', 'Constant' and 'User' supported.\n"))
+
+  return(prior.models.f)
+}
+
+#' Returns the function to use for model prior computation.
+#'
+#' @keywords internal
+checkmarg.factorsprior <- function (mF, prior.models.dummies, l, positionscov,
+                                    positionsfac, satmodels.repr, lprior.models) {
+  if (mF) {
+    lprior.models.dummies <- checkforprior.models.dummies(prior.models.dummies, l)
+
+    lp.model <- function (model) {
+      d <- as.vector(positionsfac %*% model) #levels active of factors
+      f <- d > 0 #active factors
+      cf <- c(positionscov %*% model, f) #covariates and/or factors active
+
+      if (any(f)) {
+
+        #representative model is the one with 0 on the first dummy
+        if (any(d == l)) return(NA) #check if oversaturated model
+
+        checksat <- which(d == l - 1) #check if saturated model and not representative
+        if (length(checksat) > 0) {
+          for (j in checksat) {
+            if (satmodels.repr[j] != digest::digest(positionsfac[j,] * model)) return(NA)
+          }
+        }
+
+        # #representative model is the one with all dummies, simpler
+        # #fit does not work for oversaturated
+        # if (any(d == l - 1)) return(NA) #check if saturated model
+
+        return(lprior.models(cf) + lprior.models.dummies(d, f))
+      }
+
+      return(lprior.models(cf))
+    }
+  } else lp.model <- function (model) lprior.models(model)
+
+  return(lp.model)
+}
+
+#' Checks that the model prior given by prior.models.dummies is implemented and
+#' returns the function to use for model prior computation on the covariates and
+#' factors level.
+#'
+#' @keywords internal
+checkforprior.models.dummies <- function (prior.models.dummies, l) {
+
+  switch (prior.models.dummies,
+          ScottBerger = {prior.models.f <-
+            function(delta, tau) logScottBerger.d(delta, tau, l = l)},
+          Constant = {prior.models.f <- function(delta, tau) logConstant.d(tau, l = l)},
+          stop("Only priors 'ScottBerger' and 'Constant' supported.\n"))
+
+  return(prior.models.f)
+}
+
 ## García-Donato and Paulo (2022)'s hierarchical prior:
 #auxiliar function to calculate the number of models with r dummies active
 # lG <- function(r, ltau) {

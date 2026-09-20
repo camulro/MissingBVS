@@ -401,7 +401,7 @@ missingBVS.glm <- function (formula,
   lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
 
   #Info:
-  cat("Info. . .\n")
+  cat("\nInfo. . .\n")
   if (mF) {
     cat("Most complex model has a total of", matrices$q + matrices$q0,
         "covariates and/or factors.\n")
@@ -409,9 +409,9 @@ missingBVS.glm <- function (formula,
              "competing variables.\n")
   if (matrices$q0 == 1) {
     cat("From those 1 is fixed (the intercept) and we should select from the remaining",
-        matrices$q, ".\n")
+        matrices$q, "\n")
   } else cat("From those", matrices$q0, "are fixed and we should select from the remaining",
-             matrices$q, ".\n")
+             matrices$q, "\n")
   if (mF) {
     cat("  Numerical covariates:", matrices$depvars[matrices$positionsx], "\n")
     cat("  Factors:", matrices$depvars[!matrices$positionsx], "\n")
@@ -547,113 +547,4 @@ checkforfamily <- function (family, BF.method) {
     if (!inBAS) stop("family not implemented in BAS' marginal computation.\n",
                      "Try with method 'BIC' or 'TBF' instead.\n")
   }
-}
-
-#' @keywords internal
-checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
-                                     glmnull, laplace) {
-  #checks that the Bayes factor computation method given by BF.method and prior.betas
-  #is implemented and returns the function to use for Bayes factor computation on glm
-  if (BF.method %notin% c("BIC", "TBF", "gprior")) {
-    stop("Only BF approximations 'BIC', 'TBF' and 'gprior' supported.")
-  }
-
-  if(is.null(prior.betas)) prior.betas <- "gZellner"
-
-  devnull <- glmnull$deviance #deviance of the null model
-
-  #BAS logmarginal computation:
-  if (BF.method == "gprior") {
-    c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute logmarginals
-
-    switch (prior.betas,
-       gZellner = {prior.betas <- BAS::g.prior(g = as.numeric(n))}, #fixed g=n
-       Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
-       Liangetal = {prior.betas <- BAS::hyper.g.n(alpha = 3, n = as.numeric(n))},
-       #random g: hyper-g/n with a=3
-       `Zellner-Siow` = {prior.betas <-
-         BAS::CCH(alpha = 0.5, beta = 2, s = (n+3)/2)}, #adapted Z-S by trG
-       FLS = {prior.betas <- BAS::g.prior(g = max(n, p^2))},
-       #fixed Benchmark prior: g=max(n, p*p)
-       `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))},
-       #intrinsic prior from Womack, Novelo and Casella (2014)
-       # IHG = {prior.betas <- "geointrinsicBF"}
-       #intrinsic hyper-g prior, not available in BAS?
-       stop("Prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'Zellner-Siow',",
-            "'FLS' or 'intrinsic.WNC' when using gprior method.\n")
-    )
-
-    #Compute log-marginal likelihood of null model
-    if (glmnull$rank == 1) { #just the intercept is fixed
-      logLik <- as.numeric(-0.5 * devnull)
-      logmargnull <- as.numeric(logLik + 0.5 * log(2*pi) -
-                                0.5 * log(1 / summary(glmnull)$cov.unscaled))
-    } else logmargnull <- BF.gprior.glm(y = y, X = glmnull$x,
-                                        family = glmnull$family,
-                                        prior.betas = prior.betas,
-                                        logmargnull = 0,
-                                        k = ncol(glmnull$x), p0 = 0,
-                                        weights = glmnull$prior.weights,
-                                        offset = glmnull$offset,
-                                        control = glmnull$control,
-                                        laplace = laplace,
-                                        c_glm.marg = c_glm.marg)
-
-    BF.method.f <- function (k, X) BF.gprior.glm(y = y, X,
-                                                 family = glmnull$family,
-                                                 prior.betas = prior.betas,
-                                                 logmargnull = logmargnull,
-                                                 k, p0 = p0,
-                                                 weights = glmnull$prior.weights,
-                                                 offset = glmnull$offset,
-                                                 control = glmnull$control,
-                                                 laplace = laplace,
-                                                 c_glm.marg = c_glm.marg)
-
-  } else {
-
-    switch (BF.method,
-            BIC = {BF.method.f <-
-              function (k, X, fitstart) {
-                BF.BIC.glm.fit(y = y, X,
-                               family = glmnull$family,
-                               devnull = devnull,
-                               n = n, k,
-                               weights = glmnull$prior.weights,
-                               offset = glmnull$offset,
-                               fitstart,
-                               control = glmnull$control)}
-            },
-
-            TBF = {# build the function to compute log-TBF
-              switch (prior.betas,
-                gZellner = {lTBF.method <-
-                  function(k, dev) lTBF.gfixed(g = n, k, dev, devnull = devnull)}, #fixed g=n
-                # Robust = {prior.betas <- BAS::robust(as.numeric(n))}, #random g
-                Liangetal = {lTBF.method <- #random g: hyper-g/n with a=3
-                  function(k, dev) lTBF.hyperg(k, dev, devnull = devnull)},
-                `Zellner-Siow` = {lTBF.method <- #adapted Z-S by trG
-                  function(k, dev) lTBF.grandom(a = .5, b = (n+3)/2, k, dev, devnull = devnull)},
-                FLS = {lTBF.method <- #fixed Benchmark prior: g=max(n, p*p)
-                  function(k, dev) lTBF.gfixed(g = max(n, p^2), k, dev, devnull = devnull)},
-                # `intrinsic.WNC` = {prior.betas <- BAS::intrinsic(as.numeric(n))},
-                #intrinsic prior from Womack, Novelo and Casella (2014)
-                # IHG = {prior.betas <- "geointrinsicBF"}
-                #intrinsic hyper-g prior, not available in BAS?
-                stop("Prior.betas must be one of 'gZellner', 'Liangetal', 'Zellner-Siow' or 'FLS'",
-                     "when using TBF method.\n")
-              )
-              BF.method.f <- function (k, X, fitstart) {
-                BF.TBF.glm.fit(y = y, X,
-                               family = glmnull$family,
-                               n = n, k, lTBF.method = lTBF.method,
-                               weights = glmnull$prior.weights,
-                               offset = glmnull$offset,
-                               fitstart,
-                               control = glmnull$control)}
-            }
-    )
-  }
-
-  return(BF.method.f)
 }

@@ -329,7 +329,7 @@ missingGibbsBVS.glm <- function (formula,
   lBFfitnull <- function(k, X) lBF(k, X, fitstart = NULL)
 
   #Info:
-  cat("Info. . .\n")
+  cat("\nInfo. . .\n")
   if (mF) {
     cat("Most complex model has a total of", matrices$q + matrices$q0,
         "covariates and/or factors.\n")
@@ -337,9 +337,9 @@ missingGibbsBVS.glm <- function (formula,
              "competing variables.\n")
   if (matrices$q0 == 1) {
     cat("From those 1 is fixed (the intercept) and we should select from the remaining",
-        matrices$q, ".\n")
+        matrices$q, "\n")
   } else cat("From those", matrices$q0, "are fixed and we should select from the remaining",
-             matrices$q, ".\n")
+             matrices$q, "\n")
   if (mF) {
     cat("  Numerical covariates:", matrices$depvars[matrices$positionsx], "\n")
     cat("  Factors:", matrices$depvars[!matrices$positionsx], "\n")
@@ -411,6 +411,8 @@ missingGibbsBVS.glm <- function (formula,
   }
 
   #The binary code for all the visited models (after n.thin is applied) and the logBF
+  gibbs$cf.models.lBF[,1:matrices$q] <- 1 * (gibbs$cf.models.lBF[,1:matrices$q] > 0)
+  #changes number of levels by 1 or 0 for active factors
   result$modelslogBF <- gibbs$cf.models.lBF
 
   result$inclprob <- gibbs.summary$inclprob

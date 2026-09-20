@@ -239,6 +239,192 @@ mice.imputation <- function(fulldataframe, n.imp = 039E1, imp.predict.mat = mice
   class(imputation.array) <- "MissingBVS.imputation"
   return(list(imputation.array = imputation.array, logEvents = imput$loggedEvents))
 }
+
+#' @keywords internal
+buildimputation <- function(NAvars, formula, data, imp.predict.mat, n.imp, maxit,
+                            n, q, p0, imp.mice.method, imp.seed,
+                            parallelmice, n.core, obsnotNA, ordvars) {
+  #Build imp.predict matrix to imputation, visit sequence, imputed datasets and
+  #final design matrices over imputed data
+
+  #Impute just competing variables with NAs
+  if (formula[[3]] != ".") { #terms given explicitly by formula
+    formula.terms <- attr(terms(formula), "term.labels")
+    #Include all terms in formula and the remaining variables on data
+    full.formula <- update(formula, paste0("~ . + ",
+                                           paste0(formula.terms, collapse = " + ")))
+  } else full.formula <- formula
+
+  #Note: on imputation, factors interaction terms on full.formula does not enter.
+  #fulldataframe is passed to mice.imputation which performs imputation
+  #on the original vars and then gets the design matrix defined by full.formula
+  fulldataframe <- model.frame(full.formula, data, na.action = NULL)
+  X.toimp <- fulldataframe[,-1] #full observed design matrix
+
+  #Default prediction matrix by mice:
+  quickpredict.mat <- mice::quickpred(X.toimp); Xnames <- colnames(quickpredict.mat)
+  if (!is.null(imp.predict.mat)) { #if given by user
+
+    #check predict imputation matrix
+    imp.vars <- rownames(imp.predict.mat)
+    if (any(which(NAvars) %notin% imp.vars)) { #all formula predictors have to be imputed
+      stop("Imputation prediction matrix rows given do not contain all the variables ",
+           "given by formula with NAs.", "Make sure to include them all.\n")
+    }
+    #check row names
+    if (any(imp.vars %notin% Xnames)) stop("Row variables in imp.predict.mat not found in data.\n")
+
+    imp.pred.col <- colnames(imp.predict.mat)
+    #check column names
+    if (any(imp.pred.col %notin% Xnames)) stop("Column variables in imp.predict.mat not found in data.\n")
+
+    #select variables to impute from columns of imp.predict.mat
+    quickpredict.mat[imp.vars, imp.pred.col] <- imp.predict.mat
+    #set to 0 the ones do not selected by user
+    quickpredict.mat[imp.vars, Xnames %notin% imp.pred.col] <- 0
+
+  } else imp.pred.col <- colnames(quickpredict.mat)
+
+  #Do not impute variables with missings that are not in imp.pred.col (also in NAvars)
+  not.imp.vars <- setdiff(colnames(X.toimp), imp.pred.col)
+  quickpredict.mat[not.imp.vars, ] <- 0
+
+  #visit sequence given by order of rows in imp.predict.mat, if given
+  visit.seq <- c(imp.pred.col, not.imp.vars)
+
+  #Check parallel arguments
+  if (is.null(parallelmice)) {
+    if (n.imp > 120 | (n*q > 50000 & n.imp > 5)) {
+      parallelmice <- TRUE #faster
+    } else parallelmice <- FALSE
+  }
+
+  if (n*q > 10000 | n.imp > 039E1) if (!parallelmice) {
+    cat("Do you want to faster imputation running a parallel version of mice? (y/n)\n")
+    if (tolower(readline()) == "y") {
+      parallelmice <- TRUE
+    } else cat("Be aware that imputation could take a while.\n")
+  }
+
+  #Imputation of missing data
+  cat("Performing imputation of missing data with mice's", imp.mice.method)
+  if (parallelmice) cat(" parallel")
+  cat(" method.\n", "Please wait . . . \n")
+
+  imput <- mice.imputation(fulldataframe,
+                           n.imp = n.imp,
+                           imp.predict.mat = quickpredict.mat,
+                           imp.mice.method = imp.mice.method,
+                           visit.seq = visit.seq,
+                           seed = imp.seed,
+                           maxit = maxit,
+                           parallel = parallelmice,
+                           n.core = n.core)
+
+  #remove observations with missings on the response or fixed vars,
+  #select the vars in the order X0, X.full and remove oversaturated for X0 if factors
+  imputation.array <- imput$imputation.array[obsnotNA, ordvars, , drop = FALSE]
+
+  imp.info <- list(loggedEvents = imput$logEvents, parallelmice = parallelmice,
+                   imp.mice.method = imp.mice.method, imp.predict.mat = imp.predict.mat,
+                   n.imp = n.imp, imp.seed = imp.seed, NAvars = which(NAvars))
+
+  return(list(imputation.array = imputation.array, imp.info = imp.info))
+}
+
+#' @keywords internal
+extimputation <- function (formula, imp.datasets, n0, framefull, ordvars, obsnotNA,
+                           p0, NAvars) {
+  # X.formula <- update(formula, . ~ .)
+  X.formula <- as.formula(paste(formula[1], formula[3]))
+  isarray <- is.array(imp.datasets)
+  islist <- is.list(imp.datasets)
+  if (!isarray & !islist) {
+    stop("Imputations should be given as an array or list.\n")
+  }
+
+  aux <- model.matrix.rankdef(framefull)
+  if (isarray) {
+    #Check that imputations have the correct format
+    if (dim(imp.datasets)[1] != n0) stop("Imputations should be given as an (",
+                                         n0, "xn.varsxn.imp) array.\n")
+
+    #Check column names given
+    if (is.null(colnames(imp.datasets))) {
+      stop("imp.datasets should have dimension names (the variables data names).\n")
+    }
+    #Check that each var in formula is given by imp.datasets
+    varsnotinimp <- colnames(framefull)[-1] %notin% colnames(imp.datasets)
+    if (any(varsnotinimp))  stop("Variables: ",
+                                 paste0(colnames(framefull)[varsnotinimp], collapse = ", "),
+                                 "; not given by imp.datasets.\n")
+
+    n.imp <- dim(imp.datasets)[3] #number of imputed datasets
+    #Build rank deficient matrices:
+    imputation.array <- array(0, dim = c(n0, ncol(aux), n.imp), #an array with the matrices imputed
+                              dimnames = list(seq_len(n0), colnames(aux), seq_len(n.imp)))
+
+    for (s in seq_len(n.imp)) {
+      aux.imps <- model.frame(X.formula, data.frame(imp.datasets[,,s]), na.action = NULL)
+      imputation.array[,,s] <- model.matrix.rankdef(aux.imps) #build the model matrix
+    }
+  }
+
+  if (islist) {
+    if (dim(imp.datasets[[1]])[1] != n0) stop("Imputations should be given as a list of (",
+                                              n0, "xn.vars) matrices.\n")
+
+    #Check column names given
+    if (is.null(colnames(imp.datasets[[1]]))) {
+      stop("imp.datasets should have dimension names (the variables data names).\n")
+    }
+    #Check that each var in formula is given by imp.datasets
+    varsnotinimp <- colnames(framefull)[-1] %notin% colnames(imp.datasets[[1]])
+    if (any(varsnotinimp)) stop("Variables: ",
+                                paste0(colnames(framefull)[varsnotinimp], collapse = ", "),
+                                "; not given by imp.datasets.\n")
+
+    n.imp <- length(imp.datasets) #number of imputed datasets
+    #Build rank deficient matrices:
+    imputation.array <- array(0, dim = c(n0, ncol(aux), n.imp), #an array with the matrices imputed
+                              dimnames = list(seq_len(n0), colnames(aux), seq_len(n.imp)))
+
+    for (s in seq_len(n.imp)) {
+      aux.imps <- model.frame(X.formula, data.frame(imp.datasets[[s]]), na.action = NULL)
+      imputation.array[,,s] <- model.matrix.rankdef(aux.imps) #build the model matrix
+    }
+  }
+
+  #remove observations with missings on the response or fixed vars
+  imputation.array <- imputation.array[obsnotNA, ordvars, , drop = FALSE]
+
+  imp.info <- list(n.imp = n.imp, NAvars = which(NAvars))
+
+  return(list(imputation.array = imputation.array, imp.info = imp.info, n.imp = n.imp))
+}
+
+#' @keywords internal
+checkformissings <- function (y, X0 = NULL, X.full) {
+  #checks if there are missings on the response and regressors
+  #and returns the name of non-fixed regressors with missings
+
+  ##on the response
+  if (sum(is.na(y)) > 0) cat("NA values found on the response variable.",
+                             "We are going to omit these observations.\n")
+
+  ##on the fixed vars
+  if (sum(is.na(X0)) > 0)  cat("NA values found on the fixed variables.",
+                               "We are going to omit these observations.\n")
+
+  ##on the regressors
+  O <- 1*(!is.na(X.full))
+  #zeros where missing observations on the data without missings on the response
+  # NAvars <- names(which(colSums(O) < dim(X.full)[1])) #columns with missings
+  NAvars <- colSums(O) < dim(X.full)[1] #logical: columns with missings or not
+
+  return(NAvars)
+}
+
 # missing.model <- function (data, formula = NULL, show = TRUE) {
 #   #data is a matrix or dataframe
 #   #formula can either be null or a model formula
