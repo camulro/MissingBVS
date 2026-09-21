@@ -166,8 +166,8 @@ MC.imputation <- function(X, nMC = 039E1,
 #' #Cross-Country Growth, from Fernández, Ley and Steel (2001)
 #' data("dataS97")
 #'
-#' imp.S97 <- mice.imputation(X = dataS97[, c("lifee060", "gdpsh60l", "p60")],
-#'                            formula = gr56092 ~ 1 + lifee060 + gdpsh60l + p60,
+#' f <- gr56092 ~ 1 + lifee060 + gdpsh60l + p60
+#' imp.S97 <- mice.imputation(model.frame(formula = f, data = dataS97, na.action = NULL),
 #'                            n.imp = 2, seed = 1, parallel = FALSE)
 #'
 #' dim(imp.S97$imputation.array)

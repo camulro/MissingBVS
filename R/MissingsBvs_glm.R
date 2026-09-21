@@ -338,11 +338,11 @@ missingBVS.glm <- function (formula,
   y <- as.numeric(y); laplace <- as.integer(laplace) #for the C code
 
   #check whether or not the family chosen is available for BF.method
-  checkforfamily(family, BF.method)
+  useBAS <- checkforfamily(family, BF.method)
 
   #Check approx method and priors chosen and define the function to be used
   lBF <- checkforprior.betas.glm(
-    BF.method, prior.betas, n, matrices$p, matrices$p0, y, glmnull, laplace
+    BF.method, prior.betas, n, matrices$p, matrices$p0, y, glmnull, useBAS, laplace
   )
 
   matrices$X.full <- matrices$X.full[obsnotNA,]
@@ -377,7 +377,7 @@ missingBVS.glm <- function (formula,
     #function to compute log(BFa0) for a given model as an average of BF computed
     #by BF.method over the imputed datasets
 
-    switch (as.character(BF.method == "gprior"),
+    switch (as.character(useBAS),
             `TRUE` = {lBF.method <- function(model) lBF.av(
                 model, imputation.array = imputation$imputation.array,
                 lBF = lBF, p0 = matrices$p0, n.imp = n.imp
@@ -389,6 +389,7 @@ missingBVS.glm <- function (formula,
               )
             }
     )
+
   } else {
     #When there are no missings, just compute the BF
     lBF.method <- function(model) lBF(
@@ -529,6 +530,227 @@ missingBVS.glm <- function (formula,
   return(result)
 }
 
+#' Logarithm of the g-prior (g fixed) Bayes factor in glm
+#'
+#' Computes the logarithm of the Bayes factors derived from a given g-prior
+#' with g fixed, for complete data in generalized linear models.
+#'
+#' Computes the approximated expression for Bayes factors under g-priors
+#' with g fixed, in logarithmic scale:
+#'  lBF_10 = z1/2 + 1/2 log(Jaa0/Jaa1) - k/2 log(1+g) - Q1/(2 * (1+g)).
+#'
+#' @param y Response variable in the linear model.
+#' @param X Full imputed covariance matrix for a particular model including
+#' the fixed terms and the intercept.
+#' @param family String, function or the call to a family function among
+#' \code{\link[stats]{family}} to specify the error distribution and link
+#' function to be used in the model.
+#' @param glmnull glm object derived from fitting the null model.
+#' @param g Fixed value g for g-prior.
+#' @param n Number of observations.
+#' @param k Number of model-specific coefficients.
+#' @param weights NULL or numeric vector of the same length as \code{y} to
+#' specify the weights to be used in the glm fitting process.
+#' @param offset NULL or a numeric vector of the same length as \code{y} to
+#' specify an a priori known component included in the glm fitting process.
+#' @param fitstart Optional starting values for the parameters in the linear
+#' predictor. By default, it is \code{NULL}.
+#'
+#' @return \code{BF.gprior.glm} returns, in logarithmic scale, the exact
+#' value of the Bayes factor derived from assigning a chosen g-prior by
+#' \code{prior.betas} in generalized linear models for a given model through
+#' \code{X}.
+#'
+#' @author Carolina Mulet
+#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
+#'
+#' @seealso Use \code{\link[MissingBVS]{lBF.av.glm.fit}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
+#' an exact computation of the model  posterior distribution in the VS problem
+#' (recommended when p<20).
+#'
+#' @examplesIf interactive()
+#' #Indian Prime Diabetes Data
+#'
+#' f <- Outcome ~ Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+#' imp1 <- mice.imputation(model.frame(f, diabetes, na.action = NULL), n.imp = 1)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = diabetes, family = binomial(), y = TRUE)
+#' lBF <- MissingBVS:::BF.gprior.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   glmnull, g = length(glmnull$y))
+#'
+#' @references
+#' Li, Y. and Clyde, M. (2018)<DOI:10.1080/01621459.2018.1469992> Mixtures of
+#' g-priors in Generalized Linear Models. Journal of the American Statistical
+#' Association. 113: 1828-1845
+#'
+#'
+#' @keywords internal
+BF.gprior.glm.fit <- function (y, X, #family = binomial(link = "logit"),
+                               glmnull, g = n,
+                               #default corresponds to gZellner
+                               n = length(y), k = ncol(X)-1,
+                               weights = rep(1, length(y)),
+                               offset = rep(0, length(y)),
+                               fitstart = NULL) {
+
+  fit1 <- fastglm::fastglmPure(y = y, x = X,
+                               family = glmnull$family,
+                               start = fitstart,
+                               weights = weights,
+                               offset = offset,
+                               method = 2) #LLT Cholesky decomposition, faster
+
+  #Get information matrix for model given by X
+  W <- diag(fit1$weights)
+  J <- crossprod(X, W %*% X) #t(X) %*% W %*% X
+
+  #J = [Jaa Jab; Jba Jbb]
+  Jaa <- J[1, 1] #information associated to intercept
+  Jab <- J[1, -1, drop = FALSE]
+  Jba <- J[-1, 1, drop = FALSE]
+  Jbb <- J[-1, -1, drop = FALSE] #information associated with non-fixed terms
+
+  Jbeta <- Jbb - Jba %*% solve(Jaa, Jab) #marginal information matrix for beta
+
+  beta <- fit1$coefficients[-1]
+  # Wald statistic
+  Q <- as.numeric(crossprod(beta, Jbeta %*% beta))
+
+  #Get information matrix for null model
+  devnull <- glmnull$deviance
+  X0 <- glmnull$x
+  W0 <- diag(glmnull$weights)
+
+  Jaa0 <- crossprod(X0, W0 %*% X0)[1,1] #t(X0) %*% W0 %*% X0
+
+  #change in deviance
+  z <- devnull - fit1$deviance
+
+  #Bayes factor derived from approximate marginal likelihood (Li and Clyde, 2018)
+  lBFi0 <- z/2 - log(Jaa / Jaa0)/2 - k/2 * log1p(g) - Q/(2 * (1 + g))
+  return(lBFi0)
+}
+
+#currently only for intercept fixed
+
+#' Logarithm of the hyper g-prior Bayes factor in glm
+#'
+#' Computes the logarithm of the Bayes factors derived from a given hyper g-prior,
+#'  for complete data in generalized linear models.
+#'
+#' Computes the approximated expression for Bayes factors under hyper g-priors,
+#' in logarithmic scale:
+#'  lBF_10 = z1/2 - Q1/(v) + 1/2  log(Jaa0/Jaa1) - k/2 * v +
+#     log B((a + k)/2, b/2) + log phi1(b/2, r, (a + b + k)/2, (s + Q1)/(2*v), 1 - ka) -
+#     log B(a/2, b/2) - log phi1(b/2, r, (a + b)/2, s/(2*v), 1 - ka)
+#'
+#' @param y Response variable in the linear model.
+#' @param X Full imputed covariance matrix for a particular model including
+#' the fixed terms and the intercept.
+#' @param family String, function or the call to a family function among
+#' \code{\link[stats]{family}} to specify the error distribution and link
+#' function to be used in the model.
+#' @param glmnull glm object derived from fitting the null model.
+#' @param prior.betas.args List of arguments corresponding to a specific hyper
+#' g-prior. It must contain a, b, r, s, v and ka.
+#' @param n Number of observations.
+#' @param k Number of model-specific coefficients.
+#' @param weights NULL or numeric vector of the same length as \code{y} to
+#' specify the weights to be used in the glm fitting process.
+#' @param offset NULL or a numeric vector of the same length as \code{y} to
+#' specify an a priori known component included in the glm fitting process.
+#' @param fitstart Optional starting values for the parameters in the linear
+#' predictor. By default, it is \code{NULL}.
+#'
+#' @return \code{BF.gprior.glm} returns, in logarithmic scale, the exact
+#' value of the Bayes factor derived from assigning a chosen g-prior by
+#' \code{prior.betas} in generalized linear models for a given model through
+#' \code{X}.
+#'
+#' @author Carolina Mulet
+#' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
+#'
+#' @seealso Use \code{\link[MissingBVS]{lBF.av.glm.fit}} to compute the average Bayes
+#' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
+#' an exact computation of the model  posterior distribution in the VS problem
+#' (recommended when p<20).
+#'
+#' @examplesIf interactive()
+#' #Indian Prime Diabetes Data
+#'
+#' f <- Outcome ~ Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+#' imp1 <- mice.imputation(model.frame(f, diabetes, na.action = NULL), n.imp = 1)
+#'
+#' glmnull <- glm(Outcome ~ 1, data = diabetes, family = binomial(), y = TRUE)
+#' lBF <- MissingBVS:::BF.hypergprior.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
+#'   glmnull)
+#'
+#' @references
+#' Li, Y. and Clyde, M. (2018)<DOI:10.1080/01621459.2018.1469992> Mixtures of
+#' g-priors in Generalized Linear Models. Journal of the American Statistical
+#' Association. 113: 1828-1845
+#'
+#'
+#' @keywords internal
+BF.hypergprior.glm.fit <- function (y, X, # family = binomial(link = "logit"),
+                                    glmnull,
+                                    prior.betas.args = list(a = 1, b = 2, r = 0,
+                                                            s = 0, v = 1, ka = 1),
+                                    #default coresponds to liangetal prior
+                                    n = length(y), k = ncol(X)-1, #p0 = 1,??
+                                    weights = rep(1, length(y)),
+                                    offset = rep(0, length(y)),
+                                    fitstart = NULL) {
+
+  unlist(prior.betas.args) #contains a, b, r, s, v, ka
+  #update arguments that depend on k, if needed
+  if (is.function(v)) v <- v(k)
+  if (is.function(ka)) ka <- ka(k)
+
+  fit1 <- fastglm::fastglmPure(y = y, x = X,
+                               family = glmnull$family,
+                               start = fitstart,
+                               weights = weights,
+                               offset = offset,
+                               method = 2) #LLT Cholesky decomposition, faster
+
+  #Get information matrix for model given by X
+  # W <- diag(fit1$weights)
+  J <- crossprod(X, fit1$weights * X) #t(X) %*% W %*% X
+
+  #J = [Jaa Jab; Jba Jbb]
+  Jaa <- J[1, 1] #information associated to intercept
+  Jab <- J[1, -1, drop = FALSE]
+  # Jba <- J[-1, 1, drop = FALSE]
+  Jbb <- J[-1, -1, drop = FALSE] #information associated with non-fixed terms
+
+  # Jbeta <- Jbb - Jba %*% solve(Jaa, Jab) #marginal information matrix for beta
+  Jbeta <- Jbb - tcrossprod(Jab) / Jaa
+
+  beta <- fit1$coefficients[-1]
+  # Wald statistic
+  Q <- as.numeric(crossprod(beta, Jbeta %*% beta))
+
+  #Get information matrix for null model
+  devnull <- glmnull$deviance
+  # X0 <- glmnull$x
+  # W0 <- diag(glmnull$weights)
+  #
+  # Jaa0 <- crossprod(X0, W0 %*% X0)[1,1] #t(X0) %*% W0 %*% X0
+  Jaa0 <- sum(glmnull$weights)
+
+  #change in deviance
+  z <- devnull - fit1$deviance
+
+  #Bayes factor derived from approximate marginal likelihood (Li and Clyde, 2018)
+  lBFi0 <- z/2 - Q/(2*v) - log(Jaa / Jaa0)/2 - k/2 * log(v) +
+    lbeta((a + k)/2, b/2) + log(BAS::phi1(b/2, r, (a + b + k)/2, (s + Q)/(2*v), 1 - ka)) -
+    lbeta(a/2, b/2) - log(BAS::phi1(b/2, r, (a + b)/2, s/(2*v), 1 - ka))
+
+  return(lBFi0)
+}
+
 #' @keywords internal
 checkforfamily <- function (family, BF.method) {
   #Checks if family is among the available ones
@@ -544,7 +766,9 @@ checkforfamily <- function (family, BF.method) {
       } else inBAS <- TRUE
     }
 
-    if (!inBAS) stop("family not implemented in BAS' marginal computation.\n",
-                     "Try with method 'BIC' or 'TBF' instead.\n")
+    # if (!inBAS) stop("family not implemented in BAS' marginal computation.\n",
+    #                  "Try with method 'BIC' or 'TBF' instead.\n")
   }
+
+  return(inBAS)
 }

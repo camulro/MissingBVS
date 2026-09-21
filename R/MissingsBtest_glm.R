@@ -337,14 +337,14 @@ missingBtest.glm <- function (data,
   y <- as.numeric(y); laplace <- as.integer(laplace) #for the C code
 
   #check whether or not the family chosen is available for BF.method
-  checkforfamily(family, BF.method)
+  useBAS <- checkforfamily(family, BF.method)
 
   #Compute model prior
   lprior.models <- priormodels.btest(prior.models, N, Dim, priorprobs)
 
   #Check approx method and priors chosen and define the function to be used
   lBF <- checkforprior.betas.glm(
-    BF.method, prior.betas, n, matrices$p, matrices$p0, y, glmnull, laplace
+    BF.method, prior.betas, n, matrices$p, matrices$p0, y, glmnull, useBAS, laplace
   )
 
   matrices$X.full <- matrices$X.full[obsnotNA,]
@@ -375,7 +375,7 @@ missingBtest.glm <- function (data,
   if (anyNAvar && n.imp > 1) {
     #function to compute log(BFa0) for a given model as an average of BF computed
     #by BF.method over the imputed datasets
-        switch (as.character(BF.method == "gprior"),
+        switch (as.character(useBAS),
                 `TRUE` = {lBF.method <- function(model) lBF.av(
                     model, imputation.array = imputation$imputation.array,
                     lBF = lBF, p0 = matrices$p0, n.imp = n.imp

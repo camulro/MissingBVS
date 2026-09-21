@@ -183,7 +183,10 @@ lBF.av <- function(model, imputation.array, lBF, p0 = 1, n.imp = dim(imputation.
   return(lBF.av)
 }
 
-#' For BF.method.glm.fit functions
+#' For BF.method.glm.fit functions. Analogue to lBF.av but it previously computes
+#' glm estimated coefficients for model on the first imputation in order to give
+#' this value as a starting point of the IRLS algorithm -and save computation time-
+#'  for next iterations.
 #'
 #' @keywords internal
 lBF.av.glm.fit <- function(model, imputation.array, lBF, p0 = 1,
@@ -197,12 +200,12 @@ lBF.av.glm.fit <- function(model, imputation.array, lBF, p0 = 1,
   #                weights = glmnull$prior.weights,
   #                offset = glmnull$offset,
   #                control = glmnull$control)
+
   X <- imputation.array[, c(1:p0, model+p0), 1]
   fit <- fastglm::fastglmPure(y = y, x = X,
                               family = glmnull$family,
                               weights = glmnull$prior.weights,
                               offset = glmnull$offset,
-                              # control = control,
                               method = 2) #LLT Cholesky decomposition, faster
 
   lBF.aux <- numeric(n.imp)
@@ -484,8 +487,6 @@ BF.FLS.lm <- function(y, X, SS0, dmax,
 #' specify an a priori known component included in the glm fitting process.
 #' @param fitstart Optional starting values for the parameters in the linear
 #' predictor. By default, it is \code{NULL}.
-#' @param control List of parameters for controlling the glm fitting process.
-#' It is set to \code{[stats]{glm.control()}} by default.
 #'
 #' @return \code{BF.BIC.glm.fit} returns, in logarithmic scale, the BIC
 #' approximation of the Bayes factor in generalized linear models for a given
@@ -494,26 +495,18 @@ BF.FLS.lm <- function(y, X, SS0, dmax,
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' @seealso Use \code{\link[MissingBVS]{lBF.av.glm.fit}} to compute the average Bayes
 #' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
 #' an exact computation of the model posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
 #' @examplesIf interactive()
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+#' #Indian Prime Diabetes Data
 #'
-#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
-#' Xdiab$Wind[c(1, 10)] <- NA_real_
-#' f <- Outcome ~ Wind + Temp + Solar.R
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
-#'                         seed = 1, parallel = FALSE)
+#' f <- Outcome ~ Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+#' imp1 <- mice.imputation(model.frame(f, diabetes, na.action = NULL), n.imp = 1)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' glmnull <- glm(Outcome ~ 1, data = diabetes, family = binomial(), y = TRUE)
 #' lBF <- MissingBVS:::BF.BIC.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
 #'   family = binomial(), devnull = glmnull$deviance)
 #'
@@ -526,8 +519,7 @@ BF.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
                            n = length(y), k = ncol(X)-1,
                            weights = rep(1, n),
                            offset = rep(0, n),
-                           fitstart = NULL,
-                           control = glm.control()) {
+                           fitstart = NULL) {
 
   ##OLD: slow
   # fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
@@ -538,7 +530,6 @@ BF.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
                                start = fitstart,
                                weights = weights,
                                offset = offset,
-                               # control = control,
                                method = 2) #LLT Cholesky decomposition, faster
 
   lBFi0 <- (devnull - fit1$deviance - k * log(n))/2
@@ -565,8 +556,6 @@ BF.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
 #' specify an a priori known component included in the glm fitting process.
 #' @param fitstart Optional starting values for the parameters in the linear
 #' predictor. By default, it is \code{NULL}.
-#' @param control List of parameters for controlling the glm fitting process.
-#' It is set to \code{[stats]{glm.control()}} by default.
 #'
 #' @return \code{BF.TBF.glm.fit} returns, in logarithmic scale, the TBF
 #' approximation of the Bayes factor in generalized linear models for a given
@@ -575,26 +564,18 @@ BF.BIC.glm.fit <- function(y, X, family = binomial(link = "logit"),
 #' @author Carolina Mulet
 #' Maintainer: <Carolina.Mulet1@@alu.uclm.es>
 #'
-#' @seealso Use \code{\link[MissingBVS]{lBF.av}} to compute the average Bayes
+#' @seealso Use \code{\link[MissingBVS]{lBF.av.glm.fit}} to compute the average Bayes
 #' factor for missing data. Use \code{\link[MissingBVS]{missingBVS.glm}} for
 #' an exact computation of the model  posterior distribution in the VS problem
 #' (recommended when p<20).
 #'
 #' @examplesIf interactive()
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+#' #Indian Prime Diabetes Data
 #'
-#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
-#' Xdiab$Wind[c(1, 10)] <- NA_real_
-#' f <- Outcome ~ Wind + Temp + Solar.R
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
-#'                         seed = 1, parallel = FALSE)
+#' f <- Outcome ~ Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+#' imp1 <- mice.imputation(model.frame(f, diabetes, na.action = NULL), n.imp = 1)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' glmnull <- glm(Outcome ~ 1, data = diabetes, family = binomial(), y = TRUE)
 #' lTBF.method <- function (k, dev) MissingBVS:::lTBF.gfixed(g = length(glmnull$y), k, dev, devnull = 0)
 #' lBF <- MissingBVS:::BF.TBF.glm.fit(y = glmnull$y, X = imp1$imputation.array[,,1],
 #'   family = binomial(), lTBF.method = lTBF.method)
@@ -609,8 +590,7 @@ BF.TBF.glm.fit <- function(y, X, family = binomial(link = "logit"),
                            lTBF.method,
                            weights = rep(1, length(y)),
                            offset = rep(0, length(y)),
-                           fitstart = NULL,
-                           control = glm.control()) {
+                           fitstart = NULL) {
 
   # fit1 <- glm.fit(y = y, x = X, family = family, start = fitstart,
   #                 weights = weights, offset = offset, control = control)
@@ -620,7 +600,6 @@ BF.TBF.glm.fit <- function(y, X, family = binomial(link = "logit"),
                                start = fitstart,
                                weights = weights,
                                offset = offset,
-                               # control = control,
                                method = 2) #LLT Cholesky decomposition, faster
 
   lBFi0 <- lTBF.method(k = k, dev = fit1$deviance)
@@ -697,20 +676,12 @@ lTBF.hyperg <- function (k, dev, devnull) {
 #' (recommended when p<20).
 #'
 #' @examplesIf interactive()
-#' # Build a small reproducible binary-response example from airquality.
-#' data("airquality")
-#' glm_data <- airquality[complete.cases(airquality[, c("Ozone", "Wind",
-#'   "Temp", "Solar.R")]), c("Ozone", "Wind", "Temp", "Solar.R")]
-#' glm_data$Outcome <- as.integer(glm_data$Ozone > median(glm_data$Ozone))
-#' glm_data <- glm_data[, c("Outcome", "Wind", "Temp", "Solar.R")]
+#' #Indian Prime Diabetes Data
 #'
-#' Xdiab <- glm_data[, c("Wind", "Temp", "Solar.R")]
-#' Xdiab$Wind[c(1, 10)] <- NA_real_
-#' f <- Outcome ~ Wind + Temp + Solar.R
-#' imp1 <- mice.imputation(X = Xdiab, formula = f, n.imp = 1,
-#'                         seed = 1, parallel = FALSE)
+#' f <- Outcome ~ Pregnancies + Glucose + BloodPressure + SkinThickness + Insulin
+#' imp1 <- mice.imputation(model.frame(f, diabetes, na.action = NULL), n.imp = 1)
 #'
-#' glmnull <- glm(Outcome ~ 1, data = glm_data, family = binomial(), y = TRUE)
+#' glmnull <- glm(Outcome ~ 1, data = diabetes, family = binomial(), y = TRUE)
 #' lBF <- MissingBVS:::BF.gprior.glm(y = glmnull$y, X = imp1$imputation.array[,,1],
 #'   family = binomial(), logmargnull = 0) #returns the logmarginal
 #'
@@ -821,7 +792,7 @@ checkforprior.betas.lm <- function (BF.method, prior.betas, n, p, p0, y, SS0) {
 #'
 #' @keywords internal
 checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
-                                     glmnull, laplace) {
+                                     glmnull, useBAS, laplace) {
 
   if (BF.method %notin% c("BIC", "TBF", "gprior")) {
     stop("Only BF approximations 'BIC', 'TBF' and 'gprior' supported.")
@@ -831,8 +802,8 @@ checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
 
   devnull <- glmnull$deviance #deviance of the null model
 
-  #BAS logmarginal computation:
-  if (BF.method == "gprior") {
+  #BAS logmarginal computation: faster for the families available in BAS
+  if (useBAS) {
     c_glm.marg <- function() utils::getFromNamespace("C_glm_deterministic", "BAS") #to compute logmarginals
 
     switch (prior.betas,
@@ -897,7 +868,7 @@ checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
                              control = glmnull$control)}
             },
 
-            TBF = {# build the function to compute log-TBF
+            TBF = {#first build the function to compute log-TBF
               switch (prior.betas,
 
                       gZellner = {lTBF.method <- #fixed g=n
@@ -921,6 +892,51 @@ checkforprior.betas.glm <- function (BF.method, prior.betas, n, p, p0, y,
                                offset = glmnull$offset,
                                fitstart,
                                control = glmnull$control)}
+            },
+
+            gprior = {
+              switch (prior.betas,
+
+                      gZellner = {prior.betas.args <- list(type = "fixed", g = n)}, #fixed g=n
+                      Robust = {prior.betas.args <- #random g
+                        list(type = "hyper-g", a = 1, b = 2, r = 3/2, s = 0,
+                             v = function (k) (n + 1)/(k + 1), ka = 1)},
+                      Liangetal = {prior.betas.args <-
+                        list(type = "hyper-g", a = 1, b = 2, r = 0, s = 0, v = 1, ka = 1)},
+                      #random g: hyper-g/n with a=3
+                      `Zellner-Siow` = {prior.betas.args <- #adapted Z-S by trG
+                        list(type = "hyper-g", a = 1, b = 2, r = 0, s = n + 3, v = 1, ka = 1)},
+                      FLS = {prior.betas.args <- list(type = "fixed", g = max(n, p^2))},
+                      #fixed Benchmark prior: g=max(n, p*p)
+                      `intrinsic.WNC` = {prior.betas.args <- #intrinsic prior from Womack, Novelo and Casella (2014)
+                        list(type = "hyper-g", a = 1, b = 1, r = 1, s = 0,
+                             v = function (k) (n + k + 1)/(k + 1),
+                             ka = function (k) (n + k + 1)/n)},
+
+                      # IHG non-available for gprior
+                      stop("Prior.betas must be one of 'gZellner', 'Robust', 'Liangetal', 'Zellner-Siow',",
+                           "'FLS' or 'intrinsic.WNC' when using gprior method.\n")
+              )
+
+              switch(prior.betas.args$type,
+
+                     fixed = {BF.method.f <- function (k, X, fitstart) {
+                       BF.gprior.glm.fit(y = y, X, #family = glmnull$family,
+                                         glmnull, g = prior.betas.args$g,
+                                         n = n, k,
+                                         weights = glmnull$prior.weights,
+                                         offset = glmnull$offset,
+                                         fitstart)}
+                     },
+
+                     `hyper-g` = {BF.method.f <- function (k, X, fitstart) {
+                       BF.hypergprior.glm.fit(y = y, X, #family = glmnull$family,
+                                              glmnull, prior.betas.args = prior.betas.args,
+                                              n = n, k,
+                                              weights = glmnull$prior.weights,
+                                              offset = glmnull$offset,
+                                              fitstart)}
+                     })
             }
     )
   }
